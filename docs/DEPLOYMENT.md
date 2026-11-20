@@ -19,6 +19,8 @@ Mở http://localhost:3000. Không cần điền biến môi trường để dù
 3. Deploy. Bản local-first không cần biến môi trường.
 4. Mỗi máy/trình duyệt có dữ liệu riêng. Export/import JSON để chuyển máy.
 
+Để tự động kiểm tra và deploy sau mỗi push vào `master`, cấu hình GitHub Actions theo [CI_CD.md](CI_CD.md). Không nên bật đồng thời Vercel Git Integration production deployment và job deploy trong Actions vì sẽ tạo hai deployment cho cùng một commit.
+
 ## Supabase (schema chuẩn bị)
 
 - Tạo project, chạy `supabase/schema.sql` trong SQL Editor.

@@ -20,6 +20,7 @@
 - Loading/error fallback, validation import/form, keyboard interaction và format code bằng Prettier.
 - SEO metadata đầy đủ, icon SVG, Apple icon và web manifest; workspace local vẫn `noindex`.
 - Schema Supabase, hướng dẫn Vercel và tài liệu mở rộng.
+- GitHub Actions tự kiểm tra pull request và tự deploy production lên Vercel khi push vào `master`.
 
 ## Công nghệ
 
@@ -43,6 +44,7 @@ Truy cập http://localhost:3000. Không cần credentials để dùng tính nă
 ```bash
 npm run typecheck
 npm run build
+npm run format:check
 ```
 
 ## Dùng dữ liệu
@@ -53,10 +55,11 @@ Dữ liệu local gắn với trình duyệt và profile máy tính. Xóa site d
 
 ## Deploy Vercel
 
-1. Đẩy repo lên Git provider.
-2. Import project trong Vercel.
-3. Deploy bằng cấu hình Next.js mặc định.
-4. Mỗi browser có dữ liệu riêng; dùng JSON backup để chuyển máy.
+1. Đẩy repo lên GitHub và import project trong Vercel.
+2. Tạo ba GitHub Actions secrets: `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`.
+3. Push vào `master`; workflow sẽ chạy format check, typecheck, build rồi deploy production.
+4. Xem hướng dẫn chi tiết tại [docs/CI_CD.md](docs/CI_CD.md).
+5. Mỗi browser có dữ liệu riêng; dùng JSON backup để chuyển máy.
 
 ## Supabase
 
@@ -102,6 +105,7 @@ supabase/
   SECURITY.md        Giới hạn bảo mật và checklist
   DATA_FORMAT.md     JSON backup schema
   ROADMAP.md         Kế hoạch phiên bản
+  CI_CD.md           GitHub Actions và deploy Vercel
 ```
 
 ### Quy ước mở rộng
@@ -115,6 +119,7 @@ supabase/
 
 ```bash
 npm run format       # Format app, lib, docs và package.json
+npm run format:check # Kiểm tra format, dùng trong CI
 npm run typecheck    # Kiểm tra TypeScript
 npm run build        # Build production
 ```

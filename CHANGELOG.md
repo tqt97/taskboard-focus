@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.2 - 2026-11-20
+
+- Thêm GitHub Actions chạy format check, typecheck và production build.
+- Tự deploy Vercel production sau mỗi push vào `master` khi CI pass.
+- Thêm tài liệu cấu hình Vercel secrets, project linking, troubleshooting và bảo vệ production.
+
 ## 0.1.1 — 2026-11-20
 
 - Tổ chức lại UI theo `app/_components/layout` và `app/_components/workspace`; giữ nguyên route `/` và `/tasks`.
