@@ -5,10 +5,12 @@
 - Dashboard, CRUD, lọc/tìm, drag ordering, members, confirm dialogs.
 - JSON backup/restore, dark mode, responsive, deadline overview.
 - Supabase schema và hướng dẫn tích hợp.
+- Focus view, quick capture, saved views, bulk update, undo, dependency, workload và activity history đã bắt đầu đi vào local-first workflow.
 
 ## v0.2 — Đồng bộ có xác thực
 
-- Supabase Auth, private RLS, remote repository adapter.
+- Supabase Auth, private RLS và single-account `owner_id` contract.
+- Remote repository adapter, trạng thái đồng bộ và lỗi/retry.
 - Trạng thái đồng bộ, lỗi/retry, concurrency policy.
 
 ## v0.3 — Notification

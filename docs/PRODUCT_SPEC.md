@@ -21,6 +21,8 @@ Một workspace cá nhân giúp ghi task nhanh, nhìn tình hình chung và khô
 6. Export/import JSON versioned; import thay thế workspace hiện tại.
 7. Dark mode, giao diện tiếng Việt, layout responsive.
 8. Reminder trực quan theo mốc trong 7 ngày và đánh dấu quá hạn.
+9. Focus view, quick capture bằng phím tắt, bulk update và task có bước tiếp theo.
+10. Lưu activity history tối giản cho các thay đổi quan trọng của task.
 
 ## Sau MVP
 
@@ -37,3 +39,10 @@ Một workspace cá nhân giúp ghi task nhanh, nhìn tình hình chung và khô
 - Backup JSON export ra hợp lệ; import kiểm tra schema version và cấu trúc.
 - UI dùng được ở viewport 375px trở lên, dialog không tràn viewport.
 - Không có secret trong mã frontend hoặc file export.
+
+## Nguyên tắc hiệu quả cá nhân
+
+- Tạo task mới không quá một thao tác chính (`N` hoặc nút tạo task).
+- Focus view chỉ giữ task đang mở, urgent/high, đang review, chưa giao hoặc gần/quá hạn.
+- Bulk action phải hiển thị số task được chọn và reset selection sau khi hoàn tất.
+- Activity history chỉ giữ các thay đổi gần nhất để không làm phình localStorage.

@@ -9,6 +9,7 @@
 - `lib/data.ts` giữ demo seed và adapter localStorage.
 - `lib/types.ts` là hợp đồng dữ liệu.
 - `supabase/schema.sql` là schema mục tiêu cho database.
+- Workflow local-first hiện có seam cho Focus view, saved views, bulk update, undo snapshot và activity/next-action; các field mới vẫn optional để tương thích dữ liệu v1.
 
 ## Quy ước mở rộng UI
 
@@ -28,12 +29,12 @@ flowchart LR
  Validate --> State
 ```
 
-MVP hiện tại là local-first. Mỗi trình duyệt/máy có vùng lưu riêng. Export/import là cách di chuyển dữ liệu. Supabase package và schema được chuẩn bị, nhưng adapter CRUD chưa nối vào giao diện. Không được xem cấu hình public anon key cùng RLS mở là bảo mật.
+MVP hiện tại là local-first. Mỗi trình duyệt/máy có vùng lưu riêng. Export/import là cách di chuyển dữ liệu. Supabase schema đã có contract single-account với `owner_id = auth.uid()` và RLS; adapter CRUD chưa nối vào giao diện. Local mode không cần credentials.
 
 ## Mô hình dữ liệu
 
 - `members`: id, name, role, color, active.
-- `tasks`: id, code, title, description, status, priority, severity, legacy `assignee_id`, dev_up, staging_up, release_at, deadline, order_index, links, timestamps.
+- `tasks`: id, code, title, description, status, priority, severity, next action, review note, dependency IDs, activity summary, primary/secondary links, legacy `assignee_id`, dev_up, staging_up, release_at, deadline, order_index, links, timestamps.
 - `task_assignees`: bảng nối nhiều-nhiều giữa task và member; đây là nguồn quan hệ assignment chuẩn cho task có một hoặc nhiều người phụ trách.
 - `BoardData` also stores `code_prefix` and `sort_mode`; manual drag order therefore survives refresh and JSON import/export.
 - Priority diễn đạt thứ tự xử lý. Severity biểu thị mức ảnh hưởng/rủi ro. Hai thuộc tính không thay thế nhau.
@@ -44,10 +45,10 @@ Ngày do người dùng nhập là ngày lịch; hiện MVP chuyển thành UTC 
 
 ## Mở rộng Supabase
 
-1. Thêm Auth (một user hoặc allowlist) và session server-side.
-2. Bật RLS, giới hạn mọi hàng theo owner_id/workspace_id.
+1. Bật Supabase Auth cho account deploy duy nhất và session server-side.
+2. Chạy schema, kiểm tra RLS bằng request authenticated và anonymous.
 3. Tạo `lib/repositories/task-repository.ts` với adapter local và Supabase.
-4. Thêm migration cho owner_id, file metadata, notification settings.
+4. Thêm migration cho owner_id, domain fields mới, file metadata, notification settings.
 5. Xử lý optimistic update và lỗi đồng bộ; không báo “đã lưu” nếu remote write thất bại.
 6. Với uploads, Storage policy phải cùng quyền truy cập bảng task.
 

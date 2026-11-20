@@ -13,6 +13,9 @@
 - Trạng thái, thứ tự ưu tiên, độ nghiêm trọng, thành viên phụ trách.
 - Mốc Dev up, Staging up, Release và Deadline; nhắc trực quan task gần/quá hạn.
 - Tìm kiếm, lọc trạng thái/ưu tiên, kéo thả đổi thứ tự.
+- Focus view cho task cần xử lý, phím tắt `N` tạo task và `Ctrl/Cmd + K` focus tìm kiếm.
+- Chọn nhiều task để đổi trạng thái hoặc ưu tiên cùng lúc.
+- Bước tiếp theo, ghi chú review và activity history tối giản trên từng task.
 - Chỉnh sửa danh sách thành viên qua UI.
 - Dark mode, giao diện responsive.
 - Export/import backup JSON schema v1.
@@ -43,8 +46,11 @@ Truy cập http://localhost:3000. Không cần credentials để dùng tính nă
 
 ```bash
 npm run typecheck
+npm run test
 npm run build
 npm run format:check
+# hoặc chạy toàn bộ check liên tiếp
+npm run check
 ```
 
 ## Dùng dữ liệu
@@ -63,19 +69,21 @@ Dữ liệu local gắn với trình duyệt và profile máy tính. Xóa site d
 
 ## Supabase
 
-`supabase/schema.sql` tạo bảng `members`, `tasks`, index và bật RLS. Script không tạo policy anon. Giao diện chưa nối CRUD Supabase. Trước khi thêm đồng bộ:
+`supabase/schema.sql` tạo bảng `members`, `tasks`, index, owner contract và RLS cho single-account deploy. Giao diện local chưa nối CRUD Supabase. Trước khi bật remote sync:
 
 1. Cấu hình Supabase Auth.
-2. Thêm `owner_id` hoặc `workspace_id` và RLS kiểm tra quyền sở hữu.
+2. Dùng `owner_id = auth.uid()` và kiểm tra RLS bằng cả request authenticated/anonymous.
 3. Viết repository adapter và xử lý lỗi đồng bộ.
 4. Chỉ dùng anon key ở client khi policies đã được kiểm chứng; không đưa service role key vào frontend.
 
 Xem [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 ## Chatwork, Gmail và tệp đính kèm
+
 Chatwork đã có nút gửi thông báo test qua server route; reminder định kỳ vẫn chưa bật vì task MVP chỉ nằm trong localStorage. Gmail và upload attachment chưa triển khai. Token phải nằm ở server secrets, notification định kỳ cần scheduler và chống gửi trùng. Xem [docs/NOTIFICATIONS.md](docs/NOTIFICATIONS.md) và [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Màn hình khóa
+
 Lock screen trong MVP chỉ là giao diện tiện ích, không phải xác thực. Mọi giá trị `NEXT_PUBLIC_*` đều có thể đọc trong bundle frontend. Không dùng passcode client để bảo vệ dữ liệu cá nhân trên ứng dụng public.
 
 ## Cấu trúc
@@ -122,6 +130,7 @@ supabase/
 npm run format       # Format app, lib, docs và package.json
 npm run format:check # Kiểm tra format, dùng trong CI
 npm run typecheck    # Kiểm tra TypeScript
+npm run test         # Chạy regression và edge-case tests
 npm run build        # Build production
 ```
 

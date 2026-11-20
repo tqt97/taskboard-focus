@@ -11,7 +11,12 @@
 
 - Tìm theo mã, tiêu đề, mô tả.
 - Lọc trạng thái và ưu tiên độc lập.
+- Lọc thêm theo người phụ trách, task chưa giao và deadline quá hạn/hôm nay/7 ngày tới.
 - Kéo thẻ task để thay đổi thứ tự hiển thị. Thứ tự này không tự đổi priority.
+- Nhấn `N` để tạo task nhanh; nhấn `Ctrl/Cmd + K` để focus ô tìm kiếm.
+- Chọn **Focus** để chỉ xem task urgent/high, đang review, chưa giao hoặc gần/quá hạn.
+- Bấm **Chọn nhiều** rồi tick các task để dùng bulk action chuyển sang **Đang làm** hoặc đặt **Ưu tiên cao**; tắt chế độ này để giao diện gọn hơn.
+- Trên màn hình hẹp, assignee/deadline nằm trong **Bộ lọc nâng cao**. Mã task dùng monospace và có nút copy để dán vào ô tìm kiếm.
 
 ## Thành viên
 

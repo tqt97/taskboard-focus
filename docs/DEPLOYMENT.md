@@ -12,6 +12,8 @@ npm run dev
 
 Mở http://localhost:3000. Không cần điền biến môi trường để dùng localStorage.
 
+`NEXT_PUBLIC_APP_URL` nếu có phải là URL đầy đủ, ví dụ `https://taskboard.example.com`. Nếu biến bị bỏ trống hoặc sai định dạng, app tự dùng fallback local để không làm hỏng build metadata.
+
 ## Vercel
 
 1. Đưa repo lên GitHub/GitLab.
@@ -24,8 +26,9 @@ Mở http://localhost:3000. Không cần điền biến môi trường để dù
 ## Supabase (schema chuẩn bị)
 
 - Tạo project, chạy `supabase/schema.sql` trong SQL Editor.
-- Schema bật RLS nhưng cố ý không tạo quyền anon. Giao diện hiện tại chưa đồng bộ CRUD với Supabase.
-- Trước khi bật adapter: cấu hình Supabase Auth, tạo policies riêng tư, kiểm tra owner isolation rồi mới đưa keys vào Vercel.
+- Schema bật RLS theo `auth.uid()` cho account deploy duy nhất và không cấp quyền anon. Giao diện local hiện chưa đồng bộ CRUD với Supabase.
+- Schema hiện phù hợp cho project mới; nếu project Supabase đã có bảng từ trước, phải tạo migration riêng để backfill `owner_id` trước khi đặt `not null`, không chạy mù `create table if not exists` trên dữ liệu production.
+- Trước khi bật adapter: cấu hình Supabase Auth, chạy schema, kiểm tra owner isolation bằng request authenticated/anonymous rồi mới đưa keys vào Vercel.
 - Không dùng service role key trong `NEXT_PUBLIC_*`.
 
 ## Chatwork/Gmail

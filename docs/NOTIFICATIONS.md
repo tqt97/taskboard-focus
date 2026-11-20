@@ -33,7 +33,7 @@ Room ID hiện được nhập từ UI để hỗ trợ test nhưng phải khớ
 
 Chưa bật gửi tự động định kỳ trong MVP. Lý do là task hiện chỉ nằm trong localStorage nên server/Cron không thể đọc workspace của trình duyệt. Muốn bật production reminder cần:
 
-1. Đồng bộ task vào Supabase hoặc repository server-side có `owner_id/workspace_id`.
+1. Đồng bộ task vào Supabase hoặc repository server-side có `owner_id` theo account.
 2. Tạo bảng notification delivery log với idempotency key dạng `task_id + milestone + local_date + channel`.
 3. Tạo Vercel Cron hoặc worker gọi server route/service.
 4. Gửi theo lead time, timezone và quiet hours của workspace.

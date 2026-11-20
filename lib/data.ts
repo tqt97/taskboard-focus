@@ -117,11 +117,26 @@ const isBoundedString = (value: unknown, max: number): value is string =>
   typeof value === "string" && value.length <= max;
 const isDateValue = (value: unknown) =>
   typeof value === "string" && (!value || Number.isFinite(new Date(value).getTime()));
+const isRequiredDateValue = (value: unknown) =>
+  typeof value === "string" &&
+  Boolean(value) &&
+  Number.isFinite(new Date(value).getTime());
 const isLink = (value: unknown): value is { label: string; url: string } =>
   isRecord(value) &&
   isBoundedString(value.label, maxLengths.linkLabel) &&
+  Boolean(value.label.trim()) &&
   isBoundedString(value.url, maxLengths.url) &&
   /^https?:\/\//i.test(value.url.trim());
+const isActivity = (value: unknown) =>
+  isRecord(value) &&
+  isBoundedString(value.id, maxLengths.id) &&
+  Boolean(value.id.trim()) &&
+  ["created", "updated", "status_changed", "priority_changed", "assigned"].includes(
+    String(value.type),
+  ) &&
+  isRequiredDateValue(value.at) &&
+  isBoundedString(value.summary, 500) &&
+  Boolean(value.summary.trim());
 
 const isMember = (value: unknown): value is Member =>
   isRecord(value) &&
@@ -138,6 +153,7 @@ const isTask = (value: unknown): value is Task =>
   isBoundedString(value.id, maxLengths.id) &&
   Boolean(value.id.trim()) &&
   isBoundedString(value.title, maxLengths.title) &&
+  Boolean(value.title.trim()) &&
   isBoundedString(value.code, maxLengths.code) &&
   isBoundedString(value.description, maxLengths.description) &&
   typeof value.status === "string" &&
@@ -175,9 +191,21 @@ const isTask = (value: unknown): value is Task =>
   isDateValue(value.staging_up) &&
   isDateValue(value.release_at) &&
   isDateValue(value.deadline) &&
-  isDateValue(value.created_at) &&
-  isDateValue(value.updated_at) &&
-  (value.custom_code === undefined || typeof value.custom_code === "boolean");
+  isRequiredDateValue(value.created_at) &&
+  isRequiredDateValue(value.updated_at) &&
+  (value.custom_code === undefined || typeof value.custom_code === "boolean") &&
+  (value.next_action === undefined || isBoundedString(value.next_action, 1000)) &&
+  (value.review_note === undefined || isBoundedString(value.review_note, 2000)) &&
+  (value.blocked_by === undefined ||
+    (Array.isArray(value.blocked_by) &&
+      value.blocked_by.length <= 100 &&
+      value.blocked_by.every(
+        (id) => isBoundedString(id, maxLengths.id) && Boolean(id.trim()),
+      ))) &&
+  (value.activity === undefined ||
+    (Array.isArray(value.activity) &&
+      value.activity.length <= 200 &&
+      value.activity.every(isActivity)));
 
 type ParseBoardResult = { data: BoardData | null; error?: string };
 
@@ -210,11 +238,42 @@ export function parseBoardDataWithError(value: unknown): ParseBoardResult {
     return { data: null, error: "Backup có ID task bị trùng." };
   }
   if (
-    tasks.some((task) =>
-      (task.assignee_ids || []).some((memberId) => !memberIds.has(memberId)),
+    tasks.some(
+      (task) =>
+        (task.assignee_ids || []).some((memberId) => !memberIds.has(memberId)) ||
+        (task.assignee_id && !memberIds.has(task.assignee_id)),
     )
   ) {
     return { data: null, error: "Backup có task gán cho thành viên không tồn tại." };
+  }
+  const taskIds = new Set(tasks.map((task) => task.id));
+  if (
+    tasks.some((task) =>
+      (task.blocked_by || []).some(
+        (dependencyId) => dependencyId === task.id || !taskIds.has(dependencyId),
+      ),
+    )
+  ) {
+    return {
+      data: null,
+      error: "Backup có dependency trỏ tới task không tồn tại hoặc tự phụ thuộc.",
+    };
+  }
+  const visiting = new Set<string>();
+  const visited = new Set<string>();
+  const taskById = new Map(tasks.map((task) => [task.id, task]));
+  const hasDependencyCycle = (taskId: string): boolean => {
+    if (visiting.has(taskId)) return true;
+    if (visited.has(taskId)) return false;
+    visiting.add(taskId);
+    const task = taskById.get(taskId);
+    if (task && (task.blocked_by || []).some(hasDependencyCycle)) return true;
+    visiting.delete(taskId);
+    visited.add(taskId);
+    return false;
+  };
+  if (tasks.some((task) => hasDependencyCycle(task.id))) {
+    return { data: null, error: "Backup có vòng lặp giữa các task phụ thuộc nhau." };
   }
   const normalizedTasks = tasks.map((task) => {
     const assigneeIds = task.assignee_ids?.length

@@ -6,9 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "test": "node --experimental-default-type=module --test tests/*.test.mts",
     "typecheck": "tsc --noEmit",
-    "format": "prettier --write app lib docs package.json",
-    "format:check": "prettier --check app lib docs package.json"
+    "format": "prettier --write app lib docs tests package.json",
+    "format:check": "prettier --check app lib docs tests package.json",
+    "check": "npm run typecheck && npm run test && npm run format:check && npm run build"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.56.0",

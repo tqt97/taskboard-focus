@@ -33,6 +33,7 @@ const legacyLinks = (task: Task): TaskLink[] =>
 
 export function TaskModal({
   task,
+  tasks,
   prefix,
   members,
   isNew,
@@ -42,6 +43,7 @@ export function TaskModal({
   onPrefixChange,
 }: {
   task: Task;
+  tasks: Task[];
   prefix: string;
   members: Member[];
   isNew: boolean;
@@ -89,6 +91,8 @@ export function TaskModal({
     const links = [...primary, ...secondary].filter((link) => link.url.trim());
     const title = form.title.trim();
     const description = form.description.trim();
+    const nextAction = form.next_action?.trim() || "";
+    const reviewNote = form.review_note?.trim() || "";
     const normalizedPrefix = localPrefix.trim();
     if (!title) {
       setError("Vui lòng nhập tên task.");
@@ -102,6 +106,14 @@ export function TaskModal({
       setError("Mô tả không được vượt quá 10.000 ký tự.");
       return;
     }
+    if (nextAction.length > 1000) {
+      setError("Bước tiếp theo không được vượt quá 1.000 ký tự.");
+      return;
+    }
+    if (reviewNote.length > 2000) {
+      setError("Ghi chú review không được vượt quá 2.000 ký tự.");
+      return;
+    }
     if (usePrefix && !normalizedPrefix) {
       setError("Vui lòng nhập prefix hoặc bỏ chọn Dùng prefix.");
       return;
@@ -112,6 +124,23 @@ export function TaskModal({
     }
     if (form.code.trim().length > 100) {
       setError("Mã task không được vượt quá 100 ký tự.");
+      return;
+    }
+    const dependencies = form.blocked_by || [];
+    const dependencyGraph = new Map(
+      tasks.map((candidate) => [candidate.id, candidate.blocked_by || []]),
+    );
+    dependencyGraph.set(form.id, dependencies);
+    const reachesCurrent = (id: string, visited = new Set<string>()): boolean => {
+      if (id === form.id) return true;
+      if (visited.has(id)) return false;
+      visited.add(id);
+      return (dependencyGraph.get(id) || []).some((dependency) =>
+        reachesCurrent(dependency, visited),
+      );
+    };
+    if (dependencies.some((dependency) => reachesCurrent(dependency))) {
+      setError("Không thể tạo vòng lặp giữa các task phụ thuộc nhau.");
       return;
     }
     if (links.some((link) => link.label.trim().length > 120)) {
@@ -138,6 +167,8 @@ export function TaskModal({
       ...form,
       title,
       description,
+      next_action: nextAction,
+      review_note: reviewNote,
       code: finalCode,
       custom_code: !usePrefix,
       primary_links: normalizeLinks(primary),
@@ -350,6 +381,72 @@ export function TaskModal({
                 placeholder="Bối cảnh, yêu cầu, lưu ý..."
               />
             </label>
+            <label className="field full">
+              <span>Bước tiếp theo</span>
+              <input
+                value={form.next_action || ""}
+                onChange={(e) => field("next_action", e.target.value)}
+                placeholder="Ví dụ: Chờ QA xác nhận luồng thanh toán"
+              />
+            </label>
+            <label className="field full">
+              <span>Ghi chú review / vướng mắc</span>
+              <textarea
+                rows={3}
+                value={form.review_note || ""}
+                onChange={(e) => field("review_note", e.target.value)}
+                placeholder="Điều cần kiểm tra, phản hồi hoặc lý do đang review..."
+              />
+            </label>
+            <label className="field full">
+              <span>Phụ thuộc task khác</span>
+              <select
+                multiple
+                value={form.blocked_by || []}
+                onChange={(e) =>
+                  field(
+                    "blocked_by",
+                    Array.from(e.target.selectedOptions, (option) => option.value),
+                  )
+                }
+              >
+                {tasks
+                  .filter((candidate) => candidate.id !== form.id)
+                  .map((candidate) => (
+                    <option key={candidate.id} value={candidate.id}>
+                      {candidate.code || "TASK"} · {candidate.title}
+                    </option>
+                  ))}
+              </select>
+            </label>
+            {form.activity?.length ? (
+              <div className="task-activity full">
+                <div className="link-section-heading">
+                  <span>
+                    <b>Lịch sử thay đổi</b>
+                    <small>Những cập nhật gần nhất của task</small>
+                  </span>
+                </div>
+                <div className="task-activity-list">
+                  {form.activity
+                    .slice(-5)
+                    .reverse()
+                    .map((item) => (
+                      <div className="task-activity-row" key={item.id}>
+                        <span>{item.summary}</span>
+                        <small>
+                          {new Intl.DateTimeFormat("vi-VN", {
+                            day: "2-digit",
+                            month: "2-digit",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          }).format(new Date(item.at))}
+                        </small>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            ) : null}
             <div className="link-section full">
               <div className="link-section-heading">
                 <span>

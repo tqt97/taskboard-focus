@@ -13,6 +13,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock3,
+  Copy,
   Download,
   FileUp,
   Filter,
@@ -44,9 +45,11 @@ import type {
   Member,
   Priority,
   Severity,
+  SavedView,
   SortMode,
   Status,
   Task,
+  TaskActivity,
 } from "@/lib/types";
 import { TaskModal as StructuredTaskModal } from "./TaskModal";
 import { NotificationPopover, type BoardNotification } from "./NotificationPopover";
@@ -95,6 +98,8 @@ const defaultReminderSettings: ReminderSettings = {
 };
 const reminderSettingsKey = "taskboard-reminder-settings-v1";
 const browserReminderKey = "taskboard-browser-reminders-v1";
+const savedViewsKey = "taskboard-saved-views-v1";
+const wideWorkspaceBreakpoint = 1440;
 const allowedLeadDays = [0, 1, 3, 7];
 const safeSetLocalStorage = (key: string, value: string) => {
   try {
@@ -219,6 +224,8 @@ export default function Board() {
     [search, setSearch] = useState(""),
     [statusFilter, setStatusFilter] = useState("all"),
     [priorityFilter, setPriorityFilter] = useState("all"),
+    [assigneeFilter, setAssigneeFilter] = useState("all"),
+    [dueFilter, setDueFilter] = useState("all"),
     [modal, setModal] = useState<"task" | "settings" | "lock" | null>(null),
     [edit, setEdit] = useState<Task | null>(null),
     [confirm, setConfirm] = useState<string | null>(null),
@@ -228,8 +235,17 @@ export default function Board() {
     [dragId, setDragId] = useState<string | null>(null),
     [clock, setClock] = useState(""),
     [sortMode, setSortMode] = useState<SortMode>("smart"),
+    [focusMode, setFocusMode] = useState(false),
+    [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]),
+    [selectionMode, setSelectionMode] = useState(false),
+    [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false),
+    [savedViews, setSavedViews] = useState<SavedView[]>([]),
+    [undoState, setUndoState] = useState<{ data: BoardData; message: string } | null>(
+      null,
+    ),
     [notificationsOpen, setNotificationsOpen] = useState(false),
     notificationRef = useRef<HTMLDivElement>(null),
+    searchRef = useRef<HTMLInputElement>(null),
     [readNotificationIds, setReadNotificationIds] = useState<string[]>([]),
     [reminderSettings, setReminderSettings] = useState<ReminderSettings>(
       defaultReminderSettings,
@@ -244,6 +260,7 @@ export default function Board() {
     const saved = initial();
     setData(saved);
     setSortMode(saved.sort_mode || "smart");
+    setAdvancedFiltersOpen(window.innerWidth > wideWorkspaceBreakpoint);
     setReady(true);
     let storedDark = false;
     try {
@@ -252,6 +269,25 @@ export default function Board() {
     setDark(storedDark);
     setDisplayName(readDisplayName());
     setReminderSettings(readReminderSettings());
+    try {
+      const storedViews = JSON.parse(localStorage.getItem(savedViewsKey) || "[]");
+      setSavedViews(
+        Array.isArray(storedViews)
+          ? storedViews.filter(
+              (view): view is SavedView =>
+                view &&
+                typeof view.id === "string" &&
+                typeof view.name === "string" &&
+                typeof view.search === "string" &&
+                typeof view.status === "string" &&
+                typeof view.priority === "string" &&
+                typeof view.assignee === "string" &&
+                typeof view.due === "string" &&
+                typeof view.focus === "boolean",
+            )
+          : [],
+      );
+    } catch {}
     if ("Notification" in window) setBrowserPermission(Notification.permission);
     else setBrowserPermission("unsupported");
     const syncDisplayName = () => setDisplayName(readDisplayName());
@@ -301,6 +337,11 @@ export default function Board() {
     return () => clearTimeout(t);
   }, [toast]);
   useEffect(() => {
+    if (!undoState) return;
+    const timer = setTimeout(() => setUndoState(null), 10000);
+    return () => clearTimeout(timer);
+  }, [undoState]);
+  useEffect(() => {
     if (!modal) return;
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -310,6 +351,28 @@ export default function Board() {
     };
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [modal]);
+  useEffect(() => {
+    const handleShortcut = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const typing =
+        target?.tagName === "INPUT" ||
+        target?.tagName === "TEXTAREA" ||
+        target?.tagName === "SELECT" ||
+        target?.isContentEditable;
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        searchRef.current?.focus();
+        return;
+      }
+      if (!typing && !modal && event.key.toLowerCase() === "n") {
+        event.preventDefault();
+        setEdit(null);
+        setModal("task");
+      }
+    };
+    window.addEventListener("keydown", handleShortcut);
+    return () => window.removeEventListener("keydown", handleShortcut);
   }, [modal]);
   useEffect(() => {
     if (!notificationsOpen) return;
@@ -345,6 +408,7 @@ export default function Board() {
           ),
     [ordered, sortMode],
   );
+  const nowMs = now.getTime();
   const deferredSearch = useDeferredValue(search);
   const filtered = useMemo(
     () =>
@@ -352,17 +416,50 @@ export default function Board() {
         (t) =>
           (statusFilter === "all" || t.status === statusFilter) &&
           (priorityFilter === "all" || t.priority === priorityFilter) &&
+          (assigneeFilter === "all" ||
+            (assigneeFilter === "__unassigned"
+              ? !taskAssigneeIds(t).length
+              : taskAssigneeIds(t).includes(assigneeFilter))) &&
+          (dueFilter === "all" ||
+            (dueFilter === "overdue" && dueState(t.deadline) === "overdue") ||
+            (dueFilter === "today" && dueText(t.deadline) === "Hôm nay") ||
+            (dueFilter === "week" &&
+              Boolean(t.deadline) &&
+              new Date(t.deadline).getTime() - nowMs >= 0 &&
+              new Date(t.deadline).getTime() - nowMs <= 7 * 86400000)) &&
           `${t.code} ${t.title} ${t.description}`
             .toLowerCase()
             .includes(deferredSearch.toLowerCase()),
       ),
-    [sorted, statusFilter, priorityFilter, deferredSearch],
+    [
+      sorted,
+      statusFilter,
+      priorityFilter,
+      assigneeFilter,
+      dueFilter,
+      deferredSearch,
+      nowMs,
+    ],
+  );
+  const visibleTasks = useMemo(
+    () =>
+      focusMode
+        ? filtered.filter(
+            (task) =>
+              task.status !== "done" &&
+              (task.priority === "urgent" ||
+                task.priority === "high" ||
+                task.status === "blocked" ||
+                !taskAssigneeIds(task).length ||
+                Boolean(dueState(task.deadline))),
+          )
+        : filtered,
+    [filtered, focusMode],
   );
   const active = useMemo(
     () => data.tasks.filter((t) => t.status !== "done"),
     [data.tasks],
   );
-  const nowMs = now.getTime();
   const isInReminderWindow = (date: string, label: ReminderLabel) => {
     const diff = new Date(date).getTime() - nowMs;
     return diff >= -86400000 && diff <= reminderSettings.leadDays[label] * 86400000;
@@ -448,6 +545,93 @@ export default function Board() {
       setToast("Không thể lưu cài đặt; hãy kiểm tra quyền lưu của trình duyệt.");
     }
   };
+  const toggleTaskSelection = (id: string) => {
+    setSelectedTaskIds((ids) =>
+      ids.includes(id) ? ids.filter((item) => item !== id) : [...ids, id],
+    );
+  };
+  const toggleSelectionMode = () => {
+    setSelectionMode((enabled) => {
+      if (enabled) setSelectedTaskIds([]);
+      return !enabled;
+    });
+  };
+  const copyTaskCode = async (code: string) => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setToast(`Đã copy mã ${code}`);
+    } catch {
+      setToast("Không thể copy mã task; hãy thử lại trên HTTPS.");
+    }
+  };
+  const saveCurrentView = () => {
+    const name = window.prompt("Tên view cần lưu", focusMode ? "Focus" : "Kanban");
+    if (!name?.trim()) return;
+    const view: SavedView = {
+      id: crypto.randomUUID(),
+      name: name.trim().slice(0, 80),
+      search,
+      status: statusFilter,
+      priority: priorityFilter,
+      assignee: assigneeFilter,
+      due: dueFilter,
+      focus: focusMode,
+    };
+    const nextViews = [...savedViews, view].slice(-12);
+    setSavedViews(nextViews);
+    if (!safeSetLocalStorage(savedViewsKey, JSON.stringify(nextViews))) {
+      setToast("Không thể lưu view; hãy kiểm tra quyền lưu của trình duyệt.");
+    } else {
+      setToast(`Đã lưu view “${view.name}”`);
+    }
+  };
+  const applySavedView = (id: string) => {
+    const view = savedViews.find((item) => item.id === id);
+    if (!view) return;
+    setSearch(view.search);
+    setStatusFilter(view.status);
+    setPriorityFilter(view.priority);
+    setAssigneeFilter(view.assignee);
+    setDueFilter(view.due);
+    setFocusMode(view.focus);
+    setAdvancedFiltersOpen(view.assignee !== "all" || view.due !== "all");
+  };
+  const rememberUndo = (message: string) => setUndoState({ data, message });
+  const undoLast = () => {
+    if (!undoState) return;
+    setData(undoState.data);
+    setUndoState(null);
+    setToast(`Đã hoàn tác: ${undoState.message}`);
+  };
+  const bulkUpdateTasks = (patch: Partial<Task>, message: string) => {
+    if (!selectedTaskIds.length) return;
+    rememberUndo(message);
+    const selected = new Set(selectedTaskIds);
+    const timestamp = new Date().toISOString();
+    setData((d) => ({
+      ...d,
+      tasks: d.tasks.map((task) =>
+        selected.has(task.id)
+          ? {
+              ...task,
+              ...patch,
+              updated_at: timestamp,
+              activity: [
+                ...(task.activity || []),
+                {
+                  id: crypto.randomUUID(),
+                  type: "updated" as const,
+                  at: timestamp,
+                  summary: message,
+                },
+              ].slice(-200),
+            }
+          : task,
+      ),
+    }));
+    setSelectedTaskIds([]);
+    setToast(message);
+  };
   const requestBrowserNotifications = async () => {
     if (!("Notification" in window)) {
       setToast("Trình duyệt này không hỗ trợ thông báo.");
@@ -517,22 +701,74 @@ export default function Board() {
         .slice(0, 4),
     [active],
   );
+  const workload = useMemo(
+    () =>
+      data.members
+        .map((member) => {
+          const tasks = active.filter((task) =>
+            taskAssigneeIds(task).includes(member.id),
+          );
+          return {
+            member,
+            total: tasks.length,
+            urgent: tasks.filter((task) => task.priority === "urgent").length,
+            overdue: tasks.filter(
+              (task) => task.deadline && new Date(task.deadline).getTime() < nowMs,
+            ).length,
+          };
+        })
+        .filter((item) => item.total > 0)
+        .sort((a, b) => b.total - a.total || b.overdue - a.overdue),
+    [active, data.members, nowMs],
+  );
   const saveTask = (task: Task) => {
-    setData((d) => ({
-      ...d,
-      code_prefix: d.code_prefix || "MENSQZIN-",
-      sort_mode: d.sort_mode || sortMode,
-      tasks: edit
-        ? d.tasks.map((t) =>
-            t.id === task.id ? { ...task, updated_at: new Date().toISOString() } : t,
-          )
-        : [{ ...task, order_index: d.tasks.length }, ...d.tasks],
-    }));
+    rememberUndo(edit ? "cập nhật task" : "tạo task");
+    const timestamp = new Date().toISOString();
+    setData((d) => {
+      const previous = edit ? d.tasks.find((item) => item.id === task.id) : undefined;
+      const activityType: TaskActivity["type"] = !previous
+        ? "created"
+        : previous.status !== task.status
+          ? "status_changed"
+          : previous.priority !== task.priority
+            ? "priority_changed"
+            : previous.assignee_ids?.join(",") !== task.assignee_ids?.join(",")
+              ? "assigned"
+              : "updated";
+      const activity: TaskActivity = {
+        id: crypto.randomUUID(),
+        type: activityType,
+        at: timestamp,
+        summary: !previous
+          ? "Đã tạo task"
+          : activityType === "status_changed"
+            ? `Đổi trạng thái thành ${labels[task.status]}`
+            : activityType === "priority_changed"
+              ? `Đổi ưu tiên thành ${priorityLabels[task.priority]}`
+              : activityType === "assigned"
+                ? "Cập nhật người phụ trách"
+                : "Cập nhật thông tin task",
+      };
+      const nextTask = {
+        ...task,
+        updated_at: timestamp,
+        activity: [...(task.activity || []), activity].slice(-200),
+      };
+      return {
+        ...d,
+        code_prefix: d.code_prefix || "MENSQZIN-",
+        sort_mode: d.sort_mode || sortMode,
+        tasks: edit
+          ? d.tasks.map((item) => (item.id === task.id ? nextTask : item))
+          : [{ ...nextTask, order_index: d.tasks.length }, ...d.tasks],
+      };
+    });
     setModal(null);
     setEdit(null);
     setToast(edit ? "Đã cập nhật task" : "Đã tạo task");
   };
   const removeTask = (id: string) => {
+    rememberUndo("xóa task");
     setData((d) => ({ ...d, tasks: d.tasks.filter((t) => t.id !== id) }));
     setConfirm(null);
     setModal(null);
@@ -540,6 +776,7 @@ export default function Board() {
   };
   const reorder = (target: string) => {
     if (!dragId || dragId === target) return;
+    rememberUndo("đổi thứ tự task");
     const list = [...ordered],
       from = list.findIndex((t) => t.id === dragId),
       to = list.findIndex((t) => t.id === target);
@@ -556,11 +793,29 @@ export default function Board() {
   };
   const dropOnStatus = (status: Status, target?: string) => {
     if (!dragId) return;
+    rememberUndo(status === "done" ? "hoàn tất task" : "chuyển trạng thái task");
     const list = [...ordered],
       from = list.findIndex((t) => t.id === dragId);
     if (from < 0) return;
     const [item] = list.splice(from, 1);
-    const moved = { ...item, status, updated_at: new Date().toISOString() };
+    const timestamp = new Date().toISOString();
+    const moved = {
+      ...item,
+      status,
+      updated_at: timestamp,
+      activity:
+        status === item.status
+          ? item.activity
+          : [
+              ...(item.activity || []),
+              {
+                id: crypto.randomUUID(),
+                type: "status_changed" as const,
+                at: timestamp,
+                summary: `Đổi trạng thái thành ${labels[status]}`,
+              },
+            ].slice(-200),
+    };
     let insertAt = target ? list.findIndex((t) => t.id === target) : -1;
     if (insertAt < 0) {
       const same = list
@@ -657,23 +912,53 @@ export default function Board() {
         dropTask(t);
       }}
       onClick={() => {
+        if (selectionMode) {
+          toggleTaskSelection(t.id);
+          return;
+        }
         setEdit(t);
         setModal("task");
       }}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
+          if (selectionMode) {
+            toggleTaskSelection(t.id);
+            return;
+          }
           setEdit(t);
           setModal("task");
         }
       }}
     >
       <div className="task-top">
+        {selectionMode && (
+          <input
+            className="task-select"
+            type="checkbox"
+            checked={selectedTaskIds.includes(t.id)}
+            aria-label={`Chọn task ${t.code || "TASK"}`}
+            onClick={(event) => event.stopPropagation()}
+            onChange={() => toggleTaskSelection(t.id)}
+          />
+        )}
         <span
           className={`urgency-dot ${t.priority}`}
           title={`Ưu tiên ${priorityLabels[t.priority]}`}
         />
-        <span className="task-code">{t.code || "TASK"}</span>
+        <button
+          className="task-code-copy"
+          type="button"
+          title={`Copy mã ${t.code || "TASK"}`}
+          aria-label={`Copy mã ${t.code || "TASK"}`}
+          onClick={(event) => {
+            event.stopPropagation();
+            void copyTaskCode(t.code || "TASK");
+          }}
+        >
+          <span className="task-code">{t.code || "TASK"}</span>
+          <Copy size={12} aria-hidden="true" />
+        </button>
         {(t.priority === "urgent" || t.priority === "high") && (
           <span
             className={`priority-badge priority-badge-${t.priority}`}
@@ -695,6 +980,10 @@ export default function Board() {
         </button>
       </div>
       <h3>{t.title}</h3>
+      {t.next_action && <p className="task-next-action">→ {t.next_action}</p>}
+      {t.blocked_by?.length ? (
+        <p className="task-dependency">Phụ thuộc {t.blocked_by.length} task</p>
+      ) : null}
       <div className="task-meta">
         <span className="assignee" title="Người phụ trách">
           {(() => {
@@ -1096,6 +1385,40 @@ export default function Board() {
                     <div className="empty-small">Không có task cần xử lý.</div>
                   )}
                 </section>
+                <section className="panel workload-panel">
+                  <div className="panel-heading">
+                    <div>
+                      <h2>Tải công việc</h2>
+                      <p>Task đang mở theo người phụ trách</p>
+                    </div>
+                    <span className="round-icon">
+                      <Users size={17} />
+                    </span>
+                  </div>
+                  {workload.length ? (
+                    <div className="workload-list">
+                      {workload.map(({ member, total, urgent, overdue }) => (
+                        <div className="workload-row" key={member.id}>
+                          <span className={`avatar avatar-${member.color}`}>
+                            {member.name.slice(0, 1)}
+                          </span>
+                          <span className="workload-name">
+                            <b>{member.name}</b>
+                            <small>{member.role}</small>
+                          </span>
+                          <span className="workload-count">{total}</span>
+                          {(urgent > 0 || overdue > 0) && (
+                            <small className="workload-risk">
+                              {urgent ? `${urgent} khẩn` : `${overdue} quá hạn`}
+                            </small>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="empty-small">Chưa có task đang mở theo người.</div>
+                  )}
+                </section>
               </div>
             </>
           )}
@@ -1105,19 +1428,67 @@ export default function Board() {
                 <div className="panel-heading">
                   <div>
                     <h2>Ưu tiên công việc</h2>
-                    <p>{filtered.length} task · trạng thái đi từ trái sang phải</p>
+                    <p>
+                      {visibleTasks.length} task
+                      {focusMode
+                        ? " cần tập trung"
+                        : " · trạng thái đi từ trái sang phải"}
+                    </p>
                   </div>
-                  <div className="view-switch">
-                    <button className="selected">Kanban</button>
-                    <span className="view-switch-note">
-                      {sortMode === "manual" ? "Thứ tự kéo thả" : "Ưu tiên → deadline"}
-                    </span>
+                  <div className="task-panel-actions">
+                    <button
+                      className={`selection-toggle${selectionMode ? " active" : ""}`}
+                      type="button"
+                      aria-pressed={selectionMode}
+                      onClick={toggleSelectionMode}
+                    >
+                      <CheckCheck size={14} />
+                      {selectionMode ? "Đang chọn" : "Chọn nhiều"}
+                    </button>
+                    <div className="view-switch">
+                      <button
+                        className={focusMode ? "" : "selected"}
+                        onClick={() => setFocusMode(false)}
+                      >
+                        Kanban
+                      </button>
+                      <button
+                        className={focusMode ? "selected" : ""}
+                        onClick={() => setFocusMode(true)}
+                      >
+                        Focus
+                      </button>
+                      <span className="view-switch-note">
+                        {sortMode === "manual"
+                          ? "Thứ tự kéo thả"
+                          : "Ưu tiên → deadline"}
+                      </span>
+                    </div>
                   </div>
+                </div>
+                <div className="saved-view-bar">
+                  <span>Saved views</span>
+                  <select
+                    aria-label="Chọn saved view"
+                    defaultValue=""
+                    onChange={(e) => applySavedView(e.target.value)}
+                  >
+                    <option value="">Chọn view đã lưu</option>
+                    {savedViews.map((savedView) => (
+                      <option value={savedView.id} key={savedView.id}>
+                        {savedView.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button className="text-button" onClick={saveCurrentView}>
+                    Lưu view hiện tại
+                  </button>
                 </div>
                 <div className="filters">
                   <label className="search-box">
                     <Search size={16} />
                     <input
+                      ref={searchRef}
                       placeholder="Tìm task, mã, mô tả..."
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
@@ -1153,7 +1524,88 @@ export default function Board() {
                     </select>
                     <ChevronDown size={13} />
                   </label>
+                  <button
+                    className={`filter-toggle${advancedFiltersOpen ? " active" : ""}`}
+                    type="button"
+                    aria-expanded={advancedFiltersOpen}
+                    onClick={() => setAdvancedFiltersOpen((open) => !open)}
+                  >
+                    <ListFilter size={14} />
+                    Bộ lọc nâng cao
+                    {(assigneeFilter !== "all" || dueFilter !== "all") && (
+                      <span className="filter-count">
+                        {Number(assigneeFilter !== "all") + Number(dueFilter !== "all")}
+                      </span>
+                    )}
+                  </button>
+                  {advancedFiltersOpen && (
+                    <>
+                      <label className="select-wrap advanced-filter">
+                        <select
+                          value={assigneeFilter}
+                          onChange={(e) => setAssigneeFilter(e.target.value)}
+                        >
+                          <option value="all">Mọi người phụ trách</option>
+                          <option value="__unassigned">Chưa giao</option>
+                          {data.members
+                            .filter((member) => member.active)
+                            .map((member) => (
+                              <option value={member.id} key={member.id}>
+                                {member.name}
+                              </option>
+                            ))}
+                        </select>
+                        <ChevronDown size={13} />
+                      </label>
+                      <label className="select-wrap advanced-filter">
+                        <select
+                          value={dueFilter}
+                          onChange={(e) => setDueFilter(e.target.value)}
+                        >
+                          <option value="all">Mọi deadline</option>
+                          <option value="overdue">Quá hạn</option>
+                          <option value="today">Hôm nay</option>
+                          <option value="week">7 ngày tới</option>
+                        </select>
+                        <ChevronDown size={13} />
+                      </label>
+                    </>
+                  )}
                 </div>
+                {selectedTaskIds.length > 0 && (
+                  <div
+                    className="bulk-toolbar"
+                    role="toolbar"
+                    aria-label="Thao tác hàng loạt"
+                  >
+                    <strong>{selectedTaskIds.length} task đã chọn</strong>
+                    <button
+                      className="secondary-button"
+                      onClick={() =>
+                        bulkUpdateTasks(
+                          { status: "in_progress" },
+                          "Đã chuyển task sang Đang làm",
+                        )
+                      }
+                    >
+                      Đang làm
+                    </button>
+                    <button
+                      className="secondary-button"
+                      onClick={() =>
+                        bulkUpdateTasks({ priority: "high" }, "Đã đặt ưu tiên cao")
+                      }
+                    >
+                      Ưu tiên cao
+                    </button>
+                    <button
+                      className="text-button"
+                      onClick={() => setSelectedTaskIds([])}
+                    >
+                      Bỏ chọn
+                    </button>
+                  </div>
+                )}
                 <div className="priority-guide">
                   <span className="guide-note">
                     <i className="urgent" />
@@ -1202,7 +1654,7 @@ export default function Board() {
                   </div>
                 </div>
                 <div className="kanban-board">
-                  {filtered.length ? (
+                  {visibleTasks.length ? (
                     Object.entries(labels).map(([status, label]) => (
                       <section
                         className="kanban-column"
@@ -1215,10 +1667,14 @@ export default function Board() {
                             <i />
                             {label}
                           </span>
-                          <b>{filtered.filter((t) => t.status === status).length}</b>
+                          <b>
+                            {visibleTasks.filter((t) => t.status === status).length}
+                          </b>
                         </header>
                         <div className="kanban-cards">
-                          {filtered.filter((t) => t.status === status).map(taskCard)}
+                          {visibleTasks
+                            .filter((t) => t.status === status)
+                            .map(taskCard)}
                         </div>
                       </section>
                     ))
@@ -1366,6 +1822,7 @@ export default function Board() {
       {modal === "task" && (
         <StructuredTaskModal
           task={edit || emptyTask(data.code_prefix || "MENSQZIN-")}
+          tasks={data.tasks}
           prefix={data.code_prefix || "MENSQZIN-"}
           members={data.members}
           isNew={!edit}
@@ -1434,6 +1891,11 @@ export default function Board() {
         <div className="toast" role="status" aria-live="polite">
           <Check size={16} />
           {toast}
+          {undoState && (
+            <button className="toast-action" onClick={undoLast}>
+              Hoàn tác
+            </button>
+          )}
         </div>
       )}
     </main>

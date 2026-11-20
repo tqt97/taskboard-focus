@@ -10,6 +10,22 @@ export type Member = {
   active: boolean;
 };
 export type TaskLink = { label: string; url: string };
+export type TaskActivity = {
+  id: string;
+  type: "created" | "updated" | "status_changed" | "priority_changed" | "assigned";
+  at: string;
+  summary: string;
+};
+export type SavedView = {
+  id: string;
+  name: string;
+  search: string;
+  status: string;
+  priority: string;
+  assignee: string;
+  due: string;
+  focus: boolean;
+};
 export type Task = {
   id: string;
   title: string;
@@ -30,6 +46,10 @@ export type Task = {
   links: string[];
   primary_links?: TaskLink[];
   secondary_links?: TaskLink[];
+  next_action?: string;
+  review_note?: string;
+  blocked_by?: string[];
+  activity?: TaskActivity[];
   custom_code?: boolean;
   created_at: string;
   updated_at: string;

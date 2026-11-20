@@ -1,7 +1,20 @@
 import type { Metadata } from "next";
 
+const fallbackAppUrl = "http://localhost:3000";
+const configuredAppUrl = process.env.NEXT_PUBLIC_APP_URL?.trim() || "";
+const metadataBase = (() => {
+  try {
+    const url = new URL(configuredAppUrl || fallbackAppUrl);
+    return url.protocol === "http:" || url.protocol === "https:"
+      ? url
+      : new URL(fallbackAppUrl);
+  } catch {
+    return new URL(fallbackAppUrl);
+  }
+})();
+
 export const siteMetadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"),
+  metadataBase,
   title: "Taskboard — Theo dõi công việc và mốc phát hành",
   description:
     "Bảng quản lý task cá nhân: theo dõi ưu tiên, người phụ trách, deadline, Dev up, Staging up và Release.",
