@@ -13,8 +13,9 @@
 
 ## v0.3 — Notification
 
-- Cấu hình mốc nhắc và quiet hours.
-- Chatwork server-side + scheduled job + dedupe log.
+- Browser reminder, cấu hình lead time và notification center đã có ở MVP.
+- Chatwork server-side test endpoint đã có; scheduled job + dedupe log vẫn cần backend remote.
+- Cấu hình quiet hours và lịch gửi production.
 - Gmail nếu xác định sender/auth provider.
 
 ## v0.4 — Tài liệu và cộng tác

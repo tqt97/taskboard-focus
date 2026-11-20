@@ -30,4 +30,6 @@ Mở http://localhost:3000. Không cần điền biến môi trường để dù
 
 ## Chatwork/Gmail
 
-Tích hợp chưa được bật trong MVP. Khi triển khai, token đặt ở server environment variables, endpoint cần xác thực, validate payload, rate limit và ghi log gửi. Cron định kỳ có thể dùng Vercel Cron hoặc Supabase Scheduled Functions; cần kiểm tra giới hạn hiện hành trước khi chọn.
+Chatwork đã có server route gửi thông báo test tại `/api/notifications/chatwork-test`. Token đặt ở server environment variables, không dùng `NEXT_PUBLIC_*`. Reminder Chatwork định kỳ chưa bật vì task MVP chỉ nằm trong localStorage; cần repository server-side, scheduler, auth, rate limit và delivery log trước khi triển khai. Xem [NOTIFICATIONS.md](NOTIFICATIONS.md).
+
+Gmail chưa triển khai. Cron định kỳ có thể dùng Vercel Cron hoặc Supabase Scheduled Functions sau khi hoàn thiện dữ liệu remote và idempotency.

@@ -1154,7 +1154,14 @@ textarea:focus-visible {
   height: 16px;
   border-radius: 12px;
   background: #d7dce5;
+  border: 0;
+  padding: 0;
   position: relative;
+  flex: 0 0 auto;
+}
+.toggle-switch:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 .toggle-switch:after {
   content: "";
@@ -1181,6 +1188,20 @@ textarea:focus-visible {
   gap: 9px;
   padding: 11px 0;
   border-bottom: 1px solid #f0f2f5;
+}
+.integration-test-button {
+  margin-top: 12px;
+}
+.integration-feedback {
+  font-size: 10px;
+  line-height: 1.4;
+  margin: 8px 0 0;
+}
+.integration-feedback.success {
+  color: var(--green);
+}
+.integration-feedback.error {
+  color: var(--red);
 }
 .integration-logo {
   width: 27px;

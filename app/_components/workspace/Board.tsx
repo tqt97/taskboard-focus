@@ -1,5 +1,5 @@
 "use client";
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Activity,
@@ -23,6 +23,7 @@ import {
   MoreHorizontal,
   Plus,
   Search,
+  Send,
   Settings2,
   ShieldAlert,
   Sun,
@@ -63,6 +64,40 @@ const severityLabels: Record<Severity, string> = {
   medium: "Vừa",
   low: "Thấp",
 };
+const reminderLabels = ["Deadline", "Dev up", "Staging up", "Release"] as const;
+type ReminderLabel = (typeof reminderLabels)[number];
+type ReminderSettings = {
+  browserEnabled: boolean;
+  leadDays: Record<ReminderLabel, number>;
+};
+const defaultReminderSettings: ReminderSettings = {
+  browserEnabled: false,
+  leadDays: { Deadline: 3, "Dev up": 1, "Staging up": 1, Release: 1 },
+};
+const reminderSettingsKey = "taskboard-reminder-settings-v1";
+const browserReminderKey = "taskboard-browser-reminders-v1";
+const allowedLeadDays = [0, 1, 3, 7];
+const readReminderSettings = (): ReminderSettings => {
+  if (typeof window === "undefined") return defaultReminderSettings;
+  try {
+    const value = JSON.parse(localStorage.getItem(reminderSettingsKey) || "null");
+    const leadDays = { ...defaultReminderSettings.leadDays };
+    reminderLabels.forEach((label) => {
+      if (allowedLeadDays.includes(value?.leadDays?.[label])) {
+        leadDays[label] = value.leadDays[label];
+      }
+    });
+    return {
+      ...defaultReminderSettings,
+      browserEnabled: value?.browserEnabled === true,
+      leadDays,
+    };
+  } catch {
+    return defaultReminderSettings;
+  }
+};
+const saveReminderSettings = (settings: ReminderSettings) =>
+  localStorage.setItem(reminderSettingsKey, JSON.stringify(settings));
 const emptyTask = (prefix = "MENSQZIN-"): Task => ({
   id: crypto.randomUUID(),
   code: prefix,
@@ -147,7 +182,14 @@ export default function Board() {
     [clock, setClock] = useState(""),
     [sortMode, setSortMode] = useState<SortMode>("smart"),
     [notificationsOpen, setNotificationsOpen] = useState(false),
+    notificationRef = useRef<HTMLDivElement>(null),
     [readNotificationIds, setReadNotificationIds] = useState<string[]>([]),
+    [reminderSettings, setReminderSettings] = useState<ReminderSettings>(
+      defaultReminderSettings,
+    ),
+    [browserPermission, setBrowserPermission] = useState<
+      NotificationPermission | "unsupported"
+    >("default"),
     [sidebarCollapsed, setSidebarCollapsed] = useState(false),
     [displayName, setDisplayName] = useState("Tuấn");
   useEffect(() => {
@@ -158,6 +200,9 @@ export default function Board() {
     const storedDark = localStorage.getItem("taskboard-dark") === "1";
     setDark(storedDark);
     setDisplayName(readDisplayName());
+    setReminderSettings(readReminderSettings());
+    if ("Notification" in window) setBrowserPermission(Notification.permission);
+    else setBrowserPermission("unsupported");
     const syncDisplayName = () => setDisplayName(readDisplayName());
     window.addEventListener("storage", syncDisplayName);
     window.addEventListener("focus", syncDisplayName);
@@ -215,6 +260,17 @@ export default function Board() {
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, [modal]);
+  useEffect(() => {
+    if (!notificationsOpen) return;
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      const target = event.target;
+      if (target instanceof Node && !notificationRef.current?.contains(target)) {
+        setNotificationsOpen(false);
+      }
+    };
+    document.addEventListener("pointerdown", closeOnOutsidePointer);
+    return () => document.removeEventListener("pointerdown", closeOnOutsidePointer);
+  }, [notificationsOpen]);
   const ordered = useMemo(
     () => [...data.tasks].sort((a, b) => a.order_index - b.order_index),
     [data.tasks],
@@ -253,11 +309,14 @@ export default function Board() {
       ),
     [sorted, statusFilter, priorityFilter, deferredSearch],
   );
-  const active = data.tasks.filter((t) => t.status !== "done");
+  const active = useMemo(
+    () => data.tasks.filter((t) => t.status !== "done"),
+    [data.tasks],
+  );
   const nowMs = now.getTime();
-  const isInAttentionWindow = (date: string) => {
+  const isInReminderWindow = (date: string, label: ReminderLabel) => {
     const diff = new Date(date).getTime() - nowMs;
-    return diff >= -3 * 86400000 && diff < 7 * 86400000;
+    return diff >= -86400000 && diff <= reminderSettings.leadDays[label] * 86400000;
   };
   const upcoming = active
     .flatMap((t) =>
@@ -266,7 +325,7 @@ export default function Board() {
         { task: t, label: "Dev up", date: t.dev_up },
         { task: t, label: "Staging up", date: t.staging_up },
         { task: t, label: "Release", date: t.release_at },
-      ].filter((x) => x.date && isInAttentionWindow(x.date)),
+      ].filter((x) => x.date && isInReminderWindow(x.date, x.label as ReminderLabel)),
     )
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
     .slice(0, 5);
@@ -279,7 +338,9 @@ export default function Board() {
             { task: t, label: "Dev up", date: t.dev_up },
             { task: t, label: "Staging up", date: t.staging_up },
             { task: t, label: "Release", date: t.release_at },
-          ].filter((x) => x.date && isInAttentionWindow(x.date)),
+          ].filter(
+            (x) => x.date && isInReminderWindow(x.date, x.label as ReminderLabel),
+          ),
         )
         .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
         .slice(0, 8)
@@ -293,8 +354,48 @@ export default function Board() {
             read: readNotificationIds.includes(`${item.task.id}-${item.label}`),
           };
         }),
-    [active, nowMs, readNotificationIds],
+    [active, nowMs, readNotificationIds, reminderSettings],
   );
+  useEffect(() => {
+    if (!ready || !reminderSettings.browserEnabled || browserPermission !== "granted")
+      return;
+    let sent: string[] = [];
+    try {
+      const stored = JSON.parse(localStorage.getItem(browserReminderKey) || "[]");
+      sent = Array.isArray(stored) ? stored.filter((id) => typeof id === "string") : [];
+    } catch {}
+    const nextSent = [...sent];
+    active.forEach((task) => {
+      reminderLabels.forEach((label) => {
+        const date =
+          label === "Deadline"
+            ? task.deadline
+            : label === "Dev up"
+              ? task.dev_up
+              : label === "Staging up"
+                ? task.staging_up
+                : task.release_at;
+        if (!date) return;
+        const diff = new Date(date).getTime() - nowMs;
+        if (diff < -86400000 || diff > reminderSettings.leadDays[label] * 86400000)
+          return;
+        const id = `${task.id}-${label}-${date.slice(0, 10)}`;
+        if (nextSent.includes(id)) return;
+        try {
+          new Notification(`${label}: ${task.title}`, {
+            body: `${task.code || "TASK"} · ${dueText(date)}`,
+            tag: id,
+          });
+          nextSent.push(id);
+        } catch {
+          return;
+        }
+      });
+    });
+    if (nextSent.length !== sent.length) {
+      localStorage.setItem(browserReminderKey, JSON.stringify(nextSent.slice(-200)));
+    }
+  }, [active, browserPermission, nowMs, ready, reminderSettings]);
   const unreadNotificationCount = notifications.filter((item) => !item.read).length;
   const markNotificationRead = (id: string) => {
     setReadNotificationIds((ids) => {
@@ -307,6 +408,31 @@ export default function Board() {
     const ids = notifications.map((item) => item.id);
     setReadNotificationIds(ids);
     localStorage.setItem("taskboard-notifications-read-v1", JSON.stringify(ids));
+  };
+  const updateReminderSettings = (next: ReminderSettings) => {
+    setReminderSettings(next);
+    saveReminderSettings(next);
+  };
+  const requestBrowserNotifications = async () => {
+    if (!("Notification" in window)) {
+      setToast("Trình duyệt này không hỗ trợ thông báo.");
+      return false;
+    }
+    let permission: NotificationPermission;
+    try {
+      permission = await Notification.requestPermission();
+    } catch {
+      setToast("Không thể xin quyền thông báo từ trình duyệt.");
+      return false;
+    }
+    setBrowserPermission(permission);
+    if (permission !== "granted") {
+      setToast("Bạn chưa cấp quyền thông báo cho trình duyệt.");
+      return false;
+    }
+    updateReminderSettings({ ...reminderSettings, browserEnabled: true });
+    setToast("Đã bật thông báo trình duyệt.");
+    return true;
   };
   const statusSummary = Object.entries(labels).map(([status, label]) => ({
     status: status as Status,
@@ -651,7 +777,7 @@ export default function Board() {
             >
               <Download size={18} />
             </button>
-            <div className="notification-wrap">
+            <div className="notification-wrap" ref={notificationRef}>
               <button
                 className={
                   unreadNotificationCount ? "icon-button has-unread" : "icon-button"
@@ -1206,6 +1332,11 @@ export default function Board() {
               localStorage.removeItem(displayNameStorageKey);
             }
           }}
+          reminderSettings={reminderSettings}
+          browserPermission={browserPermission}
+          onReminderSettings={updateReminderSettings}
+          onRequestBrowserNotifications={requestBrowserNotifications}
+          onToast={setToast}
         />
       )}
       {modal === "lock" && (
@@ -1249,6 +1380,11 @@ function SettingsModal({
   onClear,
   displayName,
   onDisplayName,
+  reminderSettings,
+  browserPermission,
+  onReminderSettings,
+  onRequestBrowserNotifications,
+  onToast,
 }: {
   data: BoardData;
   tab: string;
@@ -1260,10 +1396,22 @@ function SettingsModal({
   onClear: () => void;
   displayName: string;
   onDisplayName: (name: string) => void;
+  reminderSettings: ReminderSettings;
+  browserPermission: NotificationPermission | "unsupported";
+  onReminderSettings: (settings: ReminderSettings) => void;
+  onRequestBrowserNotifications: () => Promise<boolean>;
+  onToast: (message: string) => void;
 }) {
   const [newName, setNewName] = useState(""),
     [newRole, setNewRole] = useState("Developer"),
-    [room, setRoom] = useState(""),
+    [room, setRoom] = useState(() =>
+      typeof window === "undefined"
+        ? ""
+        : localStorage.getItem("taskboard-chatwork-room-id-v1") || "",
+    ),
+    [chatworkTestState, setChatworkTestState] = useState<
+      "idle" | "sending" | "success" | "error"
+    >("idle"),
     [passcode, setPasscode] = useState(() =>
       typeof window === "undefined"
         ? ""
@@ -1372,28 +1520,73 @@ function SettingsModal({
               <div className="setting-intro">
                 <h3>Nhắc mốc công việc</h3>
                 <p>
-                  Thông báo trực quan hiện ở trang tổng quan. Có thể mở rộng gửi
-                  Chatwork qua server.
+                  Notification center luôn hiển thị mốc sắp đến. Browser reminder chỉ
+                  chạy khi workspace đang mở và bạn đã cấp quyền trình duyệt.
                 </p>
               </div>
-              {["Deadline", "Dev up", "Staging up", "Release"].map((x, i) => (
+              {reminderLabels.map((x) => (
                 <div className="setting-row" key={x}>
                   <span>
                     <b>{x}</b>
                     <small>Nhắc trước khi đến hạn</small>
                   </span>
-                  <select defaultValue={i === 0 ? "3" : "1"}>
+                  <select
+                    value={reminderSettings.leadDays[x]}
+                    onChange={(e) =>
+                      onReminderSettings({
+                        ...reminderSettings,
+                        leadDays: {
+                          ...reminderSettings.leadDays,
+                          [x]: Number(e.target.value),
+                        },
+                      })
+                    }
+                  >
                     <option value="0">Đúng ngày</option>
                     <option value="1">1 ngày</option>
                     <option value="3">3 ngày</option>
                     <option value="7">7 ngày</option>
                   </select>
-                  <span className="toggle-switch on" />
                 </div>
               ))}
+              <div className="setting-row notification-setting-row">
+                <span>
+                  <b>Thông báo trình duyệt</b>
+                  <small>
+                    {browserPermission === "unsupported"
+                      ? "Trình duyệt không hỗ trợ"
+                      : browserPermission === "denied"
+                        ? "Đang bị chặn trong cài đặt trình duyệt"
+                        : "Nhắc một lần cho mỗi mốc task"}
+                  </small>
+                </span>
+                <button
+                  className={
+                    reminderSettings.browserEnabled
+                      ? "toggle-switch on"
+                      : "toggle-switch"
+                  }
+                  aria-label="Bật hoặc tắt thông báo trình duyệt"
+                  aria-pressed={reminderSettings.browserEnabled}
+                  disabled={
+                    browserPermission === "denied" ||
+                    browserPermission === "unsupported"
+                  }
+                  onClick={async () => {
+                    if (reminderSettings.browserEnabled) {
+                      onReminderSettings({
+                        ...reminderSettings,
+                        browserEnabled: false,
+                      });
+                    } else {
+                      await onRequestBrowserNotifications();
+                    }
+                  }}
+                />
+              </div>
               <p className="muted-note">
-                Nhắc định kỳ qua Chatwork cần cấu hình Cron hoặc dịch vụ lập lịch bên
-                ngoài.
+                Chatwork test và gửi định kỳ cần token server-side. Cấu hình trong tab
+                Tích hợp; lịch định kỳ production cần Cron/worker và kho dữ liệu remote.
               </p>
             </>
           )}
@@ -1419,10 +1612,50 @@ function SettingsModal({
                 </span>
                 <input
                   value={room}
-                  onChange={(e) => setRoom(e.target.value)}
+                  onChange={(e) => {
+                    setRoom(e.target.value);
+                    localStorage.setItem(
+                      "taskboard-chatwork-room-id-v1",
+                      e.target.value.trim(),
+                    );
+                  }}
                   placeholder="Ví dụ: 123456789"
                 />
               </label>
+              <button
+                className="secondary-button integration-test-button"
+                disabled={chatworkTestState === "sending" || !room.trim()}
+                onClick={async () => {
+                  setChatworkTestState("sending");
+                  try {
+                    const response = await fetch("/api/notifications/chatwork-test", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ roomId: room.trim() }),
+                    });
+                    const result = await response.json().catch(() => ({}));
+                    if (!response.ok) throw new Error(result.error || "Gửi thất bại");
+                    setChatworkTestState("success");
+                    onToast("Đã gửi thông báo test đến Chatwork.");
+                  } catch (error) {
+                    setChatworkTestState("error");
+                    onToast(
+                      error instanceof Error ? error.message : "Gửi Chatwork thất bại.",
+                    );
+                  }
+                }}
+              >
+                <Send size={15} />
+                {chatworkTestState === "sending" ? "Đang gửi..." : "Gửi thông báo test"}
+              </button>
+              {chatworkTestState === "success" && (
+                <p className="integration-feedback success">Đã gửi thành công.</p>
+              )}
+              {chatworkTestState === "error" && (
+                <p className="integration-feedback error">
+                  Không gửi được. Kiểm tra token và Room ID.
+                </p>
+              )}
               <div className="integration-card">
                 <div className="integration-logo gmail">G</div>
                 <div>

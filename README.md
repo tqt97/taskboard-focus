@@ -73,7 +73,7 @@ Dữ liệu local gắn với trình duyệt và profile máy tính. Xóa site d
 Xem [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 ## Chatwork, Gmail và tệp đính kèm
-UI có mục cấu hình hướng dẫn, nhưng gửi tin nhắn, Gmail và upload attachment chưa được triển khai. Token phải nằm ở server secrets, notification cần scheduler và chống gửi trùng. Xem [docs/ROADMAP.md](docs/ROADMAP.md).
+Chatwork đã có nút gửi thông báo test qua server route; reminder định kỳ vẫn chưa bật vì task MVP chỉ nằm trong localStorage. Gmail và upload attachment chưa triển khai. Token phải nằm ở server secrets, notification định kỳ cần scheduler và chống gửi trùng. Xem [docs/NOTIFICATIONS.md](docs/NOTIFICATIONS.md) và [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Màn hình khóa
 Lock screen trong MVP chỉ là giao diện tiện ích, không phải xác thực. Mọi giá trị `NEXT_PUBLIC_*` đều có thể đọc trong bundle frontend. Không dùng passcode client để bảo vệ dữ liệu cá nhân trên ứng dụng public.
@@ -106,6 +106,7 @@ supabase/
   DATA_FORMAT.md     JSON backup schema
   ROADMAP.md         Kế hoạch phiên bản
   CI_CD.md           GitHub Actions và deploy Vercel
+  NOTIFICATIONS.md   Browser reminder và Chatwork test
 ```
 
 ### Quy ước mở rộng
