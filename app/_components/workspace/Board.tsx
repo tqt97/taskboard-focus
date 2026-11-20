@@ -22,6 +22,7 @@ import {
   LockKeyhole,
   Moon,
   MoreHorizontal,
+  Menu,
   Plus,
   Search,
   Send,
@@ -239,6 +240,7 @@ export default function Board() {
     [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]),
     [selectionMode, setSelectionMode] = useState(false),
     [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false),
+    [mobileMenuOpen, setMobileMenuOpen] = useState(false),
     [savedViews, setSavedViews] = useState<SavedView[]>([]),
     [undoState, setUndoState] = useState<{ data: BoardData; message: string } | null>(
       null,
@@ -942,10 +944,10 @@ export default function Board() {
             onChange={() => toggleTaskSelection(t.id)}
           />
         )}
-        <span
+        {/* <span
           className={`urgency-dot ${t.priority}`}
           title={`Ưu tiên ${priorityLabels[t.priority]}`}
-        />
+        /> */}
         <button
           className="task-code-copy"
           type="button"
@@ -1103,6 +1105,54 @@ export default function Board() {
             {view === "overview" ? "Tổng quan" : "Danh sách task"}
           </div>
           <div className="top-actions">
+            <button
+              className="mobile-menu-button"
+              aria-label={mobileMenuOpen ? "Đóng menu" : "Mở menu"}
+              aria-expanded={mobileMenuOpen}
+              onClick={() => setMobileMenuOpen((open) => !open)}
+            >
+              {mobileMenuOpen ? <X size={19} /> : <Menu size={19} />}
+            </button>
+            {mobileMenuOpen && (
+              <>
+                <button
+                  className="mobile-nav-backdrop"
+                  aria-label="Đóng menu"
+                  onClick={() => setMobileMenuOpen(false)}
+                />
+                <nav className="mobile-nav" aria-label="Điều hướng mobile">
+                  <div className="mobile-nav-header">
+                    <b>Menu</b>
+                    <button
+                      className="mobile-nav-close"
+                      aria-label="Đóng menu"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      <X size={17} />
+                    </button>
+                  </div>
+                  <button
+                    className={view === "overview" ? "active" : ""}
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      router.push("/");
+                    }}
+                  >
+                    <LayoutDashboard size={17} /> Tổng quan
+                  </button>
+                  <button
+                    className={view === "tasks" ? "active" : ""}
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      router.push("/tasks");
+                    }}
+                  >
+                    <ListTodo size={17} /> Danh sách task
+                    <span>{active.length}</span>
+                  </button>
+                </nav>
+              </>
+            )}
             <div className="live-date">
               <span className="live-dot" />
               {clock}

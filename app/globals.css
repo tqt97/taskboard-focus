@@ -511,8 +511,8 @@ textarea:focus-visible {
   align-items: center;
 }
 .task-code {
-  font-size: 9px;
-  color: #9da7b4;
+  font-size: 12px !important;
+  color: #8f959e;
   letter-spacing: 0.4px;
   font-weight: 700;
 }
@@ -3797,6 +3797,10 @@ textarea:focus-visible {
   flex: none;
   opacity: 0.55;
 }
+.mobile-menu-button,
+.mobile-nav {
+  display: none;
+}
 
 /* Below this width the left rail costs more content than it provides. */
 @media (max-width: 1440px) {
@@ -3821,6 +3825,110 @@ textarea:focus-visible {
   }
   .breadcrumbs {
     display: none;
+  }
+  .sidebar-collapse {
+    display: none;
+  }
+  .mobile-menu-button {
+    display: grid;
+    order: 10;
+    width: 36px;
+    height: 36px;
+    place-items: center;
+    margin-left: 8px;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    background: var(--surface);
+    color: var(--muted);
+  }
+  .mobile-menu-button:hover,
+  .mobile-menu-button[aria-expanded="true"] {
+    border-color: #cbd5fa;
+    color: var(--accent);
+  }
+  .mobile-nav-backdrop {
+    position: fixed;
+    inset: 66px 0 0;
+    z-index: 8;
+    border: 0;
+    background: #19233452;
+  }
+  .mobile-nav {
+    position: fixed;
+    top: 66px;
+    right: 0;
+    bottom: 0;
+    z-index: 9;
+    display: grid;
+    align-content: start;
+    width: min(320px, 86vw);
+    gap: 4px;
+    padding: 12px;
+    border-left: 1px solid var(--line);
+    background: var(--surface);
+    box-shadow: -16px 0 40px #17233a22;
+    animation: mobile-nav-in 180ms ease-out;
+  }
+  .mobile-nav-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 40px;
+    margin-bottom: 8px;
+    padding: 0 4px 10px;
+    border-bottom: 1px solid var(--line);
+    color: var(--text);
+    font-size: 14px;
+  }
+  .mobile-nav-close {
+    display: grid;
+    width: 30px;
+    height: 30px;
+    place-items: center;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--muted);
+  }
+  .mobile-nav-close:hover {
+    background: var(--surface2);
+    color: var(--accent);
+  }
+  .mobile-nav > button {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    min-height: 40px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--muted);
+    padding: 0 10px;
+    text-align: left;
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .mobile-nav > button:hover,
+  .mobile-nav > button.active {
+    background: var(--surface2);
+    color: var(--accent);
+  }
+  .mobile-nav > button span {
+    margin-left: auto;
+    border-radius: 999px;
+    background: var(--surface2);
+    padding: 2px 7px;
+    font-size: 11px;
+  }
+}
+@keyframes mobile-nav-in {
+  from {
+    opacity: 0;
+    transform: translateX(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
   }
 }
 @media (min-width: 1025px) and (max-width: 1440px) {
@@ -3855,6 +3963,12 @@ textarea:focus-visible {
   }
 }
 @media (max-width: 600px) {
+  .top-actions {
+    gap: 6px;
+  }
+  .top-actions > .icon-button[aria-label="Tải dữ liệu"] {
+    display: none;
+  }
   .task-panel-actions {
     justify-content: flex-start;
   }
