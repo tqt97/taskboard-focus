@@ -25,7 +25,6 @@ import {
   Search,
   Send,
   Settings2,
-  ShieldAlert,
   Sun,
   Trash2,
   Users,
@@ -34,32 +33,18 @@ import {
   ListFilter,
 } from "lucide-react";
 import { demoData, parseBoardData, readLocal, writeLocal } from "@/lib/data";
-import type {
-  BoardData,
-  Member,
-  Priority,
-  Severity,
-  SortMode,
-  Status,
-  Task,
-} from "@/lib/types";
+import type { BoardData, Member, Priority, SortMode, Status, Task } from "@/lib/types";
 import { TaskModal as StructuredTaskModal } from "./TaskModal";
 import { NotificationPopover, type BoardNotification } from "./NotificationPopover";
 
 const labels: Record<Status, string> = {
   todo: "Chưa làm",
   in_progress: "Đang làm",
-  blocked: "Bị chặn",
+  blocked: "Đang review",
   done: "Hoàn tất",
 };
 const priorityLabels: Record<Priority, string> = {
   urgent: "Khẩn cấp",
-  high: "Cao",
-  medium: "Vừa",
-  low: "Thấp",
-};
-const severityLabels: Record<Severity, string> = {
-  critical: "Nghiêm trọng",
   high: "Cao",
   medium: "Vừa",
   low: "Thấp",
@@ -162,6 +147,11 @@ function formatDate(s: string) {
 function initial(): BoardData {
   return readLocal();
 }
+function greetingForHour(hour: number) {
+  if (hour < 12) return "Chào buổi sáng";
+  if (hour < 18) return "Chào buổi chiều";
+  return "Chào buổi tối";
+}
 export default function Board() {
   const router = useRouter(),
     pathname = usePathname(),
@@ -192,6 +182,7 @@ export default function Board() {
     >("default"),
     [sidebarCollapsed, setSidebarCollapsed] = useState(false),
     [displayName, setDisplayName] = useState("Tuấn");
+  const greeting = greetingForHour(now.getHours());
   useEffect(() => {
     const saved = initial();
     setData(saved);
@@ -318,7 +309,7 @@ export default function Board() {
     const diff = new Date(date).getTime() - nowMs;
     return diff >= -86400000 && diff <= reminderSettings.leadDays[label] * 86400000;
   };
-  const upcoming = active
+  const upcomingItems = active
     .flatMap((t) =>
       [
         { task: t, label: "Deadline", date: t.deadline },
@@ -327,8 +318,11 @@ export default function Board() {
         { task: t, label: "Release", date: t.release_at },
       ].filter((x) => x.date && isInReminderWindow(x.date, x.label as ReminderLabel)),
     )
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-    .slice(0, 5);
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  const upcomingGroups = reminderLabels.map((label) => ({
+    label,
+    items: upcomingItems.filter((item) => item.label === label).slice(0, 3),
+  }));
   const notifications = useMemo<BoardNotification[]>(
     () =>
       active
@@ -593,7 +587,7 @@ export default function Board() {
     }));
   const taskCard = (t: Task) => (
     <article
-      className="task-card"
+      className={`task-card task-status-${t.status}`}
       key={t.id}
       role="button"
       tabIndex={0}
@@ -619,11 +613,19 @@ export default function Board() {
       }}
     >
       <div className="task-top">
-        <span className="task-code">{t.code || "TASK"}</span>
         <span
           className={`urgency-dot ${t.priority}`}
           title={`Ưu tiên ${priorityLabels[t.priority]}`}
         />
+        <span className="task-code">{t.code || "TASK"}</span>
+        {(t.priority === "urgent" || t.priority === "high") && (
+          <span
+            className={`priority-badge priority-badge-${t.priority}`}
+            title={`Mức ưu tiên ${priorityLabels[t.priority]}`}
+          >
+            {t.priority === "urgent" ? "KHẨN" : "CAO"}
+          </span>
+        )}
         <button
           className="icon-button mini"
           aria-label="Mở task"
@@ -637,15 +639,6 @@ export default function Board() {
         </button>
       </div>
       <h3>{t.title}</h3>
-      <div className="task-flags">
-        <span className={`pill priority-${t.priority}`}>
-          {priorityLabels[t.priority]}
-        </span>
-        <span className={`pill severity-${t.severity}`}>
-          <ShieldAlert size={12} />
-          {severityLabels[t.severity]}
-        </span>
-      </div>
       <div className="task-meta">
         <span className="assignee" title="Người phụ trách">
           {(() => {
@@ -830,7 +823,7 @@ export default function Board() {
               <h1>
                 {view === "overview" ? (
                   <>
-                    Chào buổi sáng, <span className="display-name">{displayName}</span>
+                    {greeting}, <span className="display-name">{displayName}</span>
                   </>
                 ) : (
                   "Danh sách task"
@@ -1195,29 +1188,49 @@ export default function Board() {
                       <CalendarDays size={17} />
                     </span>
                   </div>
-                  {upcoming.length ? (
-                    <div className="timeline">
-                      {upcoming.map((item, i) => (
-                        <div
-                          className="timeline-row"
-                          key={`${item.task.id}-${item.label}`}
+                  {upcomingItems.length ? (
+                    <div className="timeline-groups">
+                      {upcomingGroups.map((group) => (
+                        <section
+                          className={`timeline-group timeline-group-${group.label
+                            .toLowerCase()
+                            .replaceAll(" ", "-")}`}
+                          key={group.label}
                         >
-                          <div className={`timeline-marker ${dueState(item.date)}`}>
-                            <i />
+                          <div className="timeline-group-heading">
+                            <i className="timeline-group-marker" />
+                            <b>{group.label}</b>
+                            <span>{group.items.length}</span>
                           </div>
-                          <div className="timeline-copy">
-                            <div className="timeline-title">
-                              <b>{item.label}</b>
-                              <span className={dueState(item.date)}>
-                                {dueText(item.date)}
-                              </span>
+                          {group.items.length ? (
+                            <div className="timeline">
+                              {group.items.map((item) => (
+                                <div
+                                  className="timeline-row"
+                                  key={`${item.task.id}-${item.label}`}
+                                >
+                                  <div
+                                    className={`timeline-marker ${dueState(item.date)}`}
+                                  >
+                                    <i />
+                                  </div>
+                                  <div className="timeline-copy">
+                                    <div className="timeline-title">
+                                      <b>{item.task.code || "TASK"}</b>
+                                      <span className={dueState(item.date)}>
+                                        {dueText(item.date)}
+                                      </span>
+                                    </div>
+                                    <p>{item.task.title}</p>
+                                    <small>{formatDate(item.date)}</small>
+                                  </div>
+                                </div>
+                              ))}
                             </div>
-                            <p>{item.task.title}</p>
-                            <small>
-                              {item.task.code} · {formatDate(item.date)}
-                            </small>
-                          </div>
-                        </div>
+                          ) : (
+                            <p className="timeline-group-empty">Chưa có mốc</p>
+                          )}
+                        </section>
                       ))}
                     </div>
                   ) : (

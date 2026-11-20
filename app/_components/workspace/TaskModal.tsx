@@ -6,7 +6,7 @@ import type { Member, Task, TaskLink, Status, Priority, Severity } from "@/lib/t
 const labels: Record<Status, string> = {
   todo: "Chưa làm",
   in_progress: "Đang làm",
-  blocked: "Bị chặn",
+  blocked: "Đang review",
   done: "Hoàn tất",
 };
 const priorityLabels: Record<Priority, string> = {
