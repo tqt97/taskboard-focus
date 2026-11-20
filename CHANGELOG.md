@@ -1,0 +1,21 @@
+# Changelog
+
+## 0.1.1 — 2026-11-20
+
+- Tổ chức lại UI theo `app/_components/layout` và `app/_components/workspace`; giữ nguyên route `/` và `/tasks`.
+- Thêm layout loading/error dùng chung và metadata tách riêng.
+- Hoàn thiện Kanban drag-and-drop trong cùng status và giữa các status.
+- Thêm priority/severity legend, creation-frequency chart, notification center và header export.
+- Thêm sidebar collapse, sticky topbar, responsive wrapping và dashboard hierarchy.
+- Thêm validation form/import, safe localStorage write, deferred search và keyboard-accessible task cards.
+- Cài Prettier, thêm `npm run format`, dọn component/state/import không còn dùng.
+- Hoàn thiện SEO metadata, favicon SVG, Apple icon và PWA manifest.
+
+## 0.1.0 — 2026-11-20
+
+- Tạo Taskboard Focus local-first với Next.js, React và TypeScript.
+- Dashboard overview, deadline timeline, priority/severity, CRUD task, member management.
+- Tìm kiếm, lọc, drag reorder, xác nhận xóa, dark mode và responsive layout.
+- Export/import JSON schema v1.
+- Thêm schema Supabase và tài liệu sản phẩm, kiến trúc, bảo mật, triển khai, hướng dẫn và roadmap.
+- Chatwork/Gmail và attachments được mô tả là phần mở rộng; chưa kết nối thực tế.

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" role="img" aria-labelledby="title">
+  <title>Taskboard</title>
+  <rect width="180" height="180" rx="42" fill="#4c72e8"/>
+  <path d="M50 48h80v20H50zM50 80h58v20H50zM50 112h68v20H50z" fill="#fff"/>
+  <circle cx="138" cy="128" r="18" fill="#f4b860"/>
+</svg>
