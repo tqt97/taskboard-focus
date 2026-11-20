@@ -95,27 +95,51 @@ function iso(offset: number) {
   return d.toISOString();
 }
 const key = "taskboard-focus-v1";
+const maxBackupBytes = 5 * 1024 * 1024;
+const colors = ["blue", "violet", "orange", "green"];
+const maxLengths = {
+  id: 100,
+  code: 100,
+  title: 500,
+  description: 10000,
+  name: 120,
+  role: 120,
+  linkLabel: 120,
+  url: 2048,
+} as const;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;
 const statuses = ["todo", "in_progress", "blocked", "done"];
 const priorities = ["urgent", "high", "medium", "low"];
 const severities = ["critical", "high", "medium", "low"];
+const isBoundedString = (value: unknown, max: number): value is string =>
+  typeof value === "string" && value.length <= max;
+const isDateValue = (value: unknown) =>
+  typeof value === "string" && (!value || Number.isFinite(new Date(value).getTime()));
+const isLink = (value: unknown): value is { label: string; url: string } =>
+  isRecord(value) &&
+  isBoundedString(value.label, maxLengths.linkLabel) &&
+  isBoundedString(value.url, maxLengths.url) &&
+  /^https?:\/\//i.test(value.url.trim());
 
 const isMember = (value: unknown): value is Member =>
   isRecord(value) &&
-  typeof value.id === "string" &&
-  typeof value.name === "string" &&
-  typeof value.role === "string" &&
-  typeof value.color === "string" &&
+  isBoundedString(value.id, maxLengths.id) &&
+  Boolean(value.id.trim()) &&
+  isBoundedString(value.name, maxLengths.name) &&
+  Boolean(value.name.trim()) &&
+  isBoundedString(value.role, maxLengths.role) &&
+  colors.includes(String(value.color)) &&
   typeof value.active === "boolean";
 
 const isTask = (value: unknown): value is Task =>
   isRecord(value) &&
-  typeof value.id === "string" &&
-  typeof value.title === "string" &&
-  typeof value.code === "string" &&
-  typeof value.description === "string" &&
+  isBoundedString(value.id, maxLengths.id) &&
+  Boolean(value.id.trim()) &&
+  isBoundedString(value.title, maxLengths.title) &&
+  isBoundedString(value.code, maxLengths.code) &&
+  isBoundedString(value.description, maxLengths.description) &&
   typeof value.status === "string" &&
   statuses.includes(value.status) &&
   typeof value.priority === "string" &&
@@ -124,19 +148,75 @@ const isTask = (value: unknown): value is Task =>
   severities.includes(value.severity) &&
   (value.assignee_ids === undefined ||
     (Array.isArray(value.assignee_ids) &&
-      value.assignee_ids.every((id) => typeof id === "string"))) &&
-  (value.assignee_id === undefined || typeof value.assignee_id === "string") &&
-  typeof value.order_index === "number" &&
+      value.assignee_ids.length <= 100 &&
+      value.assignee_ids.every(
+        (id) => isBoundedString(id, maxLengths.id) && Boolean(id.trim()),
+      ))) &&
+  (value.assignee_id === undefined ||
+    (typeof value.assignee_id === "string" &&
+      isBoundedString(value.assignee_id, maxLengths.id) &&
+      Boolean(value.assignee_id.trim()))) &&
+  Number.isSafeInteger(value.order_index) &&
   Array.isArray(value.links) &&
-  value.links.every((link) => typeof link === "string") &&
-  typeof value.created_at === "string" &&
-  typeof value.updated_at === "string";
+  value.links.length <= 100 &&
+  value.links.every(
+    (link) =>
+      isBoundedString(link, maxLengths.url) && /^https?:\/\//i.test(link.trim()),
+  ) &&
+  (value.primary_links === undefined ||
+    (Array.isArray(value.primary_links) &&
+      value.primary_links.length <= 100 &&
+      value.primary_links.every(isLink))) &&
+  (value.secondary_links === undefined ||
+    (Array.isArray(value.secondary_links) &&
+      value.secondary_links.length <= 100 &&
+      value.secondary_links.every(isLink))) &&
+  isDateValue(value.dev_up) &&
+  isDateValue(value.staging_up) &&
+  isDateValue(value.release_at) &&
+  isDateValue(value.deadline) &&
+  isDateValue(value.created_at) &&
+  isDateValue(value.updated_at) &&
+  (value.custom_code === undefined || typeof value.custom_code === "boolean");
 
-export function parseBoardData(value: unknown): BoardData | null {
-  if (!isRecord(value) || !Array.isArray(value.tasks) || !Array.isArray(value.members))
-    return null;
-  if (!value.tasks.every(isTask) || !value.members.every(isMember)) return null;
-  const tasks = value.tasks.map((task) => {
+type ParseBoardResult = { data: BoardData | null; error?: string };
+
+export function parseBoardDataWithError(value: unknown): ParseBoardResult {
+  if (!isRecord(value)) {
+    return { data: null, error: "Backup phải là một object JSON hợp lệ." };
+  }
+  if (!Array.isArray(value.tasks) || !Array.isArray(value.members)) {
+    return { data: null, error: "Backup phải có hai danh sách tasks và members." };
+  }
+  if (value.tasks.length > 10000 || value.members.length > 1000) {
+    return { data: null, error: "Backup vượt quá giới hạn số lượng dữ liệu cho phép." };
+  }
+  if (!value.members.every(isMember)) {
+    return {
+      data: null,
+      error: "Backup có thành viên thiếu dữ liệu hoặc không hợp lệ.",
+    };
+  }
+  if (!value.tasks.every(isTask)) {
+    return { data: null, error: "Backup có task thiếu dữ liệu hoặc không hợp lệ." };
+  }
+  const members = value.members;
+  const tasks = value.tasks;
+  const memberIds = new Set(members.map((member) => member.id));
+  if (memberIds.size !== members.length) {
+    return { data: null, error: "Backup có ID thành viên bị trùng." };
+  }
+  if (new Set(tasks.map((task) => task.id)).size !== tasks.length) {
+    return { data: null, error: "Backup có ID task bị trùng." };
+  }
+  if (
+    tasks.some((task) =>
+      (task.assignee_ids || []).some((memberId) => !memberIds.has(memberId)),
+    )
+  ) {
+    return { data: null, error: "Backup có task gán cho thành viên không tồn tại." };
+  }
+  const normalizedTasks = tasks.map((task) => {
     const assigneeIds = task.assignee_ids?.length
       ? task.assignee_ids
       : task.assignee_id
@@ -149,18 +229,26 @@ export function parseBoardData(value: unknown): BoardData | null {
     };
   });
   return {
-    tasks,
-    members: value.members,
-    code_prefix:
-      typeof value.code_prefix === "string" && value.code_prefix.trim()
-        ? value.code_prefix.trim()
-        : "MENSQZIN-",
-    sort_mode:
-      value.sort_mode === "deadline" || value.sort_mode === "manual"
-        ? value.sort_mode
-        : "smart",
+    data: {
+      tasks: normalizedTasks,
+      members,
+      code_prefix:
+        typeof value.code_prefix === "string" && value.code_prefix.trim()
+          ? value.code_prefix.trim().slice(0, maxLengths.code)
+          : "MENSQZIN-",
+      sort_mode:
+        value.sort_mode === "deadline" || value.sort_mode === "manual"
+          ? value.sort_mode
+          : "smart",
+    },
   };
 }
+
+export function parseBoardData(value: unknown): BoardData | null {
+  return parseBoardDataWithError(value).data;
+}
+
+export { maxBackupBytes };
 
 export function readLocal(): BoardData {
   if (typeof window === "undefined") return demoData;

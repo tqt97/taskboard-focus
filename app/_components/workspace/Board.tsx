@@ -32,8 +32,22 @@ import {
   Link2,
   ListFilter,
 } from "lucide-react";
-import { demoData, parseBoardData, readLocal, writeLocal } from "@/lib/data";
-import type { BoardData, Member, Priority, SortMode, Status, Task } from "@/lib/types";
+import {
+  demoData,
+  maxBackupBytes,
+  parseBoardDataWithError,
+  readLocal,
+  writeLocal,
+} from "@/lib/data";
+import type {
+  BoardData,
+  Member,
+  Priority,
+  Severity,
+  SortMode,
+  Status,
+  Task,
+} from "@/lib/types";
 import { TaskModal as StructuredTaskModal } from "./TaskModal";
 import { NotificationPopover, type BoardNotification } from "./NotificationPopover";
 
@@ -49,8 +63,28 @@ const priorityLabels: Record<Priority, string> = {
   medium: "Vừa",
   low: "Thấp",
 };
+const priorityRank: Record<Priority, number> = {
+  urgent: 0,
+  high: 1,
+  medium: 2,
+  low: 3,
+};
+const severityRank: Record<Severity, number> = {
+  critical: 0,
+  high: 1,
+  medium: 2,
+  low: 3,
+};
 const reminderLabels = ["Deadline", "Dev up", "Staging up", "Release"] as const;
 type ReminderLabel = (typeof reminderLabels)[number];
+const milestoneDefinitions = [
+  ["Deadline", "deadline"],
+  ["Dev up", "dev_up"],
+  ["Staging up", "staging_up"],
+  ["Release", "release_at"],
+] as const satisfies ReadonlyArray<readonly [ReminderLabel, keyof Task]>;
+const taskMilestones = (task: Task) =>
+  milestoneDefinitions.map(([label, key]) => ({ task, label, date: task[key] }));
 type ReminderSettings = {
   browserEnabled: boolean;
   leadDays: Record<ReminderLabel, number>;
@@ -62,6 +96,14 @@ const defaultReminderSettings: ReminderSettings = {
 const reminderSettingsKey = "taskboard-reminder-settings-v1";
 const browserReminderKey = "taskboard-browser-reminders-v1";
 const allowedLeadDays = [0, 1, 3, 7];
+const safeSetLocalStorage = (key: string, value: string) => {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch {
+    return false;
+  }
+};
 const readReminderSettings = (): ReminderSettings => {
   if (typeof window === "undefined") return defaultReminderSettings;
   try {
@@ -82,7 +124,15 @@ const readReminderSettings = (): ReminderSettings => {
   }
 };
 const saveReminderSettings = (settings: ReminderSettings) =>
-  localStorage.setItem(reminderSettingsKey, JSON.stringify(settings));
+  safeSetLocalStorage(reminderSettingsKey, JSON.stringify(settings));
+const safeRemoveLocalStorage = (key: string) => {
+  try {
+    localStorage.removeItem(key);
+    return true;
+  } catch {
+    return false;
+  }
+};
 const emptyTask = (prefix = "MENSQZIN-"): Task => ({
   id: crypto.randomUUID(),
   code: prefix,
@@ -114,10 +164,17 @@ const taskAssigneeIds = (task: Task) =>
       ? [task.assignee_id]
       : [];
 const displayNameStorageKey = "taskboard-display-name-v1";
-const readDisplayName = () =>
-  (typeof window !== "undefined"
-    ? localStorage.getItem(displayNameStorageKey)?.trim()
-    : "") || "Tuấn";
+const readDisplayName = () => {
+  try {
+    return (
+      (typeof window !== "undefined"
+        ? localStorage.getItem(displayNameStorageKey)?.trim()
+        : "") || "Tuấn"
+    );
+  } catch {
+    return "Tuấn";
+  }
+};
 function dueText(s: string) {
   if (!s) return "Chưa đặt";
   const days = Math.ceil(
@@ -188,7 +245,10 @@ export default function Board() {
     setData(saved);
     setSortMode(saved.sort_mode || "smart");
     setReady(true);
-    const storedDark = localStorage.getItem("taskboard-dark") === "1";
+    let storedDark = false;
+    try {
+      storedDark = localStorage.getItem("taskboard-dark") === "1";
+    } catch {}
     setDark(storedDark);
     setDisplayName(readDisplayName());
     setReminderSettings(readReminderSettings());
@@ -233,7 +293,7 @@ export default function Board() {
   }, [data, ready]);
   useEffect(() => {
     document.documentElement.dataset.theme = dark ? "dark" : "light";
-    localStorage.setItem("taskboard-dark", dark ? "1" : "0");
+    safeSetLocalStorage("taskboard-dark", dark ? "1" : "0");
   }, [dark]);
   useEffect(() => {
     if (!toast) return;
@@ -267,10 +327,8 @@ export default function Board() {
     [data.tasks],
   );
   const smartCompare = (a: Task, b: Task) =>
-    ({ urgent: 0, high: 1, medium: 2, low: 3 })[a.priority] -
-      { urgent: 0, high: 1, medium: 2, low: 3 }[b.priority] ||
-    { critical: 0, high: 1, medium: 2, low: 3 }[a.severity] -
-      { critical: 0, high: 1, medium: 2, low: 3 }[b.severity] ||
+    priorityRank[a.priority] - priorityRank[b.priority] ||
+    severityRank[a.severity] - severityRank[b.severity] ||
     new Date(a.deadline || "9999-12-31").getTime() -
       new Date(b.deadline || "9999-12-31").getTime() ||
     a.order_index - b.order_index;
@@ -309,46 +367,35 @@ export default function Board() {
     const diff = new Date(date).getTime() - nowMs;
     return diff >= -86400000 && diff <= reminderSettings.leadDays[label] * 86400000;
   };
-  const upcomingItems = active
-    .flatMap((t) =>
-      [
-        { task: t, label: "Deadline", date: t.deadline },
-        { task: t, label: "Dev up", date: t.dev_up },
-        { task: t, label: "Staging up", date: t.staging_up },
-        { task: t, label: "Release", date: t.release_at },
-      ].filter((x) => x.date && isInReminderWindow(x.date, x.label as ReminderLabel)),
-    )
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  const upcomingGroups = reminderLabels.map((label) => ({
-    label,
-    items: upcomingItems.filter((item) => item.label === label).slice(0, 3),
-  }));
-  const notifications = useMemo<BoardNotification[]>(
+  const reminderItems = useMemo(
     () =>
       active
-        .flatMap((t) =>
-          [
-            { task: t, label: "Deadline", date: t.deadline },
-            { task: t, label: "Dev up", date: t.dev_up },
-            { task: t, label: "Staging up", date: t.staging_up },
-            { task: t, label: "Release", date: t.release_at },
-          ].filter(
-            (x) => x.date && isInReminderWindow(x.date, x.label as ReminderLabel),
-          ),
-        )
-        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-        .slice(0, 8)
-        .map((item) => {
-          const overdue = new Date(item.date).getTime() < nowMs;
-          return {
-            id: `${item.task.id}-${item.label}`,
-            title: `${item.label}: ${item.task.title}`,
-            detail: `${item.task.code || "TASK"} · ${dueText(item.date)}`,
-            overdue,
-            read: readNotificationIds.includes(`${item.task.id}-${item.label}`),
-          };
-        }),
-    [active, nowMs, readNotificationIds, reminderSettings],
+        .flatMap(taskMilestones)
+        .filter(({ date, label }) => date && isInReminderWindow(date, label))
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
+    [active, nowMs, reminderSettings],
+  );
+  const upcomingGroups = useMemo(
+    () =>
+      reminderLabels.map((label) => ({
+        label,
+        items: reminderItems.filter((item) => item.label === label).slice(0, 3),
+      })),
+    [reminderItems],
+  );
+  const notifications = useMemo<BoardNotification[]>(
+    () =>
+      reminderItems.slice(0, 8).map((item) => {
+        const overdue = new Date(item.date).getTime() < nowMs;
+        return {
+          id: `${item.task.id}-${item.label}`,
+          title: `${item.label}: ${item.task.title}`,
+          detail: `${item.task.code || "TASK"} · ${dueText(item.date)}`,
+          overdue,
+          read: readNotificationIds.includes(`${item.task.id}-${item.label}`),
+        };
+      }),
+    [nowMs, readNotificationIds, reminderItems],
   );
   useEffect(() => {
     if (!ready || !reminderSettings.browserEnabled || browserPermission !== "granted")
@@ -360,15 +407,7 @@ export default function Board() {
     } catch {}
     const nextSent = [...sent];
     active.forEach((task) => {
-      reminderLabels.forEach((label) => {
-        const date =
-          label === "Deadline"
-            ? task.deadline
-            : label === "Dev up"
-              ? task.dev_up
-              : label === "Staging up"
-                ? task.staging_up
-                : task.release_at;
+      taskMilestones(task).forEach(({ label, date }) => {
         if (!date) return;
         const diff = new Date(date).getTime() - nowMs;
         if (diff < -86400000 || diff > reminderSettings.leadDays[label] * 86400000)
@@ -387,25 +426,27 @@ export default function Board() {
       });
     });
     if (nextSent.length !== sent.length) {
-      localStorage.setItem(browserReminderKey, JSON.stringify(nextSent.slice(-200)));
+      safeSetLocalStorage(browserReminderKey, JSON.stringify(nextSent.slice(-200)));
     }
   }, [active, browserPermission, nowMs, ready, reminderSettings]);
   const unreadNotificationCount = notifications.filter((item) => !item.read).length;
   const markNotificationRead = (id: string) => {
     setReadNotificationIds((ids) => {
       const next = ids.includes(id) ? ids : [...ids, id];
-      localStorage.setItem("taskboard-notifications-read-v1", JSON.stringify(next));
+      safeSetLocalStorage("taskboard-notifications-read-v1", JSON.stringify(next));
       return next;
     });
   };
   const markAllNotificationsRead = () => {
     const ids = notifications.map((item) => item.id);
     setReadNotificationIds(ids);
-    localStorage.setItem("taskboard-notifications-read-v1", JSON.stringify(ids));
+    safeSetLocalStorage("taskboard-notifications-read-v1", JSON.stringify(ids));
   };
   const updateReminderSettings = (next: ReminderSettings) => {
     setReminderSettings(next);
-    saveReminderSettings(next);
+    if (!saveReminderSettings(next)) {
+      setToast("Không thể lưu cài đặt; hãy kiểm tra quyền lưu của trình duyệt.");
+    }
   };
   const requestBrowserNotifications = async () => {
     if (!("Notification" in window)) {
@@ -428,11 +469,15 @@ export default function Board() {
     setToast("Đã bật thông báo trình duyệt.");
     return true;
   };
-  const statusSummary = Object.entries(labels).map(([status, label]) => ({
-    status: status as Status,
-    label,
-    count: data.tasks.filter((t) => t.status === status).length,
-  }));
+  const statusSummary = useMemo(
+    () =>
+      Object.entries(labels).map(([status, label]) => ({
+        status: status as Status,
+        label,
+        count: data.tasks.filter((t) => t.status === status).length,
+      })),
+    [data.tasks],
+  );
   const creationActivity = useMemo(
     () =>
       Array.from({ length: 14 }, (_, index) => {
@@ -460,15 +505,18 @@ export default function Board() {
     [data.tasks, now],
   );
   const maxCreated = Math.max(...creationActivity.map((item) => item.count), 1);
-  const attentionTasks = [...active]
-    .sort(
-      (a, b) =>
-        ({ urgent: 0, high: 1, medium: 2, low: 3 })[a.priority] -
-          { urgent: 0, high: 1, medium: 2, low: 3 }[b.priority] ||
-        new Date(a.deadline || "9999-12-31").getTime() -
-          new Date(b.deadline || "9999-12-31").getTime(),
-    )
-    .slice(0, 4);
+  const attentionTasks = useMemo(
+    () =>
+      [...active]
+        .sort(
+          (a, b) =>
+            priorityRank[a.priority] - priorityRank[b.priority] ||
+            new Date(a.deadline || "9999-12-31").getTime() -
+              new Date(b.deadline || "9999-12-31").getTime(),
+        )
+        .slice(0, 4),
+    [active],
+  );
   const saveTask = (task: Task) => {
     setData((d) => ({
       ...d,
@@ -562,20 +610,28 @@ export default function Board() {
   };
   const importData = (file?: File) => {
     if (!file) return;
+    if (file.size > maxBackupBytes) {
+      setToast("File backup quá lớn; giới hạn là 5 MB.");
+      return;
+    }
     const reader = new FileReader();
     reader.onload = () => {
       try {
         const parsed = JSON.parse(String(reader.result));
-        const imported = parseBoardData(parsed);
-        if (parsed.schema_version !== 1 || !imported)
-          throw new Error("File không đúng định dạng Taskboard v1.");
-        setData(imported);
-        setSortMode(imported.sort_mode || "smart");
+        if (!parsed || parsed.schema_version !== 1) {
+          throw new Error("File không đúng schema Taskboard v1.");
+        }
+        const result = parseBoardDataWithError(parsed);
+        if (!result.data)
+          throw new Error(result.error || "Dữ liệu backup không hợp lệ.");
+        setData(result.data);
+        setSortMode(result.data.sort_mode || "smart");
         setToast("Đã nhập dữ liệu");
       } catch (e) {
         setToast(e instanceof Error ? e.message : "Không thể đọc file");
       }
     };
+    reader.onerror = () => setToast("Không thể đọc file backup từ thiết bị.");
     reader.readAsText(file);
   };
   const setMember = (m: Member) =>
@@ -1188,7 +1244,7 @@ export default function Board() {
                       <CalendarDays size={17} />
                     </span>
                   </div>
-                  {upcomingItems.length ? (
+                  {reminderItems.length ? (
                     <div className="timeline-groups">
                       {upcomingGroups.map((group) => (
                         <section
@@ -1339,10 +1395,11 @@ export default function Board() {
           onDisplayName={(name) => {
             const nextName = name.trim();
             setDisplayName(nextName || "Tuấn");
-            if (nextName) {
-              localStorage.setItem(displayNameStorageKey, nextName);
-            } else {
-              localStorage.removeItem(displayNameStorageKey);
+            const saved = nextName
+              ? safeSetLocalStorage(displayNameStorageKey, nextName)
+              : safeRemoveLocalStorage(displayNameStorageKey);
+            if (!saved) {
+              setToast("Không thể lưu tên hiển thị; hãy kiểm tra quyền lưu.");
             }
           }}
           reminderSettings={reminderSettings}
@@ -1418,17 +1475,29 @@ function SettingsModal({
   const [newName, setNewName] = useState(""),
     [newRole, setNewRole] = useState("Developer"),
     [room, setRoom] = useState(() =>
-      typeof window === "undefined"
-        ? ""
-        : localStorage.getItem("taskboard-chatwork-room-id-v1") || "",
+      (() => {
+        try {
+          return typeof window === "undefined"
+            ? ""
+            : localStorage.getItem("taskboard-chatwork-room-id-v1") || "";
+        } catch {
+          return "";
+        }
+      })(),
     ),
     [chatworkTestState, setChatworkTestState] = useState<
       "idle" | "sending" | "success" | "error"
     >("idle"),
     [passcode, setPasscode] = useState(() =>
-      typeof window === "undefined"
-        ? ""
-        : localStorage.getItem("taskboard-lock-passcode-v1") || "",
+      (() => {
+        try {
+          return typeof window === "undefined"
+            ? ""
+            : localStorage.getItem("taskboard-lock-passcode-v1") || "";
+        } catch {
+          return "";
+        }
+      })(),
     );
   return (
     <div
@@ -1627,7 +1696,7 @@ function SettingsModal({
                   value={room}
                   onChange={(e) => {
                     setRoom(e.target.value);
-                    localStorage.setItem(
+                    safeSetLocalStorage(
                       "taskboard-chatwork-room-id-v1",
                       e.target.value.trim(),
                     );
@@ -1754,8 +1823,11 @@ function SettingsModal({
                   <button
                     className="secondary-button"
                     onClick={() => {
-                      localStorage.setItem("taskboard-lock-passcode-v1", passcode);
-                      onClose();
+                      if (safeSetLocalStorage("taskboard-lock-passcode-v1", passcode)) {
+                        onClose();
+                      } else {
+                        onToast("Không thể lưu passcode; hãy kiểm tra quyền lưu.");
+                      }
                     }}
                   >
                     Lưu passcode

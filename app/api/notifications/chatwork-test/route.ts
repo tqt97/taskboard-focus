@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 const chatworkEndpoint = "https://api.chatwork.com/v2/rooms";
 
 export async function POST(request: Request) {
-  const token = process.env.CHATWORK_API_TOKEN;
+  const token = process.env.CHATWORK_API_TOKEN?.trim();
   const configuredRoomId = process.env.CHATWORK_ROOM_ID?.trim() || "";
   if (!token) {
     return NextResponse.json(
@@ -47,6 +47,8 @@ export async function POST(request: Request) {
     body: `[Taskboard Focus] Thông báo test thành công · ${new Date().toLocaleString("vi-VN")}`,
     self_unread: "1",
   });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10_000);
 
   try {
     const response = await fetch(`${chatworkEndpoint}/${roomId}/messages`, {
@@ -58,6 +60,7 @@ export async function POST(request: Request) {
       },
       body: form,
       cache: "no-store",
+      signal: controller.signal,
     });
 
     if (!response.ok) {
@@ -69,10 +72,18 @@ export async function POST(request: Request) {
 
     const result = await response.json().catch(() => ({}));
     return NextResponse.json({ ok: true, messageId: result.message_id || null });
-  } catch {
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      return NextResponse.json(
+        { error: "Chatwork phản hồi quá lâu; vui lòng thử lại." },
+        { status: 504 },
+      );
+    }
     return NextResponse.json(
       { error: "Không kết nối được Chatwork từ server." },
       { status: 502 },
     );
+  } finally {
+    clearTimeout(timeout);
   }
 }

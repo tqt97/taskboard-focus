@@ -87,12 +87,39 @@ export function TaskModal({
     );
   const save = () => {
     const links = [...primary, ...secondary].filter((link) => link.url.trim());
-    if (!form.title.trim()) {
+    const title = form.title.trim();
+    const description = form.description.trim();
+    const normalizedPrefix = localPrefix.trim();
+    if (!title) {
       setError("Vui lòng nhập tên task.");
       return;
     }
-    if (usePrefix && !localPrefix.trim()) {
+    if (title.length > 500) {
+      setError("Tên task không được vượt quá 500 ký tự.");
+      return;
+    }
+    if (description.length > 10000) {
+      setError("Mô tả không được vượt quá 10.000 ký tự.");
+      return;
+    }
+    if (usePrefix && !normalizedPrefix) {
       setError("Vui lòng nhập prefix hoặc bỏ chọn Dùng prefix.");
+      return;
+    }
+    if (usePrefix && normalizedPrefix.length > 100) {
+      setError("Prefix không được vượt quá 100 ký tự.");
+      return;
+    }
+    if (form.code.trim().length > 100) {
+      setError("Mã task không được vượt quá 100 ký tự.");
+      return;
+    }
+    if (links.some((link) => link.label.trim().length > 120)) {
+      setError("Tên link không được vượt quá 120 ký tự.");
+      return;
+    }
+    if (links.some((link) => link.url.trim().length > 2048)) {
+      setError("URL không được vượt quá 2.048 ký tự.");
       return;
     }
     if (links.some((link) => !/^https?:\/\//i.test(link.url.trim()))) {
@@ -100,16 +127,21 @@ export function TaskModal({
       return;
     }
     setError("");
-    if (usePrefix) onPrefixChange(localPrefix.trim());
-    const finalCode = usePrefix
-      ? `${localPrefix}${form.code.replace(prefix, "")}`
-      : form.code;
+    if (usePrefix) onPrefixChange(normalizedPrefix);
+    const codeSuffix = form.code.replace(prefix, "").trim();
+    const finalCode = usePrefix ? `${normalizedPrefix}${codeSuffix}` : form.code.trim();
+    const normalizeLinks = (items: TaskLink[]) =>
+      items
+        .filter((link) => link.url.trim())
+        .map((link) => ({ label: link.label.trim(), url: link.url.trim() }));
     onSave({
       ...form,
+      title,
+      description,
       code: finalCode,
       custom_code: !usePrefix,
-      primary_links: primary.filter((x) => x.url.trim()),
-      secondary_links: secondary.filter((x) => x.url.trim()),
+      primary_links: normalizeLinks(primary),
+      secondary_links: normalizeLinks(secondary),
       assignee_ids: assigneeIds,
       assignee_id: assigneeIds[0] || "",
       links: [],
