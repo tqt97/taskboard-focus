@@ -602,33 +602,86 @@ textarea:focus-visible {
 }
 .assignee-option {
   align-items: center;
-  border: 1px solid var(--line);
+  background: transparent;
+  border: 1px solid transparent;
   border-radius: 10px;
   cursor: pointer;
   display: flex;
   gap: 8px;
-  min-height: 42px;
-  padding: 6px 9px;
+  min-width: 0;
+  min-height: 36px;
+  padding: 5px 8px;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease;
 }
 .assignee-option.selected {
-  background: var(--surface2);
+  background: var(--surface);
   border-color: var(--accent);
 }
+.assignee-option:hover {
+  background: var(--surface);
+  border-color: var(--line);
+}
 .assignee-option input {
+  flex: 0 0 auto;
   accent-color: var(--accent);
+}
+.assignee-picker .assignee-option input {
+  width: auto;
+  min-width: 16px;
+  height: 16px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
 }
 .assignee-option > span:last-child {
   display: grid;
   gap: 1px;
+  min-width: 0;
+  overflow: hidden;
+}
+.assignee-option b,
+.assignee-option small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.assignee-option b {
+  color: var(--text);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.2;
 }
 .assignee-option small {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 9px;
+  font-weight: 400;
+  line-height: 1.2;
 }
 .assignee-picker {
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
   display: grid;
+  gap: 3px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  max-height: 112px;
+  overflow-y: auto;
+  padding: 5px;
+}
+.assignee-field {
+  grid-column: 1 / -1;
+}
+.assignee-field > span {
+  align-items: baseline;
+  display: flex;
   gap: 6px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.assignee-field > span small {
+  font-size: 10px;
 }
 .due {
   display: flex;
@@ -887,7 +940,7 @@ textarea:focus-visible {
   backdrop-filter: blur(3px);
 }
 .modal {
-  width: min(640px, 100%);
+  width: min(820px, 100%);
   max-height: min(90vh, 850px);
   background: var(--surface);
   border-radius: 14px;
@@ -915,6 +968,17 @@ textarea:focus-visible {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 13px;
+}
+.field-row {
+  display: grid;
+  gap: 13px;
+  min-width: 0;
+}
+.field-row-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.field-row.full {
+  grid-column: 1 / -1;
 }
 .field {
   display: grid;
@@ -1395,6 +1459,15 @@ textarea:focus-visible {
   .sidebar {
     display: none;
   }
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+  .field-row {
+    gap: 10px;
+  }
+  .field-row-3 {
+    grid-template-columns: 1fr;
+  }
   .main-area {
     margin-left: 0;
   }
@@ -1514,8 +1587,11 @@ textarea:focus-visible {
     padding: 12px 16px;
   }
   .form-grid {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr;
     gap: 10px;
+  }
+  .field-row-3 {
+    grid-template-columns: 1fr;
   }
   .field.full {
     grid-column: 1/-1;
@@ -2082,6 +2158,9 @@ textarea:focus-visible {
   .link-row input:nth-of-type(2) {
     grid-column: 2/-1;
   }
+  .assignee-picker {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 @media (max-width: 600px) {
   .view-switch {
@@ -2114,6 +2193,10 @@ textarea:focus-visible {
   }
   .link-row input:nth-of-type(2) {
     grid-column: 2/-1;
+  }
+  .assignee-picker {
+    grid-template-columns: 1fr;
+    max-height: 148px;
   }
 }
 

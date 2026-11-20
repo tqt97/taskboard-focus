@@ -197,9 +197,14 @@ export function TaskModal({
                 )}
               </div>
             </div>
-            <div className="field">
+            <div className="field full assignee-field">
               <span>
-                Người phụ trách <small>Có thể chọn nhiều người</small>
+                Người phụ trách{" "}
+                <small>
+                  {assigneeIds.length
+                    ? `${assigneeIds.length} người đã chọn`
+                    : "Chưa giao"}
+                </small>
               </span>
               <div className="assignee-picker">
                 {members
@@ -237,62 +242,73 @@ export function TaskModal({
                 )}
               </div>
             </div>
-            <label className="field">
-              <span>Trạng thái</span>
-              <select
-                value={form.status}
-                onChange={(e) => field("status", e.target.value as Status)}
-              >
-                {Object.entries(labels).map(([k, v]) => (
-                  <option key={k} value={k}>
-                    {v}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="field">
-              <span>Thứ tự ưu tiên</span>
-              <select
-                value={form.priority}
-                onChange={(e) => field("priority", e.target.value as Priority)}
-              >
-                {Object.entries(priorityLabels).map(([k, v]) => (
-                  <option key={k} value={k}>
-                    {v}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="field">
-              <span>Độ nghiêm trọng</span>
-              <select
-                value={form.severity}
-                onChange={(e) => field("severity", e.target.value as Severity)}
-              >
-                {Object.entries(severityLabels).map(([k, v]) => (
-                  <option key={k} value={k}>
-                    {v}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {(
-              [
-                ["dev_up", "Dev up"],
-                ["staging_up", "Staging up"],
-                ["release_at", "Release"],
-                ["deadline", "Deadline"],
-              ] as const
-            ).map(([key, label]) => (
-              <label className="field" key={key}>
-                <span>{label}</span>
-                <input
-                  type="date"
-                  value={dateOnly(form[key])}
-                  onChange={(e) => field(key, stamp(e.target.value))}
-                />
+            <div className="field-row field-row-3 full">
+              <label className="field">
+                <span>Trạng thái</span>
+                <select
+                  value={form.status}
+                  onChange={(e) => field("status", e.target.value as Status)}
+                >
+                  {Object.entries(labels).map(([k, v]) => (
+                    <option key={k} value={k}>
+                      {v}
+                    </option>
+                  ))}
+                </select>
               </label>
-            ))}
+              <label className="field">
+                <span>Thứ tự ưu tiên</span>
+                <select
+                  value={form.priority}
+                  onChange={(e) => field("priority", e.target.value as Priority)}
+                >
+                  {Object.entries(priorityLabels).map(([k, v]) => (
+                    <option key={k} value={k}>
+                      {v}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="field">
+                <span>Độ nghiêm trọng</span>
+                <select
+                  value={form.severity}
+                  onChange={(e) => field("severity", e.target.value as Severity)}
+                >
+                  {Object.entries(severityLabels).map(([k, v]) => (
+                    <option key={k} value={k}>
+                      {v}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <div className="field-row field-row-3 full">
+              {(
+                [
+                  ["dev_up", "Dev up"],
+                  ["staging_up", "Staging up"],
+                  ["release_at", "Release"],
+                ] as const
+              ).map(([key, label]) => (
+                <label className="field" key={key}>
+                  <span>{label}</span>
+                  <input
+                    type="date"
+                    value={dateOnly(form[key])}
+                    onChange={(e) => field(key, stamp(e.target.value))}
+                  />
+                </label>
+              ))}
+            </div>
+            <label className="field">
+              <span>Deadline</span>
+              <input
+                type="date"
+                value={dateOnly(form.deadline)}
+                onChange={(e) => field("deadline", stamp(e.target.value))}
+              />
+            </label>
             <label className="field full">
               <span>Mô tả / ghi chú</span>
               <textarea
