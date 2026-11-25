@@ -10,6 +10,7 @@ import {
 import { getNextOccurrence } from "../lib/taskboard/recurrence.ts";
 import {
   getBrowserReminderId,
+  getReadNotificationStorageKey,
   isWithinQuietHours,
 } from "../lib/taskboard/notifications.ts";
 import { createTaskFromTemplate } from "../lib/taskboard/templates.ts";
@@ -723,6 +724,17 @@ test("browser reminder dedupe is isolated by workspace and preserves default IDs
   assert.notEqual(
     getBrowserReminderId("workspace-a", "task-1", "Deadline", date),
     getBrowserReminderId("workspace-b", "task-1", "Deadline", date),
+  );
+});
+
+test("read notification state uses a workspace-scoped key and preserves legacy default key", () => {
+  assert.equal(
+    getReadNotificationStorageKey("default"),
+    "taskboard-notifications-read-v1",
+  );
+  assert.notEqual(
+    getReadNotificationStorageKey("workspace-a"),
+    getReadNotificationStorageKey("workspace-b"),
   );
 });
 

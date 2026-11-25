@@ -76,6 +76,7 @@ import {
 } from "@/lib/storage/indexed-db-board-storage";
 import { localTemplateStorage } from "@/lib/storage/template-storage";
 import { matchesTaskSearch } from "@/lib/taskboard/search";
+import { getReadNotificationStorageKey } from "@/lib/taskboard/notifications";
 import { useBoardSync } from "@/lib/taskboard/use-board-sync";
 import {
   createTaskFromTemplate,
@@ -488,12 +489,6 @@ export default function Board() {
     window.addEventListener("focus", syncDisplayName);
     window.addEventListener("focus", syncBrowserPermission);
     document.addEventListener("visibilitychange", syncBrowserPermission);
-    try {
-      const storedRead = JSON.parse(
-        localStorage.getItem("taskboard-notifications-read-v1") || "[]",
-      );
-      setReadNotificationIds(Array.isArray(storedRead) ? storedRead : []);
-    } catch {}
     return () => {
       window.removeEventListener("storage", syncDisplayName);
       window.removeEventListener("focus", syncDisplayName);
@@ -501,6 +496,21 @@ export default function Board() {
       document.removeEventListener("visibilitychange", syncBrowserPermission);
     };
   }, [cloudConfigured]);
+  useEffect(() => {
+    if (!ready) return;
+    try {
+      const storedRead = JSON.parse(
+        localStorage.getItem(getReadNotificationStorageKey(workspaceId)) || "[]",
+      );
+      setReadNotificationIds(
+        Array.isArray(storedRead)
+          ? storedRead.filter((id): id is string => typeof id === "string")
+          : [],
+      );
+    } catch {
+      setReadNotificationIds([]);
+    }
+  }, [ready, workspaceId]);
   useEffect(() => {
     if (ready) setReminderSettings(readReminderSettings(workspaceId));
   }, [ready, workspaceId]);
@@ -754,14 +764,20 @@ export default function Board() {
   const markNotificationRead = (id: string) => {
     setReadNotificationIds((ids) => {
       const next = ids.includes(id) ? ids : [...ids, id];
-      safeSetLocalStorage("taskboard-notifications-read-v1", JSON.stringify(next));
+      safeSetLocalStorage(
+        getReadNotificationStorageKey(workspaceId),
+        JSON.stringify(next),
+      );
       return next;
     });
   };
   const markAllNotificationsRead = () => {
     const ids = notifications.map((item) => item.id);
     setReadNotificationIds(ids);
-    safeSetLocalStorage("taskboard-notifications-read-v1", JSON.stringify(ids));
+    safeSetLocalStorage(
+      getReadNotificationStorageKey(workspaceId),
+      JSON.stringify(ids),
+    );
   };
   const updateReminderSettings = (next: ReminderSettings) => {
     setReminderSettings(next);

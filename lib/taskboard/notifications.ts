@@ -16,6 +16,13 @@ export function getBrowserReminderId(
   return `${scope}${taskId}-${milestone}-${date.slice(0, 10)}`;
 }
 
+export function getReadNotificationStorageKey(workspaceId: string) {
+  const legacyKey = "taskboard-notifications-read-v1";
+  return workspaceId === "default"
+    ? legacyKey
+    : `${legacyKey}:${encodeURIComponent(workspaceId)}`;
+}
+
 export function isWithinQuietHours(
   date: Date,
   start: string,

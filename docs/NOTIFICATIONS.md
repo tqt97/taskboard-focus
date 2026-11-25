@@ -4,7 +4,7 @@
 
 ### Notification center
 
-Notification center trong header đọc các mốc `Deadline`, `Dev up`, `Staging up` và `Release` của task chưa hoàn tất. Mốc được lọc theo số ngày nhắc đã cấu hình trong **Cài đặt → Thông báo**, có trạng thái chưa xem/đã xem lưu ở localStorage.
+Notification center trong header đọc các mốc `Deadline`, `Dev up`, `Staging up` và `Release` của task chưa hoàn tất. Mốc được lọc theo số ngày nhắc đã cấu hình trong **Cài đặt → Thông báo**, có trạng thái chưa xem/đã xem lưu riêng theo workspace trong localStorage.
 
 ### Browser notification
 
