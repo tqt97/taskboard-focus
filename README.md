@@ -14,6 +14,7 @@
 - Mốc Dev up, Staging up, Release và Deadline; nhắc trực quan task gần/quá hạn.
 - Tìm kiếm, lọc trạng thái/ưu tiên, kéo thả đổi thứ tự.
 - Focus view cho task cần xử lý, phím tắt `N` tạo task và `Ctrl/Cmd + K` focus tìm kiếm.
+- Ghi nhanh bằng `N` hoặc nút **Ghi nhanh**: tạo task vào Inbox chỉ với tiêu đề, triage sau.
 - Chọn nhiều task để đổi trạng thái hoặc ưu tiên cùng lúc.
 - Bước tiếp theo, ghi chú review và activity history tối giản trên từng task.
 - Chỉnh sửa danh sách thành viên qua UI.
@@ -33,7 +34,8 @@
 
 - Next.js 15 App Router, React 19, TypeScript
 - CSS riêng, Lucide icons
-- LocalStorage cho MVP
+- Geist Sans được self-host, giao diện không phụ thuộc font cài sẵn trên thiết bị.
+- IndexedDB là lưu trữ local chính, LocalStorage là fallback; giữ 7 bản sao an toàn theo ngày trên từng workspace.
 - Supabase Postgres schema chuẩn bị cho bước đồng bộ
 
 ## Bắt đầu
@@ -62,7 +64,7 @@ npm run check
 
 Mở **Cài đặt → Dữ liệu** để xuất backup JSON hoặc nhập backup trên máy khác. Import thay thế toàn bộ workspace đang mở. Xuất dữ liệu đích trước khi import nếu muốn giữ bản hiện tại.
 
-Dữ liệu local gắn với trình duyệt và profile máy tính. Xóa site data/browser profile có thể xóa workspace; hãy backup định kỳ.
+Dữ liệu local gắn với trình duyệt và profile máy tính. App tự giữ 7 bản sao theo ngày trong IndexedDB; vào **Cài đặt → Dữ liệu** để xem và khôi phục qua preview. Bản sao này vẫn nằm trên cùng thiết bị/profile, nên hãy xuất JSON định kỳ nếu cần lưu độc lập hoặc chuyển máy.
 
 ## Deploy Vercel
 

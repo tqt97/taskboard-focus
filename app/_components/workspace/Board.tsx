@@ -1,5 +1,12 @@
 "use client";
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { usePathname, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import {
@@ -11,14 +18,12 @@ import {
   CalendarRange,
   Check,
   CheckCheck,
-  CheckCircle2,
   CloudDownload,
   CloudUpload,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   Clock3,
-  Copy,
   Download,
   Filter,
   LogIn,
@@ -26,11 +31,8 @@ import {
   ListTodo,
   LockKeyhole,
   Moon,
-  MoreHorizontal,
   Menu,
   Plus,
-  Play,
-  RotateCcw,
   Search,
   Save,
   Settings2,
@@ -60,12 +62,7 @@ import type {
 } from "@/lib/types";
 import { NotificationPopover } from "./NotificationPopover";
 import type { ReminderSettings } from "./WorkspaceDialogs";
-import {
-  getTodayTasks,
-  isArchived,
-  isDueToday,
-  isSnoozed,
-} from "@/lib/taskboard/selectors";
+import { getTodayTasks, isArchived, isDueToday } from "@/lib/taskboard/selectors";
 import { toDateInputValue } from "@/lib/taskboard/dates";
 import {
   getUiCopy,
@@ -81,7 +78,6 @@ import {
 } from "@/lib/storage/indexed-db-board-storage";
 import { localTemplateStorage } from "@/lib/storage/template-storage";
 import { matchesTaskSearch } from "@/lib/taskboard/search";
-import { isWithinQuietHours } from "@/lib/taskboard/notifications";
 import { useBoardSync } from "@/lib/taskboard/use-board-sync";
 import {
   createTaskFromTemplate,
@@ -113,6 +109,11 @@ import { mergeBoardImport } from "@/lib/taskboard/import-merge";
 import { diffTaskFields } from "@/lib/taskboard/activity-diff";
 import { useWorkspacePersistence } from "./hooks/useWorkspacePersistence";
 import { useWorkspaceNotifications } from "./hooks/useWorkspaceNotifications";
+import { useBrowserReminders } from "./hooks/useBrowserReminders";
+import { createQuickCaptureTask } from "@/lib/taskboard/quick-capture";
+import { QuickCapture } from "./QuickCapture";
+import { WorkspacePageHeading } from "./WorkspacePageHeading";
+import { TaskCard } from "./TaskCard";
 
 const StructuredTaskModal = dynamic(
   () => import("./TaskModal").then((module) => module.TaskModal),
@@ -164,7 +165,6 @@ const defaultReminderSettings: ReminderSettings = {
 const reminderSettingsKey = "taskboard-reminder-settings-v1";
 const reminderSettingsStorageKey = (workspaceId: string) =>
   `${reminderSettingsKey}:${workspaceId}`;
-const browserReminderKey = "taskboard-browser-reminders-v1";
 const savedViewsKey = "taskboard-saved-views-v1";
 const savedViewsStorageKey = (workspaceId: string) => `${savedViewsKey}:${workspaceId}`;
 const wideWorkspaceBreakpoint = 1440;
@@ -319,7 +319,9 @@ export default function Board() {
     [assigneeFilter, setAssigneeFilter] = useState("all"),
     [dueFilter, setDueFilter] = useState("all"),
     [archiveFilter, setArchiveFilter] = useState<"active" | "archived">("active"),
-    [modal, setModal] = useState<"task" | "settings" | "lock" | null>(null),
+    [modal, setModal] = useState<"task" | "settings" | "lock" | "quick-capture" | null>(
+      null,
+    ),
     [edit, setEdit] = useState<Task | null>(null),
     [confirm, setConfirm] = useState<string | null>(null),
     [importPreview, setImportPreview] = useState<BoardData | null>(null),
@@ -367,6 +369,7 @@ export default function Board() {
   } = useBoardSync(data, setData, workspaceId);
   const cloudConfigured = Boolean(supabase);
   const copy = getUiCopy(locale);
+  const reminderDueText = useCallback((value: string) => dueText(value, copy), [copy]);
   const currentWorkspaceRole = remoteWorkspaceRoles[workspaceId] || "owner";
   const canEditWorkspace =
     !remoteWorkspaceIds.includes(workspaceId) ||
@@ -453,8 +456,14 @@ export default function Board() {
     if ("Notification" in window) setBrowserPermission(Notification.permission);
     else setBrowserPermission("unsupported");
     const syncDisplayName = () => setDisplayName(readDisplayName());
+    const syncBrowserPermission = () => {
+      if ("Notification" in window) setBrowserPermission(Notification.permission);
+      else setBrowserPermission("unsupported");
+    };
     window.addEventListener("storage", syncDisplayName);
     window.addEventListener("focus", syncDisplayName);
+    window.addEventListener("focus", syncBrowserPermission);
+    document.addEventListener("visibilitychange", syncBrowserPermission);
     try {
       const storedRead = JSON.parse(
         localStorage.getItem("taskboard-notifications-read-v1") || "[]",
@@ -464,6 +473,8 @@ export default function Board() {
     return () => {
       window.removeEventListener("storage", syncDisplayName);
       window.removeEventListener("focus", syncDisplayName);
+      window.removeEventListener("focus", syncBrowserPermission);
+      document.removeEventListener("visibilitychange", syncBrowserPermission);
     };
   }, [cloudConfigured]);
   useEffect(() => {
@@ -561,15 +572,14 @@ export default function Board() {
         searchRef.current?.focus();
         return;
       }
-      if (!typing && !modal && event.key.toLowerCase() === "n") {
+      if (!typing && !modal && canEditWorkspace && event.key.toLowerCase() === "n") {
         event.preventDefault();
-        setEdit(null);
-        setModal("task");
+        setModal("quick-capture");
       }
     };
     window.addEventListener("keydown", handleShortcut);
     return () => window.removeEventListener("keydown", handleShortcut);
-  }, [modal]);
+  }, [canEditWorkspace, modal]);
   useEffect(() => {
     if (!notificationsOpen) return;
     const closeOnOutsidePointer = (event: PointerEvent) => {
@@ -667,13 +677,6 @@ export default function Board() {
     const diff = new Date(date).getTime() - nowMs;
     return diff >= -86400000 && diff <= reminderSettings.leadDays[label] * 86400000;
   };
-  const isQuietHours = (date = now) => {
-    return isWithinQuietHours(
-      date,
-      reminderSettings.quietHours.start,
-      reminderSettings.quietHours.end,
-    );
-  };
   const reminderItems = useMemo(
     () =>
       active
@@ -701,43 +704,27 @@ export default function Board() {
     readIds: readNotificationIds,
     dueText,
   });
-  useEffect(() => {
-    if (
-      !ready ||
-      !reminderSettings.browserEnabled ||
-      browserPermission !== "granted" ||
-      isQuietHours()
-    )
-      return;
-    let sent: string[] = [];
-    try {
-      const stored = JSON.parse(localStorage.getItem(browserReminderKey) || "[]");
-      sent = Array.isArray(stored) ? stored.filter((id) => typeof id === "string") : [];
-    } catch {}
-    const nextSent = [...sent];
-    active.forEach((task) => {
-      taskMilestones(task).forEach(({ label, date }) => {
-        if (!date) return;
-        const diff = new Date(date).getTime() - nowMs;
-        if (diff < -86400000 || diff > reminderSettings.leadDays[label] * 86400000)
-          return;
-        const id = `${task.id}-${label}-${date.slice(0, 10)}`;
-        if (nextSent.includes(id)) return;
-        try {
-          new Notification(`${label}: ${task.title}`, {
-            body: `${task.code || "TASK"} · ${dueText(date, copy)}`,
-            tag: id,
-          });
-          nextSent.push(id);
-        } catch {
-          return;
-        }
-      });
-    });
-    if (nextSent.length !== sent.length) {
-      safeSetLocalStorage(browserReminderKey, JSON.stringify(nextSent.slice(-200)));
-    }
-  }, [active, browserPermission, copy, nowMs, ready, reminderSettings]);
+  const openTaskFromNotification = useCallback(
+    (taskId: string) => {
+      const task = data.tasks.find((item) => item.id === taskId);
+      if (!task) return;
+      setNotificationsOpen(false);
+      setTemplateCreateMode(false);
+      setEdit(task);
+      setModal("task");
+    },
+    [data.tasks],
+  );
+  useBrowserReminders({
+    ready,
+    enabled: reminderSettings.browserEnabled,
+    permission: browserPermission,
+    tasks: active,
+    settings: reminderSettings,
+    nowMs,
+    onDueText: reminderDueText,
+    onOpenTask: openTaskFromNotification,
+  });
   const unreadNotificationCount = notifications.filter((item) => !item.read).length;
   const markNotificationRead = (id: string) => {
     setReadNotificationIds((ids) => {
@@ -1323,6 +1310,24 @@ export default function Board() {
     setTemplateCreateMode(false);
     setToast(edit && !templateCreateMode ? "Đã cập nhật task" : "Đã tạo task");
   };
+  const saveQuickCapture = (title: string) => {
+    if (!canEditWorkspace) {
+      setToast("Bạn chỉ có quyền xem workspace này.");
+      setModal(null);
+      return;
+    }
+    const prefix = data.code_prefix || "MENSQZIN-";
+    const task = createQuickCaptureTask(title, data.tasks, prefix);
+    rememberUndo("ghi nhanh task vào Inbox");
+    setData((current) => ({
+      ...current,
+      code_prefix: prefix,
+      tasks: [task, ...current.tasks],
+    }));
+    syncRemoteTasks([task]);
+    setModal(null);
+    setToast("Đã ghi vào Inbox; bạn có thể phân loại sau.");
+  };
   const updateTaskDeadline = (task: Task, date: Date) => {
     if (!canEditWorkspace) {
       setToast("Bạn chỉ có quyền chỉnh deadline trong workspace này.");
@@ -1664,180 +1669,29 @@ export default function Board() {
         : [...d.members, m],
     }));
   };
-  const taskCard = (t: Task) => (
-    <article
-      className={`task-card task-status-${t.status}`}
-      key={t.id}
-      role="button"
-      tabIndex={0}
-      aria-label={`Mở task ${t.code || "TASK"}: ${t.title}`}
-      draggable
-      onDragStart={() => setDragId(t.id)}
-      onDragEnd={() => setDragId(null)}
-      onDragOver={(e) => e.preventDefault()}
-      onDrop={(e) => {
-        e.stopPropagation();
-        dropTask(t);
-      }}
-      onClick={() => {
-        if (selectionMode) {
-          toggleTaskSelection(t.id);
-          return;
-        }
-        setEdit(t);
+  const taskCard = (task: Task) => (
+    <TaskCard
+      key={task.id}
+      task={task}
+      members={data.members}
+      locale={locale}
+      copy={copy}
+      now={now}
+      selectionMode={selectionMode}
+      selected={selectedTaskIds.includes(task.id)}
+      dueText={dueText}
+      dueState={dueState}
+      onToggleSelection={toggleTaskSelection}
+      onOpen={(selectedTask) => {
+        setEdit(selectedTask);
         setModal("task");
       }}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          if (selectionMode) {
-            toggleTaskSelection(t.id);
-            return;
-          }
-          setEdit(t);
-          setModal("task");
-        }
-      }}
-    >
-      <div className="task-top">
-        {selectionMode && (
-          <input
-            className="task-select"
-            type="checkbox"
-            checked={selectedTaskIds.includes(t.id)}
-            aria-label={`Chọn task ${t.code || "TASK"}`}
-            onClick={(event) => event.stopPropagation()}
-            onChange={() => toggleTaskSelection(t.id)}
-          />
-        )}
-        {/* <span
-          className={`urgency-dot ${t.priority}`}
-          title={`Ưu tiên ${priorityLabels[t.priority]}`}
-        /> */}
-        <button
-          className="task-code-copy"
-          type="button"
-          title={`Copy mã ${t.code || "TASK"}`}
-          aria-label={`Copy mã ${t.code || "TASK"}`}
-          onClick={(event) => {
-            event.stopPropagation();
-            void copyTaskCode(t.code || "TASK");
-          }}
-        >
-          <span className="task-code">{t.code || "TASK"}</span>
-          <Copy size={12} aria-hidden="true" />
-        </button>
-        {(t.priority === "urgent" || t.priority === "high") && (
-          <span
-            className={`priority-badge priority-badge-${t.priority}`}
-            title={`Mức ưu tiên ${priorityLabels[t.priority]}`}
-          >
-            {t.priority === "urgent" ? "KHẨN" : "CAO"}
-          </span>
-        )}
-        <button
-          className="icon-button mini"
-          aria-label="Mở task"
-          title="Mở chi tiết task"
-          onClick={(e) => {
-            e.stopPropagation();
-            setEdit(t);
-            setModal("task");
-          }}
-        >
-          <MoreHorizontal size={17} />
-        </button>
-      </div>
-      <h3>{t.title}</h3>
-      {t.next_action && <p className="task-next-action">→ {t.next_action}</p>}
-      {t.checklist?.length ? (
-        <p className="task-checklist-progress">
-          <CheckCheck size={12} /> {t.checklist.filter((item) => item.done).length}/
-          {t.checklist.length} bước hoàn tất
-        </p>
-      ) : null}
-      {t.blocked_by?.length ? (
-        <p className="task-dependency">Phụ thuộc {t.blocked_by.length} task</p>
-      ) : null}
-      {isSnoozed(t, now) && t.snoozed_until ? (
-        <p className="task-snooze-info">
-          Hoãn đến{" "}
-          {new Intl.DateTimeFormat(intlLocale[locale], {
-            day: "2-digit",
-            month: "2-digit",
-            hour: "2-digit",
-            minute: "2-digit",
-          }).format(new Date(t.snoozed_until))}
-        </p>
-      ) : null}
-      {!selectionMode && (
-        <div className="task-card-actions" onClick={(event) => event.stopPropagation()}>
-          {(() => {
-            const action = getPrimaryStatusAction(t);
-            return (
-              <button
-                type="button"
-                className={`task-quick-action${
-                  t.status === "review" ? " success" : ""
-                }`}
-                title={action.title}
-                aria-label={action.title}
-                onClick={() => quickUpdateStatus(t)}
-              >
-                {t.status === "blocked" ? (
-                  <RotateCcw size={13} />
-                ) : t.status === "review" ? (
-                  <CheckCircle2 size={13} />
-                ) : (
-                  <Play size={13} />
-                )}
-                {action.label}
-              </button>
-            );
-          })()}
-        </div>
-      )}
-      <div className="task-meta">
-        <span className="assignee" title="Người phụ trách">
-          {(() => {
-            const assignees = taskAssigneeIds(t)
-              .map((id) => data.members.find((member) => member.id === id))
-              .filter((member): member is Member => Boolean(member));
-            return assignees.length ? (
-              <>
-                <span className="assignee-avatars" aria-hidden="true">
-                  {assignees.slice(0, 3).map((member) => (
-                    <span
-                      className={`avatar avatar-${member.color}`}
-                      key={member.id}
-                      title={member.name}
-                    >
-                      {member.name.slice(0, 1)}
-                    </span>
-                  ))}
-                </span>
-                <span>
-                  {assignees
-                    .slice(0, 2)
-                    .map((member) => member.name)
-                    .join(", ")}
-                  {assignees.length > 2 ? ` +${assignees.length - 2}` : ""}
-                </span>
-              </>
-            ) : (
-              <>
-                <span className="avatar avatar-blue">?</span>
-                <span>Chưa giao</span>
-              </>
-            );
-          })()}
-        </span>
-        <span className={`due ${dueState(t.deadline)}`}>
-          <CalendarDays size={13} />
-          {t.deadline ? dueText(t.deadline, copy) : copy.due.unset}
-        </span>
-      </div>
-    </article>
+      onCopyCode={(code) => void copyTaskCode(code)}
+      onQuickUpdate={quickUpdateStatus}
+      onDragStart={setDragId}
+      onDragEnd={() => setDragId(null)}
+      onDrop={dropTask}
+    />
   );
   if (!ready) {
     return (
@@ -2143,6 +1997,7 @@ export default function Board() {
                   items={notifications}
                   onRead={markNotificationRead}
                   onReadAll={markAllNotificationsRead}
+                  onOpenTask={openTaskFromNotification}
                   onClose={() => setNotificationsOpen(false)}
                 />
               )}
@@ -2168,85 +2023,65 @@ export default function Board() {
         </header>
         <div className="content">
           <div className="page-heading">
-            <div>
-              <div className="eyebrow">
-                {view === "overview"
-                  ? "THỨ NĂM · WORKSPACE CỦA BẠN"
-                  : "WORKSPACE · QUẢN LÝ CÔNG VIỆC"}
-              </div>
-              <h1>
-                {view === "overview" ? (
-                  <>
-                    {greeting}, <span className="display-name">{displayName}</span>
-                  </>
-                ) : view === "today" ? (
-                  "Hôm nay"
-                ) : view === "inbox" ? (
-                  "Inbox cần triage"
-                ) : view === "timeline" ? (
-                  "Lịch & timeline"
-                ) : (
-                  "Danh sách task"
-                )}{" "}
-                <span>✦</span>
-              </h1>
-              <p>
-                {view === "overview"
-                  ? "Một cái nhìn nhanh về tiến độ, rủi ro và các mốc sắp tới."
-                  : view === "today"
-                    ? "Các việc quá hạn, đến hạn hôm nay và ưu tiên khẩn cần được xử lý trước."
-                    : view === "inbox"
-                      ? "Các task mới cần được phân loại, giao người và đặt bước tiếp theo."
-                      : view === "timeline"
-                        ? "Nhìn toàn bộ mốc Dev, Staging, Release và Deadline trên trục thời gian."
-                        : "Tìm, lọc, tạo và cập nhật mọi task trong workspace."}
-              </p>
-            </div>
-            {(view === "tasks" || view === "today" || view === "inbox") && (
-              <div className="page-actions">
-                {templates.length > 0 && (
-                  <select
-                    className="template-select"
-                    aria-label="Tạo task từ template"
-                    defaultValue=""
+            <WorkspacePageHeading
+              view={view}
+              greeting={greeting}
+              displayName={displayName}
+            />
+            <div className="page-actions">
+              <button
+                className="secondary-button quick-capture-trigger"
+                disabled={!canEditWorkspace}
+                onClick={() => setModal("quick-capture")}
+              >
+                <Plus size={16} /> Ghi nhanh
+              </button>
+              {(view === "tasks" || view === "today" || view === "inbox") && (
+                <>
+                  {templates.length > 0 && (
+                    <select
+                      className="template-select"
+                      aria-label="Tạo task từ template"
+                      defaultValue=""
+                      disabled={!canEditWorkspace}
+                      onChange={(event) => {
+                        const template = templates.find(
+                          (item) => item.id === event.target.value,
+                        );
+                        event.currentTarget.value = "";
+                        if (!template) return;
+                        setTemplateCreateMode(true);
+                        setEdit(
+                          createTaskFromTemplate(
+                            template,
+                            `${data.code_prefix || "MENSQZIN-"}NEW`,
+                          ),
+                        );
+                        setModal("task");
+                      }}
+                    >
+                      <option value="">Template</option>
+                      {templates.map((template) => (
+                        <option key={template.id} value={template.id}>
+                          {template.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  <button
+                    className="primary-button"
                     disabled={!canEditWorkspace}
-                    onChange={(event) => {
-                      const template = templates.find(
-                        (item) => item.id === event.target.value,
-                      );
-                      event.currentTarget.value = "";
-                      if (!template) return;
-                      setTemplateCreateMode(true);
-                      setEdit(
-                        createTaskFromTemplate(
-                          template,
-                          `${data.code_prefix || "MENSQZIN-"}NEW`,
-                        ),
-                      );
+                    onClick={() => {
+                      setTemplateCreateMode(false);
+                      setEdit(null);
                       setModal("task");
                     }}
                   >
-                    <option value="">Template</option>
-                    {templates.map((template) => (
-                      <option key={template.id} value={template.id}>
-                        {template.name}
-                      </option>
-                    ))}
-                  </select>
-                )}
-                <button
-                  className="primary-button"
-                  disabled={!canEditWorkspace}
-                  onClick={() => {
-                    setTemplateCreateMode(false);
-                    setEdit(null);
-                    setModal("task");
-                  }}
-                >
-                  <Plus size={17} /> {canEditWorkspace ? "Tạo task" : "Chỉ xem"}
-                </button>
-              </div>
-            )}
+                    <Plus size={17} /> {canEditWorkspace ? "Tạo task" : "Chỉ xem"}
+                  </button>
+                </>
+              )}
+            </div>
           </div>
           {view === "overview" && (
             <>
@@ -2924,6 +2759,9 @@ export default function Board() {
           readOnly={!canEditWorkspace}
         />
       )}
+      {modal === "quick-capture" && (
+        <QuickCapture onClose={() => setModal(null)} onSave={saveQuickCapture} />
+      )}
       {modal === "settings" && (
         <SettingsModal
           data={data}
@@ -2944,6 +2782,12 @@ export default function Board() {
             }
             setModal(null);
             setConfirm("clear");
+          }}
+          workspaceId={workspaceId}
+          onRestoreBackup={(backup) => {
+            setModal(null);
+            setImportPreview(backup);
+            setToast("Đã mở bản sao tự động để xem trước khi khôi phục.");
           }}
           displayName={displayName}
           onDisplayName={(name) => {

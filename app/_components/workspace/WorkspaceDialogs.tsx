@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   AlertTriangle,
   Bell,
@@ -18,6 +18,10 @@ import {
   X,
 } from "lucide-react";
 import type { BoardData, Member } from "@/lib/types";
+import {
+  indexedDbBoardStorage,
+  type LocalBackupSummary,
+} from "@/lib/storage/indexed-db-board-storage";
 import type { RemoteWorkspaceMember } from "@/lib/repositories/task-repository";
 import { localeLabels, supportedLocales, type AppLocale } from "@/lib/i18n";
 
@@ -46,6 +50,8 @@ export function SettingsModal({
   onExport,
   onImport,
   onClear,
+  workspaceId,
+  onRestoreBackup,
   displayName,
   onDisplayName,
   reminderSettings,
@@ -69,6 +75,8 @@ export function SettingsModal({
   onExport: () => void;
   onImport: (f?: File) => void;
   onClear: () => void;
+  workspaceId: string;
+  onRestoreBackup: (data: BoardData) => void;
   displayName: string;
   onDisplayName: (name: string) => void;
   reminderSettings: ReminderSettings;
@@ -441,6 +449,13 @@ export function SettingsModal({
                     }}
                   />
                 </div>
+                {browserPermission === "denied" && (
+                  <p className="muted-note notification-permission-help">
+                    Để bật lại: mở quyền trang web từ biểu tượng cạnh thanh địa chỉ, cho
+                    phép Thông báo, rồi quay lại ứng dụng. Nếu dùng ứng dụng đã cài,
+                    kiểm tra quyền thông báo của ứng dụng trong cài đặt hệ điều hành.
+                  </p>
+                )}
                 <div className="setting-row quiet-hours-row">
                   <span>
                     <b>Quiet hours</b>
@@ -600,6 +615,10 @@ export function SettingsModal({
                     Lưu trữ<strong>Local browser</strong>
                   </span>
                 </div>
+                <LocalBackupList
+                  workspaceId={workspaceId}
+                  onRestore={onRestoreBackup}
+                />
                 <button className="danger-button ghost" onClick={onClear}>
                   <Trash2 size={15} /> Xóa toàn bộ dữ liệu local
                 </button>
@@ -690,6 +709,57 @@ export function SettingsModal({
         </footer>
       </section>
     </div>
+  );
+}
+
+function LocalBackupList({
+  workspaceId,
+  onRestore,
+}: {
+  workspaceId: string;
+  onRestore: (data: BoardData) => void;
+}) {
+  const [backups, setBackups] = useState<LocalBackupSummary[]>([]);
+
+  useEffect(() => {
+    void indexedDbBoardStorage.listBackups(workspaceId).then(setBackups);
+  }, [workspaceId]);
+
+  return (
+    <section className="local-backups" aria-label="Bản sao tự động trên thiết bị">
+      <div>
+        <b>Bản sao tự động trên thiết bị</b>
+        <small>
+          Giữ 7 bản gần nhất, mỗi ngày một bản. Dùng khi cần khôi phục dữ liệu.
+        </small>
+      </div>
+      {backups.length ? (
+        <ul>
+          {backups.map((backup) => (
+            <li key={backup.key}>
+              <span>
+                {new Intl.DateTimeFormat("vi-VN", {
+                  dateStyle: "medium",
+                  timeStyle: "short",
+                }).format(new Date(backup.createdAt))}
+              </span>
+              <button
+                className="text-button"
+                onClick={async () => {
+                  const snapshot = await indexedDbBoardStorage.loadBackup(backup.key);
+                  if (!snapshot) return;
+                  onRestore(snapshot.data);
+                }}
+              >
+                Xem và khôi phục
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <small>Chưa có bản sao; ứng dụng sẽ tạo sau lần lưu dữ liệu đầu tiên.</small>
+      )}
+    </section>
   );
 }
 export function ConfirmDialog({

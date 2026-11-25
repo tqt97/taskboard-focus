@@ -10,6 +10,8 @@ Notification center trong header đọc các mốc `Deadline`, `Dev up`, `Stagin
 
 Có thể bật trong **Cài đặt → Thông báo**. Browser sẽ hỏi quyền một lần và gửi mỗi mốc tối đa một lần cho mỗi ngày/mốc/task. Trạng thái gửi được lưu local để tránh lặp khi app re-render.
 
+Chọn một notification trong Notification Center sẽ mở task tương ứng. Khi quyền đang bị chặn, trang cài đặt hướng dẫn mở quyền thông báo ở quyền website của trình duyệt hoặc trong cài đặt hệ điều hành nếu dùng app đã cài. Ứng dụng kiểm tra lại quyền khi cửa sổ được focus hoặc tab hiện lại.
+
 Giới hạn quan trọng: browser reminder chưa có Service Worker nên chỉ chạy khi workspace đang mở trong một tab và JavaScript đang hoạt động. Đóng toàn bộ tab hoặc máy ngủ thì không thể đánh thức app để gửi nhắc. Persistence IndexedDB không thay đổi giới hạn scheduling này.
 
 ### Chatwork test
@@ -37,12 +39,14 @@ Room ID hiện được nhập từ UI để hỗ trợ test nhưng phải khớ
 Route scheduled notification hiện có idempotency theo `owner_id + run_key + channel`; delivery record theo dõi `pending`, `sent`, `failed`, số lần thử, lease claim ngắn hạn và `next_attempt_at`. Lease ngăn hai cron chạy song song gửi trùng, đồng thời cho phép reclaim nếu process chết giữa chừng. Lỗi thiếu credential hoặc HTTP delivery failure không bị đánh dấu thành công; lần chạy sau sẽ retry theo backoff tối đa 60 phút.
 Scheduled route kiểm tra quiet hours server-side theo `TASKBOARD_TIMEZONE`, `NOTIFICATION_QUIET_START` và `NOTIFICATION_QUIET_END`, rồi bỏ qua delivery trong khoảng yên lặng mà không đánh dấu run là `sent`. Browser reminder dùng quiet hours trong Cài đặt → Thông báo.
 
+Cron tạo một digest mỗi ngày theo timezone cấu hình, tránh gửi lại cùng danh sách mỗi giờ. Digest gồm Deadline, Dev up, Staging up và Release; mỗi mốc mặc định nhắc trước 1 ngày. Có thể cấu hình lead time server từ 0 đến 30 ngày bằng `NOTIFICATION_LEAD_DAYS_DEADLINE`, `NOTIFICATION_LEAD_DAYS_DEV_UP`, `NOTIFICATION_LEAD_DAYS_STAGING_UP` và `NOTIFICATION_LEAD_DAYS_RELEASE`. Đây là cấu hình triển khai; lead time trong giao diện browser vẫn riêng trên thiết bị/workspace local.
+
 Muốn bật production reminder đầy đủ cần:
 
 1. Đồng bộ task vào Supabase hoặc repository server-side có `owner_id` theo account.
 2. Dùng bảng `notification_runs` hiện có làm delivery log; nếu mở rộng nhiều milestone thì thêm idempotency key dạng `task_id + milestone + local_date + channel`.
-3. Tạo Vercel Cron hoặc worker gọi server route/service.
-4. Gửi theo lead time, timezone và quiet hours của workspace.
+3. Tạo Vercel Cron hoặc worker gọi server route/service (route hiện nhóm một digest theo ngày local).
+4. Cấu hình lead time server, timezone và quiet hours qua Environment Variables.
 5. Giữ retry lỗi 429/5xx có backoff, nhưng không gửi trùng khi retry.
 6. Có audit log trạng thái `pending`, `sent`, `failed`.
 

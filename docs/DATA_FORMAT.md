@@ -42,6 +42,6 @@ Trong cloud workspace, mỗi `task_assignees` phải trỏ tới member có cùn
 
 `next_action`, `review_note`, `blocked_by` và `activity` là field tùy chọn để tương thích backup cũ. `blocked_by` chứa task ID và không được tạo vòng lặp; `activity` chỉ là history tóm tắt các thay đổi quan trọng, không phải audit log bảo mật.
 
-Saved views và trạng thái undo được lưu riêng trong localStorage (`taskboard-saved-views-v1` và state runtime), không nằm trong JSON backup v1. Undo chỉ khôi phục thao tác gần nhất trong phiên hiện tại; export/import vẫn là cơ chế restore bền vững.
+Saved views và trạng thái undo được lưu riêng trong localStorage (`taskboard-saved-views-v1` và state runtime), không nằm trong JSON backup v1. Undo chỉ khôi phục thao tác gần nhất trong phiên hiện tại. App cũng giữ tối đa 7 snapshot cục bộ theo workspace trong IndexedDB, một snapshot mỗi ngày; snapshot được preview trước khi khôi phục và không thay thế JSON export vì cùng phụ thuộc vào browser profile.
 
 Ô tìm kiếm hỗ trợ điều kiện dạng `status:review`, `priority:urgent`, `due:today|overdue|week`, `inbox:true|false` kết hợp với text tự do. Điều kiện được parse ở selector dùng chung, không lưu text đã dịch vào domain data.

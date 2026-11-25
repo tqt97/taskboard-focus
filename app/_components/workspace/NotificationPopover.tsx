@@ -3,6 +3,7 @@ import { AlertTriangle, Bell, Check, CheckCheck, Clock3, X } from "lucide-react"
 
 export type BoardNotification = {
   id: string;
+  taskId: string;
   title: string;
   detail: string;
   overdue: boolean;
@@ -13,11 +14,13 @@ export function NotificationPopover({
   items,
   onRead,
   onReadAll,
+  onOpenTask,
   onClose,
 }: {
   items: BoardNotification[];
   onRead: (id: string) => void;
   onReadAll: () => void;
+  onOpenTask: (taskId: string) => void;
   onClose: () => void;
 }) {
   return (
@@ -51,7 +54,10 @@ export function NotificationPopover({
             <button
               className={item.read ? "notification-row read" : "notification-row"}
               key={item.id}
-              onClick={() => onRead(item.id)}
+              onClick={() => {
+                onRead(item.id);
+                onOpenTask(item.taskId);
+              }}
             >
               <span
                 className={

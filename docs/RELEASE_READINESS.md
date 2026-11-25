@@ -35,6 +35,8 @@ Tài liệu này tách rõ phần đã có bằng chứng local/browser khỏi p
 | Multi-workspace            | Đã kiểm chứng local/browser             | workspace/task/template/view isolation E2E                                                         |
 | Realtime collaboration     | Contract đã triển khai, runtime pending | task + assignee subscriptions; cần Supabase multi-client smoke test                                |
 
+Trong cập nhật 2026-11-25, quick capture, snapshot backup và daily reminder digest đã được triển khai; riêng phần mới chỉ typecheck và kiểm tra format, chưa chạy browser E2E hoặc Chatwork/Supabase runtime.
+
 ## Required cloud gate
 
 Chạy lệnh sau trong môi trường có Supabase test project và ba tài khoản dedicated owner/member/viewer:

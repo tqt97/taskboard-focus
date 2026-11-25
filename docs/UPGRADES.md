@@ -2,6 +2,11 @@
 
 ## Đã triển khai
 
+- App self-host Geist Sans (Latin + Latin Extended/Vietnamese) cho typography nhất quán giữa thiết bị; page heading không lặp eyebrow workspace khi navigation đã có breadcrumb.
+- Quick capture qua phím `N` hoặc nút **Ghi nhanh** chỉ yêu cầu tiêu đề và tạo task vào Inbox.
+- Local IndexedDB giữ 7 bản sao theo ngày/workspace, xem danh sách và khôi phục qua import preview; JSON export vẫn là bản sao độc lập để chuyển máy.
+- Browser reminder recheck permission khi tab quay lại, Notification Center mở task đích; Chatwork digest gồm đủ bốn mốc và chạy tối đa một lần/ngày theo timezone cấu hình.
+- Tách UI page heading, quick capture, browser reminder và task card thành component/hook riêng để giảm trách nhiệm của Board.
 - `/today` là workspace riêng cho task quá hạn, đến hạn hôm nay và task khẩn; task đã archive không xuất hiện.
 - Archive là soft-delete: giữ activity, có undo và restore từ filter `Đã lưu trữ`.
 - Local persistence có `boardSchemaVersion`, adapter `BoardStorage` và trạng thái autosave `Đang lưu` / `Đã lưu` / `Lỗi lưu`.
@@ -31,3 +36,5 @@ npm run build
 ```
 
 Domain tests hiện có 54 case, trong đó 53 pass và 1 skip khi thiếu credentials; Supabase integration smoke test được tách riêng. Playwright responsive hiện có 21 matrix case trên Chromium desktop/tablet/mobile, trong đó 19 pass và 2 skip có chủ đích ở mobile workspace.
+
+Trong lượt cập nhật ngày 2026-11-25, `tsc --noEmit` và Prettier check đã pass. Test runner, browser E2E, build production và Chatwork/Supabase runtime chưa chạy lại cho các thay đổi mới.

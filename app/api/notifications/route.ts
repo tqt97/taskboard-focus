@@ -28,10 +28,23 @@ export async function GET(request: NextRequest) {
     auth: { autoRefreshToken: false, persistSession: false },
   });
   const now = new Date();
-  const runKey = now.toISOString().slice(0, 13);
   const quietStart = process.env.NOTIFICATION_QUIET_START || "22:00";
   const quietEnd = process.env.NOTIFICATION_QUIET_END || "07:00";
-  const timeZone = process.env.TASKBOARD_TIMEZONE || "UTC";
+  let timeZone = process.env.TASKBOARD_TIMEZONE || "UTC";
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone }).format(now);
+  } catch {
+    timeZone = "UTC";
+  }
+  const localDateParts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(now);
+  const runKey = ["year", "month", "day"]
+    .map((key) => localDateParts.find((part) => part.type === key)?.value || "")
+    .join("-");
   if (isWithinQuietHours(now, quietStart, quietEnd, timeZone)) {
     return NextResponse.json({
       ok: true,
@@ -42,7 +55,32 @@ export async function GET(request: NextRequest) {
       run_key: runKey,
     });
   }
-  const horizon = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
+  const leadDays = (name: string, fallback: number) => {
+    const value = Number(process.env[name]);
+    return Number.isInteger(value) && value >= 0 && value <= 30 ? value : fallback;
+  };
+  const milestoneFields = [
+    {
+      label: "Deadline",
+      field: "deadline",
+      days: leadDays("NOTIFICATION_LEAD_DAYS_DEADLINE", 1),
+    },
+    {
+      label: "Dev up",
+      field: "dev_up",
+      days: leadDays("NOTIFICATION_LEAD_DAYS_DEV_UP", 1),
+    },
+    {
+      label: "Staging up",
+      field: "staging_up",
+      days: leadDays("NOTIFICATION_LEAD_DAYS_STAGING_UP", 1),
+    },
+    {
+      label: "Release",
+      field: "release_at",
+      days: leadDays("NOTIFICATION_LEAD_DAYS_RELEASE", 1),
+    },
+  ] as const;
   const { data: existingRun, error: existingRunError } = await client
     .from("notification_runs")
     .select("status, attempts, lease_until, next_attempt_at")
@@ -107,7 +145,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: insertError.message }, { status: 500 });
     }
   } else {
-    const { error: claimError } = await client
+    let claimQuery = client
       .from("notification_runs")
       .update({
         status: "pending",
@@ -118,21 +156,46 @@ export async function GET(request: NextRequest) {
       })
       .eq("owner_id", ownerId)
       .eq("run_key", runKey)
-      .eq("channel", "chatwork");
+      .eq("channel", "chatwork")
+      .eq("status", existingRun.status);
+    if (existingRun.status === "pending") {
+      claimQuery = claimQuery.lte("lease_until", now.toISOString());
+    } else {
+      claimQuery = claimQuery.lte("next_attempt_at", now.toISOString());
+    }
+    const { data: claimed, error: claimError } = await claimQuery
+      .select("run_key")
+      .maybeSingle();
     if (claimError)
       return NextResponse.json({ error: claimError.message }, { status: 500 });
+    if (!claimed) {
+      return NextResponse.json({
+        ok: true,
+        skipped: "already_claimed",
+        run_key: runKey,
+      });
+    }
   }
   const { data, error } = await client
     .from("tasks")
-    .select("id, owner_id, code, title, deadline, priority")
+    .select("id, owner_id, code, title, deadline, dev_up, staging_up, release_at")
     .eq("owner_id", ownerId)
     .is("archived_at", null)
-    .neq("status", "done")
-    .not("deadline", "is", null)
-    .lte("deadline", horizon)
-    .order("deadline");
+    .neq("status", "done");
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  const notifications = data || [];
+  const notifications = (data || [])
+    .flatMap((task) =>
+      milestoneFields.flatMap(({ label, field, days }) => {
+        const value = task[field];
+        if (!value) return [];
+        const dueAt = new Date(value).getTime();
+        const nowAt = now.getTime();
+        return dueAt > nowAt && dueAt <= nowAt + days * 86400000
+          ? [{ id: task.id, code: task.code, title: task.title, label, dueAt }]
+          : [];
+      }),
+    )
+    .sort((a, b) => a.dueAt - b.dueAt);
   const markSent = async () => {
     await client
       .from("notification_runs")
@@ -163,9 +226,9 @@ export async function GET(request: NextRequest) {
     return nextAttemptAt;
   };
   if (!notifications.length) {
-    await markSent();
     return NextResponse.json({
       ok: true,
+      skipped: "no_upcoming_milestones",
       generated_at: now.toISOString(),
       notifications: [],
     });
@@ -184,9 +247,10 @@ export async function GET(request: NextRequest) {
     });
   }
   const body = [
-    "[Taskboard Focus] Mốc cần chú ý trong 24 giờ tới",
+    "[Taskboard Focus] Các mốc sắp tới",
     ...notifications.map(
-      (item) => `- ${item.code || item.id}: ${item.title} · ${item.deadline}`,
+      (item) =>
+        `- ${item.label} · ${item.code || item.id}: ${item.title} · ${new Intl.DateTimeFormat("vi-VN", { timeZone, dateStyle: "medium", timeStyle: "short" }).format(new Date(item.dueAt))}`,
     ),
   ].join("\n");
   const response = await fetch(`https://api.chatwork.com/v2/rooms/${roomId}/messages`, {

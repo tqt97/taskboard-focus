@@ -14,6 +14,7 @@
 - Lọc thêm theo người phụ trách, task chưa giao và deadline quá hạn/hôm nay/7 ngày tới.
 - Kéo thẻ task để thay đổi thứ tự hiển thị. Thứ tự này không tự đổi priority.
 - Nhấn `N` để tạo task nhanh; nhấn `Ctrl/Cmd + K` để focus ô tìm kiếm.
+- `N` hoặc nút **Ghi nhanh** mở ô nhập tiêu đề tối giản và lưu task thẳng vào Inbox. Nhấn Enter để lưu; phân loại, giao người và đặt hạn sau.
 - Chọn **Focus** để chỉ xem task urgent/high, chờ review, chưa giao hoặc gần/quá hạn.
 - Chọn **Lịch & timeline** để xem các mốc Dev up, Staging up, Release và Deadline. **Lịch tuần** phù hợp để xem mốc theo từng ngày; **Timeline release** phù hợp để nhìn toàn bộ task và dependency trên cùng trục thời gian.
 - Dùng bộ lọc **Người phụ trách** hoặc **Mốc hiển thị** để thu hẹp thông tin. Kéo mốc **Deadline** sang ngày khác để cập nhật deadline; thay đổi vẫn được lưu vào activity và đồng bộ cloud khi workspace đã đăng nhập.
@@ -29,11 +30,11 @@ Với cloud workspace, phần **Quyền thành viên cloud** cho phép owner/adm
 
 ## Sao lưu và chuyển máy
 
-Trong Cài đặt → Dữ liệu, xuất JSON. Trên máy khác mở app và nhập file. Import thay toàn bộ task và thành viên ở trình duyệt hiện tại; hãy export dữ liệu đích trước khi nhập.
+Trong Cài đặt → Dữ liệu, app giữ 7 bản sao tự động theo ngày trên từng workspace. Chọn **Xem và khôi phục** để đưa bản sao qua màn hình preview trước khi áp dụng. Để chuyển máy hoặc giữ bản độc lập với browser profile, xuất JSON rồi nhập trên máy khác. Import thay toàn bộ task và thành viên ở trình duyệt hiện tại; luôn kiểm tra preview trước khi xác nhận.
 
 ## Dữ liệu và khóa màn hình
 
-Local workspace ưu tiên lưu trong IndexedDB và giữ localStorage làm fallback/migration. Xóa dữ liệu trình duyệt có thể làm mất workspace nếu chưa backup. Cloud workspace cần Supabase Auth và RLS. Lock screen chỉ là lớp giao diện, không bảo vệ endpoint hay dữ liệu trong DevTools.
+Local workspace ưu tiên lưu trong IndexedDB và giữ localStorage làm fallback/migration. Bản sao tự động cũng nằm trên thiết bị này; xóa site data/browser profile có thể làm mất cả workspace lẫn bản sao, nên hãy xuất JSON định kỳ. Cloud workspace cần Supabase Auth và RLS. Lock screen chỉ là lớp giao diện, không bảo vệ endpoint hay dữ liệu trong DevTools.
 
 ## Ngôn ngữ và thiết bị
 

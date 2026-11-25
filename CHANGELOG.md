@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — 2026-11-25
+
+- UI: self-host Geist Sans với hỗ trợ dấu tiếng Việt, đồng bộ font page heading và bỏ eyebrow workspace khỏi các trang.
+- Workflow: thêm quick capture qua `N`/nút **Ghi nhanh**, lưu task mới vào Inbox.
+- Dữ liệu: tự giữ 7 snapshot local theo ngày/workspace và khôi phục qua preview; JSON export vẫn hỗ trợ backup độc lập.
+- Nhắc việc: mở task từ Notification Center, cập nhật lại quyền browser khi quay lại tab, hướng dẫn khôi phục quyền và mở rộng Chatwork digest sang bốn mốc.
+- Bảo trì: tách page heading, quick capture, browser reminder và task card thành các component/hook riêng.
+
 ## 0.1.2 - 2026-11-20
 
 - Thêm GitHub Actions chạy format check, typecheck và production build.

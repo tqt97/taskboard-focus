@@ -33,6 +33,7 @@ export function useWorkspaceNotifications({
       const id = `${item.task.id}-${item.label}`;
       return {
         id,
+        taskId: item.task.id,
         title: `${item.label}: ${item.task.title}`,
         detail: `${item.task.code || "TASK"} · ${dueText(item.date, copy)}`,
         overdue: new Date(item.date).getTime() < nowMs,
@@ -55,6 +56,7 @@ export function useWorkspaceNotifications({
               const id = `mention-${task.id}-${comment.id}`;
               return {
                 id,
+                taskId: task.id,
                 title: `${mentionCopy} ${task.code || "task"}`,
                 detail: comment.body,
                 overdue: false,

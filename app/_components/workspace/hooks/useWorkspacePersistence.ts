@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import type { BoardData } from "@/lib/types";
 import { localBoardStorage } from "@/lib/storage/board-storage";
@@ -26,11 +26,22 @@ export function useWorkspacePersistence({
   setSaveStatus: Dispatch<SetStateAction<"saved" | "saving" | "error">>;
   onError: (message: string) => void;
 }) {
+  const backupFailureNotified = useRef(false);
   useEffect(() => {
     if (!ready || !persistenceReady) return;
     setSaveStatus("saving");
     const timer = window.setTimeout(() => {
       const localResult = localBoardStorage.save(data, workspaceId);
+      void indexedDbBoardStorage
+        .saveDailyBackup(data, workspaceId)
+        .then((backupSaved) => {
+          if (backupSaved) {
+            backupFailureNotified.current = false;
+          } else if (!backupFailureNotified.current) {
+            backupFailureNotified.current = true;
+            onError("Workspace đã lưu, nhưng chưa tạo được bản sao tự động. Hãy xuất JSON.");
+          }
+        });
       const workspaceName =
         localWorkspaces.find((workspace) => workspace.id === workspaceId)?.name ||
         "Workspace cá nhân";

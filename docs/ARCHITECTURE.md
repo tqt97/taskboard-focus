@@ -1,5 +1,7 @@
 # Kiến trúc
 
+Typography dùng Geist Sans self-host với Latin và Latin Extended subsets; giao diện không gọi dịch vụ font bên ngoài khi người dùng mở app. Workspace presentation được tách dần thành page heading, quick-capture dialog, task card và notification hook; Board giữ phần điều phối dữ liệu và route-level state.
+
 ## Hiện trạng package
 
 - Next.js App Router 15 + React 19 + TypeScript.

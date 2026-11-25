@@ -3,6 +3,7 @@ import type { BoardData } from "../types";
 
 const databaseName = "taskboard-focus-v2";
 const storeName = "workspace";
+const backupStoreName = "daily-backups";
 const legacyRecordKey = "current";
 const defaultWorkspaceId = "default";
 let writeQueue: Promise<boolean> = Promise.resolve(true);
@@ -13,6 +14,11 @@ export type LocalWorkspaceSummary = {
   updatedAt: string;
 };
 type WorkspaceRecord = LocalWorkspaceSummary & { data: BoardData };
+export type LocalBackupSummary = { key: string; createdAt: string };
+type LocalBackupRecord = LocalBackupSummary & {
+  workspaceId: string;
+  data: BoardData;
+};
 
 const requestResult = <T>(request: IDBRequest<T>) =>
   new Promise<T>((resolve, reject) => {
@@ -27,10 +33,13 @@ const openDatabase = () =>
       reject(new Error("IndexedDB không khả dụng."));
       return;
     }
-    const request = indexedDB.open(databaseName, 1);
+    const request = indexedDB.open(databaseName, 2);
     request.onupgradeneeded = () => {
       if (!request.result.objectStoreNames.contains(storeName)) {
         request.result.createObjectStore(storeName);
+      }
+      if (!request.result.objectStoreNames.contains(backupStoreName)) {
+        request.result.createObjectStore(backupStoreName);
       }
     };
     request.onsuccess = () => resolve(request.result);
@@ -119,6 +128,80 @@ export const indexedDbBoardStorage = {
       return summaries;
     } catch {
       return [];
+    }
+  },
+  async saveDailyBackup(
+    data: BoardData,
+    workspaceId = defaultWorkspaceId,
+  ): Promise<boolean> {
+    try {
+      const database = await openDatabase();
+      const localNow = new Date();
+      const date = `${localNow.getFullYear()}-${String(localNow.getMonth() + 1).padStart(2, "0")}-${String(localNow.getDate()).padStart(2, "0")}`;
+      const key = `${workspaceId}:${date}`;
+      await new Promise<void>((resolve, reject) => {
+        const transaction = database.transaction(backupStoreName, "readwrite");
+        const backups = transaction.objectStore(backupStoreName);
+        const existing = backups.get(key);
+        existing.onsuccess = () => {
+          if (!existing.result) {
+            backups.put(
+              { key, workspaceId, createdAt: new Date().toISOString(), data },
+              key,
+            );
+          }
+          const all = backups.getAll();
+          all.onsuccess = () => {
+            const own = (all.result as LocalBackupRecord[])
+              .filter((record) => record.workspaceId === workspaceId)
+              .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+            own.slice(7).forEach((record) => backups.delete(record.key));
+          };
+        };
+        transaction.oncomplete = () => resolve();
+        transaction.onerror = () => reject(transaction.error);
+        transaction.onabort = () => reject(transaction.error);
+      });
+      database.close();
+      return true;
+    } catch {
+      return false;
+    }
+  },
+  async listBackups(workspaceId = defaultWorkspaceId): Promise<LocalBackupSummary[]> {
+    try {
+      await writeQueue;
+      const database = await openDatabase();
+      const records = (await requestResult(
+        database
+          .transaction(backupStoreName, "readonly")
+          .objectStore(backupStoreName)
+          .getAll(),
+      )) as LocalBackupRecord[];
+      database.close();
+      return records
+        .filter((record) => record.workspaceId === workspaceId)
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+        .map(({ key, createdAt }) => ({ key, createdAt }));
+    } catch {
+      return [];
+    }
+  },
+  async loadBackup(key: string): Promise<LocalBackupRecord | null> {
+    try {
+      const database = await openDatabase();
+      const record = (await requestResult(
+        database
+          .transaction(backupStoreName, "readonly")
+          .objectStore(backupStoreName)
+          .get(key),
+      )) as LocalBackupRecord | undefined;
+      database.close();
+      if (!record?.data) return null;
+      const parsed = parseBoardData(record.data);
+      return parsed ? { ...record, data: parsed } : null;
+    } catch {
+      return null;
     }
   },
   async readLegacyRecord(): Promise<BoardData | null> {
