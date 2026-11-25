@@ -8,7 +8,7 @@ Notification center trong header đọc các mốc `Deadline`, `Dev up`, `Stagin
 
 ### Browser notification
 
-Có thể bật trong **Cài đặt → Thông báo**. Browser sẽ hỏi quyền một lần và gửi mỗi mốc tối đa một lần cho mỗi ngày/mốc/task. Trạng thái gửi được lưu local để tránh lặp khi app re-render.
+Có thể bật trong **Cài đặt → Thông báo**. Browser sẽ hỏi quyền một lần và gửi mỗi mốc tối đa một lần cho mỗi ngày/mốc/task/workspace. Trạng thái gửi được lưu local theo workspace để tránh lặp khi app re-render hoặc làm mất nhắc ở workspace khác có task ID trùng.
 
 Chọn một notification trong Notification Center sẽ mở task tương ứng. Khi quyền đang bị chặn, trang cài đặt hướng dẫn mở quyền thông báo ở quyền website của trình duyệt hoặc trong cài đặt hệ điều hành nếu dùng app đã cài. Ứng dụng kiểm tra lại quyền khi cửa sổ được focus hoặc tab hiện lại.
 

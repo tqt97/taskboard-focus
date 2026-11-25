@@ -2,7 +2,10 @@
 
 import { useEffect } from "react";
 import type { Task } from "@/lib/types";
-import { isWithinQuietHours } from "@/lib/taskboard/notifications";
+import {
+  getBrowserReminderId,
+  isWithinQuietHours,
+} from "@/lib/taskboard/notifications";
 import type { ReminderSettings } from "../WorkspaceDialogs";
 
 const storageKey = "taskboard-browser-reminders-v1";
@@ -16,6 +19,7 @@ const milestoneFields = [
 export function useBrowserReminders({
   ready,
   enabled,
+  workspaceId,
   permission,
   tasks,
   settings,
@@ -25,6 +29,7 @@ export function useBrowserReminders({
 }: {
   ready: boolean;
   enabled: boolean;
+  workspaceId: string;
   permission: NotificationPermission | "unsupported";
   tasks: Task[];
   settings: ReminderSettings;
@@ -40,7 +45,12 @@ export function useBrowserReminders({
 
     let sent: string[] = [];
     try {
-      const stored = JSON.parse(localStorage.getItem(storageKey) || "[]");
+      const scopedStorageKey = `${storageKey}:${encodeURIComponent(workspaceId)}`;
+      const stored = JSON.parse(
+        localStorage.getItem(scopedStorageKey) ||
+          (workspaceId === "default" ? localStorage.getItem(storageKey) : null) ||
+          "[]",
+      );
       sent = Array.isArray(stored) ? stored.filter((id) => typeof id === "string") : [];
     } catch {}
     const nextSent = [...sent];
@@ -51,7 +61,7 @@ export function useBrowserReminders({
         const difference = new Date(value).getTime() - nowMs;
         if (difference < -86400000 || difference > settings.leadDays[label] * 86400000)
           return;
-        const id = `${task.id}-${label}-${value.slice(0, 10)}`;
+        const id = getBrowserReminderId(workspaceId, task.id, label, value);
         if (nextSent.includes(id)) return;
         try {
           const notification = new Notification(`${label}: ${task.title}`, {
@@ -71,8 +81,21 @@ export function useBrowserReminders({
     });
     if (nextSent.length !== sent.length) {
       try {
-        localStorage.setItem(storageKey, JSON.stringify(nextSent.slice(-200)));
+        localStorage.setItem(
+          `${storageKey}:${encodeURIComponent(workspaceId)}`,
+          JSON.stringify(nextSent.slice(-200)),
+        );
       } catch {}
     }
-  }, [enabled, nowMs, onDueText, onOpenTask, permission, ready, settings, tasks]);
+  }, [
+    enabled,
+    nowMs,
+    onDueText,
+    onOpenTask,
+    permission,
+    ready,
+    settings,
+    tasks,
+    workspaceId,
+  ]);
 }

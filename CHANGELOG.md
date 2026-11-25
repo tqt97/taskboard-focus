@@ -11,6 +11,8 @@
 - Hiệu năng: lazy-load Kanban, timeline, notification popover, import/conflict dialogs; giảm cập nhật đồng hồ xuống mỗi phút và cache chart theo ngày.
 - Cache: self-hosted font assets có tên theo content hash và `Cache-Control: immutable` một năm.
 - Hiệu năng dữ liệu: ghi IndexedDB bất đồng bộ trước, chỉ stringify/ghi localStorage fallback khi IndexedDB không ghi được.
+- Nhắc việc: cô lập trạng thái đã gửi theo workspace để tránh task ID trùng làm bỏ nhắc chéo.
+- Kiểm thử: thêm regression test cho dedupe reminder xuyên workspace.
 - Kết quả build lần rà soát 2026-11-25: First Load JS workspace 203 kB (mốc trước tối ưu 208 kB); phần Board dùng chung vẫn chiếm phần lớn bundle.
 
 ## 0.1.2 - 2026-11-20

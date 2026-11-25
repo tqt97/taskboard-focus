@@ -742,6 +742,7 @@ export default function Board() {
   useBrowserReminders({
     ready,
     enabled: reminderSettings.browserEnabled,
+    workspaceId,
     permission: browserPermission,
     tasks: active,
     settings: reminderSettings,

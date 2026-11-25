@@ -6,6 +6,16 @@ const toMinutes = (value: string) => {
   return hour <= 23 && minute <= 59 ? hour * 60 + minute : null;
 };
 
+export function getBrowserReminderId(
+  workspaceId: string,
+  taskId: string,
+  milestone: string,
+  date: string,
+) {
+  const scope = workspaceId === "default" ? "" : `${encodeURIComponent(workspaceId)}:`;
+  return `${scope}${taskId}-${milestone}-${date.slice(0, 10)}`;
+}
+
 export function isWithinQuietHours(
   date: Date,
   start: string,

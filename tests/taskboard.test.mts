@@ -8,7 +8,10 @@ import {
   isSnoozed,
 } from "../lib/taskboard/selectors.ts";
 import { getNextOccurrence } from "../lib/taskboard/recurrence.ts";
-import { isWithinQuietHours } from "../lib/taskboard/notifications.ts";
+import {
+  getBrowserReminderId,
+  isWithinQuietHours,
+} from "../lib/taskboard/notifications.ts";
 import { createTaskFromTemplate } from "../lib/taskboard/templates.ts";
 import { createTaskComment } from "../lib/taskboard/comments.ts";
 import { formatActivityDate, formatActivityValue } from "../lib/taskboard/activity.ts";
@@ -708,6 +711,18 @@ test("quiet hours handle overnight windows and timezone conversion", () => {
       "Asia/Ho_Chi_Minh",
     ),
     false,
+  );
+});
+
+test("browser reminder dedupe is isolated by workspace and preserves default IDs", () => {
+  const date = "2026-11-26T10:00:00.000Z";
+  assert.equal(
+    getBrowserReminderId("default", "task-1", "Deadline", date),
+    "task-1-Deadline-2026-11-26",
+  );
+  assert.notEqual(
+    getBrowserReminderId("workspace-a", "task-1", "Deadline", date),
+    getBrowserReminderId("workspace-b", "task-1", "Deadline", date),
   );
 });
 
