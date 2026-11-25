@@ -1,4 +1,5 @@
 import { performance } from "node:perf_hooks";
+import { createTaskSearchMatcher, matchesTaskSearch } from "../lib/taskboard/search.ts";
 
 const sizes = [100, 1000, 10000];
 const makeTask = (index) => ({
@@ -27,11 +28,12 @@ for (const size of sizes) {
     Array.from({ length: size }, (_, index) => makeTask(index)),
   );
   const tasks = generated.value;
-  const search = measure("search while typing", () =>
-    tasks.filter((task) =>
-      `${task.title} ${task.description}`.toLowerCase().includes("payment"),
-    ),
+  const query = "payment";
+  const repeatedParseSearch = measure("search with per-task query parse", () =>
+    tasks.filter((task) => matchesTaskSearch(task, query)),
   );
+  const matcher = createTaskSearchMatcher(query);
+  const search = measure("search with compiled matcher", () => tasks.filter(matcher));
   const realtime = measure("realtime update", () =>
     tasks.map((task, index) =>
       index === Math.floor(size / 2)
@@ -44,6 +46,7 @@ for (const size of sizes) {
     JSON.stringify({
       size,
       generate_ms: generated.ms,
+      repeated_parse_search_ms: repeatedParseSearch.ms,
       search_ms: search.ms,
       realtime_ms: realtime.ms,
       serialize_ms: serialize.ms,

@@ -2,14 +2,14 @@ import { createClient } from "@supabase/supabase-js";
 import * as webpush from "web-push";
 import { NextRequest, NextResponse } from "next/server";
 import { isWithinQuietHours } from "@/lib/taskboard/notifications";
+import {
+  deliverPushNotifications,
+  getPushRunSkipReason,
+  validatePushConfig,
+  type PushSubscriptionRecord,
+} from "@/lib/taskboard/web-push-delivery";
 
 export const dynamic = "force-dynamic";
-
-type PushSubscription = {
-  endpoint: string;
-  p256dh: string;
-  auth: string;
-};
 
 export async function GET(request: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
@@ -28,32 +28,33 @@ export async function GET(request: NextRequest) {
   const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
   const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
   const vapidSubject = process.env.VAPID_SUBJECT;
-  if (
-    !url ||
-    !serviceKey ||
-    !ownerId ||
-    !vapidPublicKey ||
-    !vapidPrivateKey ||
-    !vapidSubject
-  ) {
+  const configError = validatePushConfig({
+    supabaseUrl: url,
+    serviceKey,
+    ownerId,
+    publicKey: vapidPublicKey,
+    privateKey: vapidPrivateKey,
+    subject: vapidSubject,
+  });
+  if (configError === "missing") {
     return NextResponse.json(
       { error: "Push reminder chưa được cấu hình đầy đủ." },
       { status: 503 },
     );
   }
-  if (!/^(mailto:.+|https:\/\/.+)$/.test(vapidSubject)) {
+  if (configError === "invalid_subject") {
     return NextResponse.json(
       { error: "VAPID_SUBJECT phải là mailto: hoặc HTTPS URL." },
       { status: 503 },
     );
   }
   try {
-    webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
+    webpush.setVapidDetails(vapidSubject!, vapidPublicKey!, vapidPrivateKey!);
   } catch {
     return NextResponse.json({ error: "VAPID keys không hợp lệ." }, { status: 503 });
   }
 
-  const client = createClient(url, serviceKey, {
+  const client = createClient(url!, serviceKey!, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
   const now = new Date();
@@ -144,25 +145,9 @@ export async function GET(request: NextRequest) {
     .maybeSingle();
   if (existingError)
     return NextResponse.json({ error: existingError.message }, { status: 500 });
-  if (existing?.status === "sent") {
-    return NextResponse.json({
-      ok: true,
-      skipped: "already_processed",
-      run_key: runKey,
-    });
-  }
-  if (
-    existing?.status === "pending" &&
-    existing.lease_until &&
-    new Date(existing.lease_until).getTime() > now.getTime()
-  ) {
-    return NextResponse.json({ ok: true, skipped: "in_progress", run_key: runKey });
-  }
-  if (
-    existing?.next_attempt_at &&
-    new Date(existing.next_attempt_at).getTime() > now.getTime()
-  ) {
-    return NextResponse.json({ ok: true, skipped: "retry_backoff", run_key: runKey });
+  const skipReason = getPushRunSkipReason(existing, now.getTime());
+  if (skipReason) {
+    return NextResponse.json({ ok: true, skipped: skipReason, run_key: runKey });
   }
   const attempts = Number(existing?.attempts || 0) + 1;
   const leaseUntil = new Date(now.getTime() + 5 * 60 * 1000).toISOString();
@@ -223,30 +208,27 @@ export async function GET(request: NextRequest) {
     url: "/today",
     tag: `taskboard-${runKey}`,
   });
-  let failures = 0;
-  for (const raw of subscriptions as PushSubscription[]) {
-    try {
+  const { failures } = await deliverPushNotifications(
+    subscriptions as PushSubscriptionRecord[],
+    payload,
+    async (subscription, message) => {
       await webpush.sendNotification(
-        { endpoint: raw.endpoint, keys: { p256dh: raw.p256dh, auth: raw.auth } },
-        payload,
+        {
+          endpoint: subscription.endpoint,
+          keys: { p256dh: subscription.p256dh, auth: subscription.auth },
+        },
+        message,
         { TTL: 3600 },
       );
-    } catch (error) {
-      const statusCode =
-        typeof error === "object" && error && "statusCode" in error
-          ? Number(error.statusCode)
-          : 0;
-      if (statusCode === 404 || statusCode === 410) {
-        await client
-          .from("push_subscriptions")
-          .delete()
-          .eq("owner_id", ownerId)
-          .eq("endpoint", raw.endpoint);
-      } else {
-        failures += 1;
-      }
-    }
-  }
+    },
+    async (endpoint) => {
+      await client
+        .from("push_subscriptions")
+        .delete()
+        .eq("owner_id", ownerId)
+        .eq("endpoint", endpoint);
+    },
+  );
   if (failures) {
     const delayMinutes = Math.min(60, 2 ** Math.min(attempts - 1, 5));
     const retryAt = new Date(now.getTime() + delayMinutes * 60000).toISOString();

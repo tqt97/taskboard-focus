@@ -1313,6 +1313,19 @@ textarea:focus-visible {
   border-radius: 8px;
   background: var(--surface);
 }
+.task-modal .dependency-search {
+  width: 100%;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  color: var(--text);
+  background: var(--surface);
+  font: inherit;
+}
+.task-modal .dependency-result-count {
+  color: var(--muted);
+}
 .task-modal .dependency-list {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -5582,6 +5595,37 @@ textarea:focus-visible {
 }
 .danger-text {
   color: var(--danger);
+}
+.task-title-row,
+.task-inline-title-form {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.task-title-row h3 {
+  flex: 1;
+  min-width: 0;
+}
+.task-inline-edit {
+  flex: none;
+  opacity: 0.55;
+}
+.task-card:hover .task-inline-edit,
+.task-card:focus-within .task-inline-edit {
+  opacity: 1;
+}
+.task-inline-title-form input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  padding: 7px 9px;
+  color: var(--text);
+  background: var(--surface);
+  font: inherit;
+}
+.task-inline-title-form button {
+  flex: none;
 }
 @media (max-width: 520px) {
   .template-manage-trigger {

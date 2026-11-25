@@ -40,7 +40,7 @@
 - Realtime conflict resolution có conditional `updated_at` write, `REPLICA IDENTITY FULL` cho stale-delete, shared workspace CRUD không còn giới hạn theo người tạo task, và không nhận event cũ hơn local; atomic server/runtime integration test vẫn cần môi trường Supabase thật.
 - Comment theo task đã tách khỏi activity history: mention, reply, pin và notification mention; deadline/mốc trong activity được format theo locale thay vì hiển thị ISO thô.
 - Conflict Center đã có compare local/remote, merge từng field, chọn giữ local/lấy remote và blocked queue riêng; thao tác ghi đè remote chỉ chạy sau xác nhận rõ ràng.
-- Có `npm run benchmark` đo workload 100/1.000/10.000 task gồm tạo dữ liệu, search khi gõ, realtime update và serialize backup; `npm run benchmark:e2e` đo trực tiếp qua IndexedDB trong browser cả load/search/mở modal/chuyển tab. Baseline lần chạy hiện tại ở 10.000 task là khoảng 1.24s/498ms/739ms/182ms; cần theo dõi thêm card height biến thiên trước khi chốt ngưỡng production.
+- Có `npm run benchmark` đo workload 100/1.000/10.000 task gồm tạo dữ liệu, search, realtime update và serialize backup; `npm run benchmark:e2e` đo trực tiếp qua IndexedDB trong browser cả load/search/mở modal/chuyển tab. Benchmark cục bộ 2026-11-25 trên 10.000 task: matcher compiled tìm kiếm 3,39 ms so với 22,28 ms khi parse query từng task. Đây là một lần đo Node cục bộ, không thay thế browser benchmark.
 - Import backup đã có preview conflict, merge từng task và lựa chọn thay thế toàn bộ; các thao tác import đều đi qua undo window.
 - Next Action, activity diff và import merge/preview được tách thành domain modules để tiếp tục refactor `Board.tsx` theo seam, không rewrite một lần.
 
@@ -54,13 +54,14 @@ P0 và phần lớn P1 đã có code/test local/E2E. P2 đã có contract chạy
 
 ## Ưu tiên sau rà soát 2026-11-25
 
-1. **P0 — xác minh luồng lưu:** bổ sung kiểm tra browser cho IndexedDB primary, localStorage fallback, workspace switch và daily backup. Unit tests hiện kiểm tra localStorage scope; Playwright chưa chạy được trên máy rà soát vì thiếu Chromium.
-2. **P1 — giảm bundle theo route:** `Board` vẫn được import trên mọi route workspace nên shared First Load JS là khoảng 203 kB. Tách state/data orchestration khỏi view-specific UI, sau đó cho `/timeline`, `/inbox`, `/today` và `/tasks` tải đúng feature của route; đo lại build trước/sau mỗi nhánh.
-3. **P1 — giảm rủi ro bảo trì:** tiếp tục tách `Board` theo seams rõ ràng (toolbar/navigation, dashboard analytics, task list, workspace settings) và thêm test cho storage fallback. Giữ các domain rules trong `lib/taskboard/`, tránh chuyển logic nghiệp vụ vào component.
+1. **P0 — xác minh lưu trữ trên browser:** unit tests đã cover backup legacy, JSON lỗi, undo thay nhầm, nhưng cần chạy browser tests cho IndexedDB primary, localStorage fallback, workspace switch và daily backup. Hiện máy thiếu Chromium nên chưa xác nhận E2E.
+2. **P1 — giảm bundle theo route:** dashboard analytics đã được tách sang `WorkspaceOverview` lazy-load, nhưng build vẫn báo 203 kB First Load JS do làm tròn; chưa có mức giảm tổng đo được. Phần orchestration chung vẫn chiếm phần lớn. Tiếp theo tách task-list workspace và settings khỏi shell trước khi đánh giá tối ưu sâu hơn.
+3. **P1 — giảm rủi ro bảo trì:** saved views và keyboard shortcuts đã chuyển sang hooks; backup, push delivery và dashboard analytics đã thành module riêng. `Board.tsx` vẫn là component điều phối lớn; tiếp tục tách toolbar/filter bar, task-list content và workspace dialogs thành seams có props rõ, giữ domain rules trong `lib/taskboard/`.
 4. **P1 — hoàn tất cloud gate:** chạy `npm run test:supabase:required` với project test, owner/member/viewer và multi-client race; chỉ sau đó nâng trạng thái cloud collaboration từ contract sang runtime-verified.
-5. **P1 — bảo vệ notification test:** Chatwork test giờ yêu cầu owner Auth, room cố định và atomic cooldown 60 giây; cần chạy integration test với project Supabase.
+5. **P1 — bảo vệ notification test:** Chatwork test giờ yêu cầu owner Auth, room cố định và atomic cooldown 60 giây; unit tests kiểm tra Web Push config, dedupe state, delivery, lỗi tạm thời và subscription 404/410. Cần chạy integration test với project Supabase.
 6. **P1 — kiểm chứng Web Push:** subscription, Service Worker, VAPID delivery và cron route đã có; cần bật env/schema và xác minh nhận banner trên thiết bị đã cài PWA.
 7. **P2 — quản lý template:** UI đổi tên/xóa template đã được thêm; tiếp theo có thể thêm tag/danh mục nếu thư viện lớn.
 8. **P2 — backup ngoài thiết bị:** app nhắc tải JSON mỗi tuần nhưng backup vẫn do người dùng chủ động lưu; có thể thêm provider cloud backup có mã hóa đầu cuối.
+9. **P2 — thao tác task nhanh:** đã có `N` để ghi nhanh, `Ctrl/⌘ K` tìm kiếm, inline edit tiêu đề và xóa saved view. Có thể mở rộng inline edit cho priority/deadline nếu browser E2E xác nhận thao tác mới ổn định.
 
 Không đưa server cache vào dữ liệu task/workspace cá nhân vì dữ liệu phụ thuộc account và thay đổi thường xuyên. Cache dài hạn phù hợp với font/static assets; cache dữ liệu cloud cần account-scoped invalidation trước khi thêm.

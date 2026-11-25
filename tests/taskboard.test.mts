@@ -28,7 +28,17 @@ import {
 import { getNextAction } from "../lib/taskboard/next-action.ts";
 import { diffTaskFields } from "../lib/taskboard/activity-diff.ts";
 import { mergeBoardImport, previewBoardImport } from "../lib/taskboard/import-merge.ts";
-import { matchesTaskSearch, parseTaskSearch } from "../lib/taskboard/search.ts";
+import {
+  createTaskSearchMatcher,
+  matchesTaskSearch,
+  parseTaskSearch,
+} from "../lib/taskboard/search.ts";
+import { updateTaskTitleInline } from "../lib/taskboard/inline-edit.ts";
+import {
+  deliverPushNotifications,
+  getPushRunSkipReason,
+  validatePushConfig,
+} from "../lib/taskboard/web-push-delivery.ts";
 import {
   remoteTaskScope,
   remoteRowToTask,
@@ -50,6 +60,92 @@ import {
 } from "../lib/taskboard/status-transitions.ts";
 
 const fixture = () => JSON.parse(JSON.stringify(demoData)) as typeof demoData;
+
+test("compiled task search matcher matches the convenience matcher", () => {
+  const task = fixture().tasks[0];
+  const matcher = createTaskSearchMatcher("status:todo priority:medium");
+  assert.equal(matcher(task), matchesTaskSearch(task, "status:todo priority:medium"));
+});
+
+test("inline title edit rejects empty titles and records a change", () => {
+  const task = fixture().tasks[0];
+  assert.equal(updateTaskTitleInline(task, "   "), null);
+  const updated = updateTaskTitleInline(
+    task,
+    "  Updated title  ",
+    "2026-11-25T12:00:00.000Z",
+  );
+  assert.ok(updated);
+  assert.equal(updated.title, "Updated title");
+  assert.equal(updated.activity?.at(-1)?.changes?.[0]?.from, task.title);
+  assert.equal(updated.activity?.at(-1)?.changes?.[0]?.to, "Updated title");
+});
+
+test("push configuration fails closed for missing values and invalid VAPID subject", () => {
+  assert.equal(validatePushConfig({}), "missing");
+  const valid = {
+    supabaseUrl: "https://example.supabase.co",
+    serviceKey: "service-key",
+    ownerId: "owner-id",
+    publicKey: "public",
+    privateKey: "private",
+    subject: "mailto:admin@example.com",
+  };
+  assert.equal(
+    validatePushConfig({ ...valid, subject: "javascript:alert(1)" }),
+    "invalid_subject",
+  );
+  assert.equal(validatePushConfig(valid), null);
+});
+
+test("push run state prevents duplicate sends and respects active lease and backoff", () => {
+  const now = Date.parse("2026-11-25T12:00:00.000Z");
+  assert.equal(getPushRunSkipReason({ status: "sent" }, now), "already_processed");
+  assert.equal(
+    getPushRunSkipReason(
+      { status: "pending", lease_until: "2026-11-25T12:01:00.000Z" },
+      now,
+    ),
+    "in_progress",
+  );
+  assert.equal(
+    getPushRunSkipReason(
+      { status: "failed", next_attempt_at: "2026-11-25T12:01:00.000Z" },
+      now,
+    ),
+    "retry_backoff",
+  );
+  assert.equal(
+    getPushRunSkipReason({ status: "failed", next_attempt_at: null }, now),
+    null,
+  );
+});
+
+test("push delivery sends valid subscriptions, removes expired endpoints, and counts failures", async () => {
+  const removed: string[] = [];
+  const sent: string[] = [];
+  const subscriptions = ["ok", "expired", "gone", "broken"].map((endpoint) => ({
+    endpoint,
+    p256dh: "p256dh",
+    auth: "auth",
+  }));
+  const result = await deliverPushNotifications(
+    subscriptions,
+    "payload",
+    async (subscription) => {
+      if (subscription.endpoint === "expired") throw { statusCode: 404 };
+      if (subscription.endpoint === "gone") throw { statusCode: 410 };
+      if (subscription.endpoint === "broken") throw new Error("temporary failure");
+      sent.push(subscription.endpoint);
+    },
+    async (endpoint) => {
+      removed.push(endpoint);
+    },
+  );
+  assert.deepEqual(sent, ["ok"]);
+  assert.deepEqual(removed, ["expired", "gone"]);
+  assert.deepEqual(result, { failures: 1, expired: 2 });
+});
 
 test("comments preserve replies and mention member IDs", () => {
   const comment = createTaskComment({
