@@ -94,6 +94,8 @@ export type Task = {
   next_action?: string;
   review_note?: string;
   blocked_by?: string[];
+  /** Status to restore when a blocked task is unblocked. */
+  blocked_from?: "todo" | "in_progress" | "review";
   activity?: TaskActivity[];
   archived_at?: string;
   recurrence?: RecurrenceRule;

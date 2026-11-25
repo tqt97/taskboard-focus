@@ -59,7 +59,7 @@ MVP hiện tại là local-first. Mỗi trình duyệt/máy có vùng lưu riên
 ## Mô hình dữ liệu
 
 - `members`: id, name, role, color, active.
-- `tasks`: id, code, title, description, status (`todo`, `in_progress`, `review`, `blocked`, `done`), priority, severity, next action, review note, dependency IDs, checklist, inbox/triage state, snooze window, activity diff, primary/secondary links, legacy `assignee_id`, dev_up, staging_up, release_at, deadline, order_index, links, attachments, timestamps.
+- `tasks`: id, code, title, description, status (`todo`, `in_progress`, `review`, `blocked`, `done`), optional `blocked_from`, priority, severity, next action, review note, dependency IDs, checklist, inbox/triage state, snooze window, activity diff, primary/secondary links, legacy `assignee_id`, dev_up, staging_up, release_at, deadline, order_index, links, attachments, timestamps.
 - `task_assignees`: bảng nối nhiều-nhiều giữa task và member; đây là nguồn quan hệ assignment chuẩn cho task có một hoặc nhiều người phụ trách.
 - `workspaces` và `workspace_members`: multi-workspace và role (`owner`, `admin`, `member`, `viewer`); local UI vẫn giữ backward compatibility với workspace mặc định, còn cloud user có thể tải/tạo workspace remote. `viewer` được đưa vào Board read-only và không thể mutate task/member data.
 - Các query task/member theo workspace có index `workspace_id`; task list cloud có thêm composite index `(workspace_id, order_index)` để giữ thứ tự ổn định khi workspace lớn.

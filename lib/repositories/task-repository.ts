@@ -97,6 +97,7 @@ export const taskToRemoteRow = (task: Task, ownerId: string, workspaceId?: strin
   next_action: task.next_action || "",
   review_note: task.review_note || "",
   blocked_by: task.blocked_by || [],
+  blocked_from: task.blocked_from || null,
   activity: task.activity || [],
   primary_links: task.primary_links || [],
   secondary_links: task.secondary_links || [],
@@ -151,6 +152,12 @@ export const remoteRowToTask = (
     deadline: row.deadline || "",
     links: Array.isArray(row.links) ? row.links : [],
     blocked_by: Array.isArray(row.blocked_by) ? row.blocked_by : [],
+    blocked_from:
+      row.blocked_from === "todo" ||
+      row.blocked_from === "in_progress" ||
+      row.blocked_from === "review"
+        ? row.blocked_from
+        : undefined,
     activity: Array.isArray(row.activity) ? row.activity : [],
     primary_links: Array.isArray(row.primary_links) ? row.primary_links : [],
     secondary_links: Array.isArray(row.secondary_links) ? row.secondary_links : [],

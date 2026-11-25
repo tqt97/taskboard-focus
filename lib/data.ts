@@ -258,6 +258,8 @@ const isTask = (value: unknown): value is Task =>
       value.blocked_by.every(
         (id) => isBoundedString(id, maxLengths.id) && Boolean(id.trim()),
       ))) &&
+  (value.blocked_from === undefined ||
+    ["todo", "in_progress", "review"].includes(String(value.blocked_from))) &&
   (value.activity === undefined ||
     (Array.isArray(value.activity) &&
       value.activity.length <= 200 &&
@@ -288,6 +290,15 @@ export function migrateBoardData(value: unknown): unknown {
           ? {
               ...task,
               blocked_by: task.blocked_by ?? [],
+              ...(task.status === "blocked"
+                ? {
+                    blocked_from: ["todo", "in_progress", "review"].includes(
+                      String(task.blocked_from),
+                    )
+                      ? task.blocked_from
+                      : "in_progress",
+                  }
+                : {}),
               attachments: task.attachments ?? [],
               checklist: task.checklist ?? [],
             }

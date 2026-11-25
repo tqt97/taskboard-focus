@@ -100,6 +100,10 @@ import {
   type RemoteWorkspaceMember,
 } from "@/lib/repositories/task-repository";
 import { can, type WorkspaceRole } from "@/lib/taskboard/permissions";
+import {
+  getPrimaryStatusAction,
+  resolveStatusTransition,
+} from "@/lib/taskboard/status-transitions";
 
 const StructuredTaskModal = dynamic(
   () => import("./TaskModal").then((module) => module.TaskModal),
@@ -1172,12 +1176,34 @@ export default function Board() {
       setToast("Bạn chỉ có quyền xem workspace này.");
       return;
     }
-    rememberUndo(edit && !templateCreateMode ? "cập nhật task" : "tạo task");
     const timestamp = new Date().toISOString();
     const previous =
       edit && !templateCreateMode
         ? data.tasks.find((item) => item.id === task.id)
         : undefined;
+    if (!previous && task.status !== "todo") {
+      setToast("⚠️ Task mới phải bắt đầu ở trạng thái Chưa làm.");
+      return;
+    }
+    if (previous) {
+      const transition = resolveStatusTransition(
+        previous.status,
+        task.status,
+        previous.blocked_from,
+      );
+      if (!transition.allowed) {
+        setToast(`⚠️ ${transition.warning || "Không thể chuyển trạng thái task."}`);
+        return;
+      }
+      task = {
+        ...task,
+        status: transition.target,
+        ...(transition.target === "blocked"
+          ? { blocked_from: transition.blocked_from }
+          : { blocked_from: undefined }),
+      };
+    }
+    rememberUndo(edit && !templateCreateMode ? "cập nhật task" : "tạo task");
     if (previous) {
       const nextPaths = new Set(
         (task.attachments || []).map((item) => item.storage_path),
@@ -1281,14 +1307,18 @@ export default function Board() {
       setToast("Bạn chỉ có quyền xem workspace này.");
       return;
     }
-    const nextStatus: Status =
-      task.status === "todo" || task.status === "blocked" ? "in_progress" : "done";
-    const summary =
-      nextStatus === "in_progress"
-        ? task.status === "blocked"
-          ? "Đã gỡ chặn task"
-          : "Đã bắt đầu task"
-        : "Đã hoàn tất task";
+    const action = getPrimaryStatusAction(task);
+    const transition = resolveStatusTransition(
+      task.status,
+      action.target,
+      task.blocked_from,
+    );
+    if (!transition.allowed) {
+      setToast(`⚠️ ${transition.warning || "Không thể chuyển trạng thái task."}`);
+      return;
+    }
+    const nextStatus = transition.target;
+    const summary = transition.summary;
     rememberUndo(summary);
     const timestamp = new Date().toISOString();
     const activity: TaskActivity = {
@@ -1307,6 +1337,9 @@ export default function Board() {
     const nextTask: Task = {
       ...task,
       status: nextStatus,
+      ...(nextStatus === "blocked"
+        ? { blocked_from: transition.blocked_from }
+        : { blocked_from: undefined }),
       updated_at: timestamp,
       activity: [...(task.activity || []), activity].slice(-200),
     };
@@ -1466,18 +1499,33 @@ export default function Board() {
       return;
     }
     if (!dragId) return;
-    rememberUndo(status === "done" ? "hoàn tất task" : "chuyển trạng thái task");
     const list = [...ordered],
       from = list.findIndex((t) => t.id === dragId);
     if (from < 0) return;
+    const source = list[from];
+    const transition = resolveStatusTransition(
+      source.status,
+      status,
+      source.blocked_from,
+    );
+    if (!transition.allowed) {
+      setToast(`⚠️ ${transition.warning || "Không thể chuyển trạng thái task."}`);
+      return;
+    }
+    rememberUndo(
+      transition.target === "done" ? "hoàn tất task" : "chuyển trạng thái task",
+    );
     const [item] = list.splice(from, 1);
     const timestamp = new Date().toISOString();
     const moved = {
       ...item,
-      status,
+      status: transition.target,
+      ...(transition.target === "blocked"
+        ? { blocked_from: transition.blocked_from }
+        : { blocked_from: undefined }),
       updated_at: timestamp,
       activity:
-        status === item.status
+        transition.target === item.status
           ? item.activity
           : [
               ...(item.activity || []),
@@ -1485,7 +1533,7 @@ export default function Board() {
                 id: crypto.randomUUID(),
                 type: "status_changed" as const,
                 at: timestamp,
-                summary: `Đổi trạng thái thành ${labels[status]}`,
+                summary: transition.summary,
               },
             ].slice(-200),
     };
@@ -1510,11 +1558,7 @@ export default function Board() {
     syncRemoteTasks(nextTasks.filter((task) => task.updated_at === timestamp));
     setSortMode("manual");
     setDragId(null);
-    setToast(
-      status === item.status
-        ? "Đã đổi vị trí task"
-        : `Đã chuyển sang ${labels[status]}`,
-    );
+    setToast(status === item.status ? "Đã đổi vị trí task" : transition.summary);
   };
   const dropTask = (target: Task) => {
     if (!canEditWorkspace) return;
@@ -1682,35 +1726,31 @@ export default function Board() {
       {t.blocked_by?.length ? (
         <p className="task-dependency">Phụ thuộc {t.blocked_by.length} task</p>
       ) : null}
-      {!selectionMode && t.status !== "done" && (
+      {!selectionMode && (
         <div className="task-card-actions" onClick={(event) => event.stopPropagation()}>
-          <button
-            type="button"
-            className={`task-quick-action${
-              t.status === "review" || t.status === "in_progress" ? " success" : ""
-            }`}
-            title={
-              t.status === "blocked"
-                ? "Gỡ chặn và bắt đầu task"
-                : t.status === "review" || t.status === "in_progress"
-                  ? "Đánh dấu task hoàn tất"
-                  : "Bắt đầu task"
-            }
-            onClick={() => quickUpdateStatus(t)}
-          >
-            {t.status === "blocked" ? (
-              <RotateCcw size={13} />
-            ) : t.status === "review" || t.status === "in_progress" ? (
-              <CheckCircle2 size={13} />
-            ) : (
-              <Play size={13} />
-            )}
-            {t.status === "blocked"
-              ? "Gỡ chặn"
-              : t.status === "review" || t.status === "in_progress"
-                ? "Hoàn tất"
-                : "Bắt đầu"}
-          </button>
+          {(() => {
+            const action = getPrimaryStatusAction(t);
+            return (
+              <button
+                type="button"
+                className={`task-quick-action${
+                  t.status === "review" ? " success" : ""
+                }`}
+                title={action.title}
+                aria-label={action.title}
+                onClick={() => quickUpdateStatus(t)}
+              >
+                {t.status === "blocked" ? (
+                  <RotateCcw size={13} />
+                ) : t.status === "review" ? (
+                  <CheckCircle2 size={13} />
+                ) : (
+                  <Play size={13} />
+                )}
+                {action.label}
+              </button>
+            );
+          })()}
           <button
             type="button"
             className="task-quick-action secondary"

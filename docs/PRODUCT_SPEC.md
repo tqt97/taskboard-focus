@@ -46,4 +46,5 @@ Một workspace cá nhân giúp ghi task nhanh, nhìn tình hình chung và khô
 - Tạo task mới không quá một thao tác chính (`N` hoặc nút tạo task).
 - Focus view chỉ giữ task đang mở, urgent/high, đang review, chưa giao hoặc gần/quá hạn.
 - Bulk action phải hiển thị số task được chọn và reset selection sau khi hoàn tất.
+- Status flow chuẩn là `Chưa làm → Đang làm → Chờ review → Hoàn tất`; `Bị chặn` là nhánh ngoại lệ và lưu trạng thái trước đó để gỡ chặn quay lại đúng bước. Không cho hoàn tất trực tiếp từ `Đang làm` hoặc `Bị chặn`.
 - Activity history chỉ giữ các thay đổi gần nhất để không làm phình localStorage.

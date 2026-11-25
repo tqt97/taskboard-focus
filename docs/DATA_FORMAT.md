@@ -30,7 +30,7 @@ Export format v1:
 
 Import hiển thị preview gồm số task/thành viên trước khi người dùng xác nhận thay thế workspace local. Task IDs và member IDs được giữ nguyên để bảo toàn quan hệ. Backup không gồm secrets, session hoặc file binary. `links` là danh sách URL; attachment metadata có thể gồm `storage_path` khi file đến từ Supabase Storage private bucket.
 
-Các field bổ sung tương thích ngược gồm `review` trong `status`, `checklist`, `inbox`, `snoozed_until` và `activity[].changes`. Backup v1/v2 vẫn được đọc; migration chỉ thêm default, không đổi task identity.
+Các field bổ sung tương thích ngược gồm `review` trong `status`, `blocked_from`, `checklist`, `inbox`, `snoozed_until` và `activity[].changes`. Backup v1/v2 vẫn được đọc; migration chỉ thêm default, không đổi task identity. `blocked_from` ghi lại trạng thái trước khi bị chặn để action Gỡ chặn quay lại đúng bước.
 
 `assignee_ids` là field chuẩn, cho phép một task có một hoặc nhiều người phụ trách. `assignee_id` chỉ được giữ để tương thích với dữ liệu cũ; khi đọc dữ liệu legacy, ứng dụng tự chuyển nó thành mảng một phần tử. Ở database Supabase, quan hệ nhiều-nhiều nằm trong bảng `task_assignees`; cột `tasks.assignee_id` được giữ nullable trong giai đoạn chuyển đổi.
 

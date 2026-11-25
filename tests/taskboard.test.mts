@@ -25,6 +25,10 @@ import {
   remoteSyncQueue,
 } from "../lib/taskboard/remote-sync-queue.ts";
 import { localBoardStorage } from "../lib/storage/board-storage.ts";
+import {
+  getPrimaryStatusAction,
+  resolveStatusTransition,
+} from "../lib/taskboard/status-transitions.ts";
 
 const fixture = () => JSON.parse(JSON.stringify(demoData)) as typeof demoData;
 
@@ -231,8 +235,8 @@ test("accepts review status, checklist items and activity diffs", () => {
       id: "activity-1",
       type: "status_changed",
       at: "2026-11-20T10:00:00.000Z",
-      summary: "Đổi trạng thái thành Đang review",
-      changes: [{ field: "Trạng thái", from: "Đang làm", to: "Đang review" }],
+      summary: "Đổi trạng thái thành Chờ review",
+      changes: [{ field: "Trạng thái", from: "Đang làm", to: "Chờ review" }],
     },
   ];
 
@@ -241,6 +245,32 @@ test("accepts review status, checklist items and activity diffs", () => {
   assert.equal(result.data.tasks[0].status, "review");
   assert.equal(result.data.tasks[0].checklist?.[0].done, false);
   assert.equal(result.data.tasks[0].activity?.[0].changes?.[0].from, "Đang làm");
+});
+
+test("status workflow requires review before completion and restores blocked state", () => {
+  assert.equal(getPrimaryStatusAction({ status: "todo" }).target, "in_progress");
+  assert.equal(getPrimaryStatusAction({ status: "in_progress" }).target, "review");
+  assert.equal(getPrimaryStatusAction({ status: "review" }).target, "done");
+  assert.equal(getPrimaryStatusAction({ status: "done" }).target, "in_progress");
+
+  const skippedReview = resolveStatusTransition("in_progress", "done");
+  assert.equal(skippedReview.allowed, false);
+  assert.match(skippedReview.warning || "", /Chờ review/);
+
+  const blocked = resolveStatusTransition("review", "blocked");
+  assert.equal(blocked.allowed, true);
+  assert.equal(blocked.blocked_from, "review");
+  const unblocked = resolveStatusTransition("blocked", "review", blocked.blocked_from);
+  assert.equal(unblocked.allowed, true);
+  assert.equal(unblocked.target, "review");
+
+  const directDoneFromBlocked = resolveStatusTransition(
+    "blocked",
+    "done",
+    "in_progress",
+  );
+  assert.equal(directDoneFromBlocked.allowed, false);
+  assert.match(directDoneFromBlocked.warning || "", /gỡ chặn/i);
 });
 
 test("migration adds an empty checklist without changing legacy task identity", () => {

@@ -67,7 +67,7 @@ const copy: Record<AppLocale, UiCopy> = {
     status: {
       todo: "Chưa làm",
       in_progress: "Đang làm",
-      review: "Đang review",
+      review: "Chờ review",
       blocked: "Bị chặn",
       done: "Hoàn tất",
     },
@@ -88,7 +88,7 @@ const copy: Record<AppLocale, UiCopy> = {
     status: {
       todo: "To do",
       in_progress: "In progress",
-      review: "In review",
+      review: "Awaiting review",
       blocked: "Blocked",
       done: "Done",
     },
@@ -109,7 +109,7 @@ const copy: Record<AppLocale, UiCopy> = {
     status: {
       todo: "未着手",
       in_progress: "進行中",
-      review: "レビュー中",
+      review: "レビュー待ち",
       blocked: "ブロック中",
       done: "完了",
     },

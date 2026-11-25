@@ -165,6 +165,7 @@ create table if not exists public.tasks(
  next_action text not null default '' check (char_length(next_action) <= 1000),
  review_note text not null default '' check (char_length(review_note) <= 2000),
  blocked_by jsonb not null default '[]'::jsonb check (jsonb_typeof(blocked_by) = 'array'),
+ blocked_from text check (blocked_from in ('todo','in_progress','review')),
  activity jsonb not null default '[]'::jsonb check (jsonb_typeof(activity) = 'array'),
  primary_links jsonb not null default '[]'::jsonb check (jsonb_typeof(primary_links) = 'array'),
  secondary_links jsonb not null default '[]'::jsonb check (jsonb_typeof(secondary_links) = 'array'),
@@ -185,6 +186,7 @@ alter table public.tasks add column if not exists attachments jsonb not null def
 alter table public.tasks add column if not exists checklist jsonb not null default '[]'::jsonb check (jsonb_typeof(checklist) = 'array');
 alter table public.tasks add column if not exists inbox boolean not null default false;
 alter table public.tasks add column if not exists snoozed_until timestamptz;
+alter table public.tasks add column if not exists blocked_from text;
 -- Realtime DELETE payloads need the previous updated_at for stale-delete protection.
 alter table public.tasks replica identity full;
 create index if not exists tasks_archived_at_idx on public.tasks(archived_at);

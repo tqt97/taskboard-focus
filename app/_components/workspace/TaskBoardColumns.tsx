@@ -5,7 +5,7 @@ import type { Status, Task } from "@/lib/types";
 const labels: Record<Status, string> = {
   todo: "Chưa làm",
   in_progress: "Đang làm",
-  review: "Đang review",
+  review: "Chờ review",
   blocked: "Bị chặn",
   done: "Hoàn tất",
 };
