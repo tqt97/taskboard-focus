@@ -7,6 +7,13 @@ export async function getCurrentUser() {
   return data.user;
 }
 
+export async function getAccessToken() {
+  if (!supabase) return null;
+  const { data, error } = await supabase.auth.getSession();
+  if (error) return null;
+  return data.session?.access_token || null;
+}
+
 export async function signInWithPassword(email: string, password: string) {
   if (!supabase) throw new Error("Supabase Auth chưa được cấu hình.");
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
