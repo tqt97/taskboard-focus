@@ -1,5 +1,32 @@
--- Taskboard Focus schema v1. Configure Auth/RLS before storing private tasks in a public deployment.
+-- Taskboard Focus schema v2. Configure Auth/RLS before storing private tasks in a public deployment.
 create extension if not exists pgcrypto;
+create table if not exists public.board_snapshots(
+ owner_id uuid primary key references auth.users(id) on delete cascade,
+ data jsonb not null check (jsonb_typeof(data) = 'object'),
+ schema_version integer not null default 1,
+ updated_at timestamptz not null default now()
+);
+alter table public.board_snapshots enable row level security;
+drop policy if exists board_snapshots_owner_policy on public.board_snapshots;
+create policy board_snapshots_owner_policy on public.board_snapshots
+  for all to authenticated
+  using (owner_id = (select auth.uid()))
+  with check (owner_id = (select auth.uid()));
+insert into storage.buckets (id, name, public)
+values ('taskboard-attachments', 'taskboard-attachments', true)
+on conflict (id) do nothing;
+drop policy if exists taskboard_attachment_read on storage.objects;
+create policy taskboard_attachment_read on storage.objects
+  for select to authenticated
+  using (bucket_id = 'taskboard-attachments' and (storage.foldername(name))[1] = (select auth.uid())::text);
+drop policy if exists taskboard_attachment_insert on storage.objects;
+create policy taskboard_attachment_insert on storage.objects
+  for insert to authenticated
+  with check (bucket_id = 'taskboard-attachments' and (storage.foldername(name))[1] = (select auth.uid())::text);
+drop policy if exists taskboard_attachment_delete on storage.objects;
+create policy taskboard_attachment_delete on storage.objects
+  for delete to authenticated
+  using (bucket_id = 'taskboard-attachments' and (storage.foldername(name))[1] = (select auth.uid())::text);
 create table if not exists public.members(
  id uuid primary key default gen_random_uuid(), owner_id uuid not null references auth.users(id) default auth.uid(), name text not null check (char_length(name) <= 120), role text not null default '' check (char_length(role) <= 120), color text not null default 'blue' check (color in ('blue', 'violet', 'orange', 'green')), active boolean not null default true, created_at timestamptz not null default now()
 );
@@ -20,6 +47,11 @@ create table if not exists public.tasks(
  order_index integer not null default 0, links jsonb not null default '[]'::jsonb check (jsonb_typeof(links) = 'array'),
  created_at timestamptz not null default now(), updated_at timestamptz not null default now()
 );
+alter table public.tasks add column if not exists archived_at timestamptz;
+alter table public.tasks add column if not exists recurrence jsonb not null default '{}'::jsonb check (jsonb_typeof(recurrence) = 'object');
+alter table public.tasks add column if not exists template_id text;
+alter table public.tasks add column if not exists attachments jsonb not null default '[]'::jsonb check (jsonb_typeof(attachments) = 'array');
+create index if not exists tasks_archived_at_idx on public.tasks(archived_at);
 create or replace function public.set_task_updated_at()
 returns trigger
 language plpgsql
@@ -86,3 +118,16 @@ create policy task_assignees_owner_policy on public.task_assignees
         and members.owner_id = (select auth.uid())
     )
   );
+create table if not exists public.notification_runs(
+ owner_id uuid not null references auth.users(id) on delete cascade,
+ run_key text not null,
+ channel text not null default 'chatwork',
+ sent_at timestamptz,
+ primary key (owner_id, run_key, channel)
+);
+alter table public.notification_runs enable row level security;
+drop policy if exists notification_runs_owner_policy on public.notification_runs;
+create policy notification_runs_owner_policy on public.notification_runs
+  for all to authenticated
+  using (owner_id = (select auth.uid()))
+  with check (owner_id = (select auth.uid()));
