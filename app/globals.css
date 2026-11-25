@@ -3812,6 +3812,12 @@ textarea:focus-visible {
   margin-top: -6px;
   color: #d58a38;
 }
+.kanban-cards .task-snooze-info {
+  margin: -6px 0 10px;
+  color: #7c62b5;
+  font-size: 11px;
+  line-height: 1.35;
+}
 .kanban-cards .task-checklist-progress {
   display: inline-flex;
   align-items: center;

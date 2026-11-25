@@ -60,6 +60,10 @@ test("new task modal groups fields and supports multiple dependencies", async ({
   await expect(
     dialog.getByText("Có thể chọn nhiều task", { exact: false }),
   ).toBeVisible();
+  const snoozeInput = dialog.getByLabel("Hoãn đến");
+  await expect(snoozeInput).toBeVisible();
+  await dialog.getByRole("button", { name: "1 tuần" }).click();
+  await expect(snoozeInput).not.toHaveValue("");
   await expect(dialog.getByText("Chưa có tài liệu hoặc liên kết")).toBeVisible();
   await dialog.getByText("Tài liệu & liên kết").click();
   await expect(dialog.getByText("Chưa có file đính kèm")).toBeVisible();

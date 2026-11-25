@@ -299,6 +299,7 @@ export function migrateBoardData(value: unknown): unknown {
                       : "in_progress",
                   }
                 : {}),
+              ...(task.status === "done" ? { snoozed_until: undefined } : {}),
               attachments: task.attachments ?? [],
               checklist: task.checklist ?? [],
             }

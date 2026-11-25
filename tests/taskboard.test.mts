@@ -5,6 +5,7 @@ import {
   getDependencyState,
   getTodayTasks,
   isArchived,
+  isSnoozed,
 } from "../lib/taskboard/selectors.ts";
 import { getNextOccurrence } from "../lib/taskboard/recurrence.ts";
 import { isWithinQuietHours } from "../lib/taskboard/notifications.ts";
@@ -61,6 +62,14 @@ test("Today excludes a task while its snooze window is active", () => {
 
   const today = getTodayTasks(data.tasks, new Date("2026-11-20T15:00:00.000Z"));
   assert.ok(!today.some((task) => task.id === data.tasks[0].id));
+  assert.equal(isSnoozed(data.tasks[0], new Date("2026-11-20T15:00:00.000Z")), true);
+  assert.equal(
+    isSnoozed(
+      { ...data.tasks[0], status: "done" },
+      new Date("2026-11-20T15:00:00.000Z"),
+    ),
+    false,
+  );
 });
 
 test("advanced task search supports field conditions and free text", () => {
@@ -202,6 +211,15 @@ test("migration adds defaults without changing legacy task identity", () => {
   assert.deepEqual(migrated.tasks[0].checklist, []);
   assert.equal(migrated.tasks[0].id, payload.tasks[0].id);
   assert.ok(parseBoardDataWithError(migrated).data);
+});
+
+test("migration clears snooze metadata from completed tasks", () => {
+  const payload = fixture();
+  payload.tasks[0].status = "done";
+  payload.tasks[0].snoozed_until = "2026-11-30T10:00:00.000Z";
+  const result = parseBoardDataWithError(payload).data;
+  assert.ok(result);
+  assert.equal(result.tasks[0].snoozed_until, undefined);
 });
 
 test("template creates a new todo task with provenance", () => {

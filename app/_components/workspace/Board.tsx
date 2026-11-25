@@ -1283,6 +1283,7 @@ export default function Board() {
     };
     const nextTask: Task = {
       ...task,
+      snoozed_until: task.status === "done" ? undefined : task.snoozed_until,
       order_index: edit && !templateCreateMode ? task.order_index : data.tasks.length,
       updated_at: timestamp,
       activity: [...(task.activity || []), activity].slice(-200),
@@ -1337,6 +1338,7 @@ export default function Board() {
     const nextTask: Task = {
       ...task,
       status: nextStatus,
+      snoozed_until: nextStatus === "done" ? undefined : task.snoozed_until,
       ...(nextStatus === "blocked"
         ? { blocked_from: transition.blocked_from }
         : { blocked_from: undefined }),
@@ -1348,40 +1350,6 @@ export default function Board() {
       tasks: d.tasks.map((current) => (current.id === task.id ? nextTask : current)),
     }));
     setToast(summary);
-    syncRemoteTasks([nextTask]);
-  };
-  const quickSnooze = (task: Task) => {
-    if (!canEditWorkspace) {
-      setToast("Bạn chỉ có quyền xem workspace này.");
-      return;
-    }
-    const timestamp = new Date().toISOString();
-    const until = new Date(Date.now() + 86400000).toISOString();
-    rememberUndo("hoãn task 1 ngày");
-    const activity: TaskActivity = {
-      id: crypto.randomUUID(),
-      type: "snoozed",
-      at: timestamp,
-      summary: "Đã hoãn task 1 ngày",
-      changes: [
-        {
-          field: "Hoãn đến",
-          from: task.snoozed_until || "Chưa hoãn",
-          to: until,
-        },
-      ],
-    };
-    const nextTask: Task = {
-      ...task,
-      snoozed_until: until,
-      updated_at: timestamp,
-      activity: [...(task.activity || []), activity].slice(-200),
-    };
-    setData((d) => ({
-      ...d,
-      tasks: d.tasks.map((current) => (current.id === task.id ? nextTask : current)),
-    }));
-    setToast("Đã hoãn task 1 ngày; task sẽ quay lại Today sau đó.");
     syncRemoteTasks([nextTask]);
   };
   const removeTask = (id: string) => {
@@ -1520,6 +1488,7 @@ export default function Board() {
     const moved = {
       ...item,
       status: transition.target,
+      snoozed_until: transition.target === "done" ? undefined : item.snoozed_until,
       ...(transition.target === "blocked"
         ? { blocked_from: transition.blocked_from }
         : { blocked_from: undefined }),
@@ -1726,6 +1695,17 @@ export default function Board() {
       {t.blocked_by?.length ? (
         <p className="task-dependency">Phụ thuộc {t.blocked_by.length} task</p>
       ) : null}
+      {isSnoozed(t, now) && t.snoozed_until ? (
+        <p className="task-snooze-info">
+          Hoãn đến{" "}
+          {new Intl.DateTimeFormat(intlLocale[locale], {
+            day: "2-digit",
+            month: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+          }).format(new Date(t.snoozed_until))}
+        </p>
+      ) : null}
       {!selectionMode && (
         <div className="task-card-actions" onClick={(event) => event.stopPropagation()}>
           {(() => {
@@ -1751,16 +1731,6 @@ export default function Board() {
               </button>
             );
           })()}
-          <button
-            type="button"
-            className="task-quick-action secondary"
-            title="Hoãn task 1 ngày khỏi Today"
-            aria-label={`Hoãn ${t.code || "task"} 1 ngày`}
-            onClick={() => quickSnooze(t)}
-          >
-            <Clock3 size={13} />
-            Hoãn 1 ngày
-          </button>
         </div>
       )}
       <div className="task-meta">

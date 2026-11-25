@@ -19,6 +19,7 @@ export const isOverdue = (task: Task, now = new Date()) =>
   task.status !== "done";
 
 export const isSnoozed = (task: Task, now = new Date()) =>
+  task.status !== "done" &&
   Boolean(task.snoozed_until) &&
   new Date(task.snoozed_until as string).getTime() > now.getTime();
 

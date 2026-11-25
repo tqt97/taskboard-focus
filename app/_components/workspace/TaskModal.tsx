@@ -25,7 +25,12 @@ import type {
   Priority,
   Severity,
 } from "@/lib/types";
-import { fromDateInputValue, toDateInputValue } from "@/lib/taskboard/dates";
+import {
+  fromDateInputValue,
+  fromDateTimeLocalValue,
+  toDateInputValue,
+  toDateTimeLocalValue,
+} from "@/lib/taskboard/dates";
 import { intlLocale, type AppLocale } from "@/lib/i18n";
 
 const labels: Record<Status, string> = {
@@ -163,6 +168,8 @@ export function TaskModal({
     setChecklist((items) =>
       [...items, { id: crypto.randomUUID(), title: "", done: false }].slice(-100),
     );
+  const setSnooze = (days: number) =>
+    field("snoozed_until", new Date(Date.now() + days * 86400000).toISOString());
   const save = () => {
     const filledLinks = links.filter((link) => link.url.trim());
     const title = form.title.trim();
@@ -269,6 +276,7 @@ export function TaskModal({
       primary_links: normalizeLinks(links),
       secondary_links: [],
       inbox: form.inbox === true,
+      snoozed_until: form.status === "done" ? undefined : form.snoozed_until,
       attachments: attachments.map((attachment) => ({
         ...attachment,
         name: attachment.name.trim(),
@@ -549,6 +557,55 @@ export function TaskModal({
                       }
                     />
                   </label>
+                  <div className="field full">
+                    <span>
+                      Hoãn đến{" "}
+                      <small>Chỉ hiện ngoài card khi task đang được hoãn.</small>
+                    </span>
+                    <p className="field-hint">
+                      Dùng để tạm ẩn task khỏi Today. Task hoàn tất sẽ tự bỏ mốc hoãn.
+                    </p>
+                    <div className="field-row field-row-3">
+                      <input
+                        type="datetime-local"
+                        aria-label="Hoãn đến"
+                        value={toDateTimeLocalValue(form.snoozed_until || "")}
+                        onChange={(event) =>
+                          field(
+                            "snoozed_until",
+                            fromDateTimeLocalValue(event.target.value) || undefined,
+                          )
+                        }
+                        disabled={readOnly}
+                      />
+                      <button
+                        className="secondary-button"
+                        type="button"
+                        onClick={() => setSnooze(1)}
+                        disabled={readOnly}
+                      >
+                        1 ngày
+                      </button>
+                      <button
+                        className="secondary-button"
+                        type="button"
+                        onClick={() => setSnooze(7)}
+                        disabled={readOnly}
+                      >
+                        1 tuần
+                      </button>
+                      {form.snoozed_until && (
+                        <button
+                          className="text-button"
+                          type="button"
+                          onClick={() => field("snoozed_until", undefined)}
+                          disabled={readOnly}
+                        >
+                          Bỏ hoãn
+                        </button>
+                      )}
+                    </div>
+                  </div>
                   <div className="field full recurrence-field">
                     <span>
                       Lặp lại task <small>Tự tạo nhắc việc theo chu kỳ đã chọn.</small>

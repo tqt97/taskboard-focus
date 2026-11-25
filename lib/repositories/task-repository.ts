@@ -163,6 +163,12 @@ export const remoteRowToTask = (
     secondary_links: Array.isArray(row.secondary_links) ? row.secondary_links : [],
     attachments: Array.isArray(row.attachments) ? row.attachments : [],
     checklist: Array.isArray(row.checklist) ? row.checklist : [],
+    snoozed_until:
+      row.status === "done"
+        ? undefined
+        : typeof row.snoozed_until === "string"
+          ? row.snoozed_until
+          : undefined,
     recurrence:
       row.recurrence && typeof row.recurrence === "object" ? row.recurrence : undefined,
     inbox: row.inbox === true,
