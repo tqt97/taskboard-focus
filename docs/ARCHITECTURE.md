@@ -4,6 +4,8 @@ Typography dùng Geist Sans self-host với Latin và Latin Extended subsets; gi
 
 Task details tách activity history và comments panel khỏi `TaskModal`; panel comments tự quản lý composer/reply state, còn mutation callback giữ đồng bộ form và workspace state.
 
+Các view/dialog ít dùng được tải bằng dynamic import để giảm JavaScript ban đầu. Font public có content hash và cache immutable; dữ liệu task/workspace không cache phía server vì thay đổi theo thiết bị/tài khoản. Selector hiện dùng `useMemo`, còn biểu đồ 14 ngày chỉ phụ thuộc vào ngày hiện tại và tập task.
+
 ## Hiện trạng package
 
 - Next.js App Router 15 + React 19 + TypeScript.

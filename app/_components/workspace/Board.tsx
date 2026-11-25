@@ -60,7 +60,6 @@ import type {
   TaskActivity,
   TaskTemplate,
 } from "@/lib/types";
-import { NotificationPopover } from "./NotificationPopover";
 import type { ReminderSettings } from "./WorkspaceDialogs";
 import { getTodayTasks, isArchived, isDueToday } from "@/lib/taskboard/selectors";
 import { toDateInputValue } from "@/lib/taskboard/dates";
@@ -83,8 +82,6 @@ import {
   createTaskFromTemplate,
   createTemplateFromTask,
 } from "@/lib/taskboard/templates";
-import { TaskBoardColumns } from "./TaskBoardColumns";
-import { TimelineView } from "./TimelineView";
 import { getAccessToken, getCurrentUser } from "@/lib/auth";
 import {
   deleteTaskAttachment,
@@ -102,9 +99,7 @@ import {
   getPrimaryStatusAction,
   resolveStatusTransition,
 } from "@/lib/taskboard/status-transitions";
-import { ConflictDialog } from "./ConflictDialog";
 import { useTaskMutations } from "./hooks/useTaskMutations";
-import { ImportDialog } from "./ImportDialog";
 import { mergeBoardImport } from "@/lib/taskboard/import-merge";
 import { diffTaskFields } from "@/lib/taskboard/activity-diff";
 import { useWorkspacePersistence } from "./hooks/useWorkspacePersistence";
@@ -132,6 +127,36 @@ const ConfirmDialog = dynamic(
 );
 const LockModal = dynamic(
   () => import("./WorkspaceDialogs").then((module) => module.LockModal),
+  { ssr: false },
+);
+const TaskBoardColumns = dynamic(
+  () => import("./TaskBoardColumns").then((module) => module.TaskBoardColumns),
+  {
+    ssr: false,
+    loading: () => <div className="board-loading" aria-busy="true" />,
+  },
+);
+const LazyTaskCard = dynamic(
+  () => import("./TaskCard").then((module) => module.TaskCard),
+  { ssr: false },
+);
+const TimelineView = dynamic(
+  () => import("./TimelineView").then((module) => module.TimelineView),
+  {
+    ssr: false,
+    loading: () => <div className="timeline-loading" aria-busy="true" />,
+  },
+);
+const NotificationPopover = dynamic(
+  () => import("./NotificationPopover").then((module) => module.NotificationPopover),
+  { ssr: false },
+);
+const ImportDialog = dynamic(
+  () => import("./ImportDialog").then((module) => module.ImportDialog),
+  { ssr: false },
+);
+const ConflictDialog = dynamic(
+  () => import("./ConflictDialog").then((module) => module.ConflictDialog),
   { ssr: false },
 );
 
@@ -531,7 +556,7 @@ export default function Board() {
       );
     };
     tick();
-    const timer = setInterval(tick, 15000);
+    const timer = setInterval(tick, 60000);
     return () => clearInterval(timer);
   }, [locale]);
   useEffect(() => {
@@ -1116,32 +1141,32 @@ export default function Board() {
       })),
     [data.tasks],
   );
-  const creationActivity = useMemo(
-    () =>
-      Array.from({ length: 14 }, (_, index) => {
-        const day = new Date(now);
-        day.setHours(0, 0, 0, 0);
-        day.setDate(day.getDate() - (13 - index));
-        const next = new Date(day);
-        next.setDate(next.getDate() + 1);
-        const count = data.tasks.filter((task) => {
-          const created = new Date(task.created_at).getTime();
-          return created >= day.getTime() && created < next.getTime();
-        }).length;
-        return {
-          key: day.toISOString(),
-          label: new Intl.DateTimeFormat("vi-VN", { weekday: "short" })
-            .format(day)
-            .replace(".", ""),
-          date: new Intl.DateTimeFormat("vi-VN", {
-            day: "2-digit",
-            month: "2-digit",
-          }).format(day),
-          count,
-        };
-      }),
-    [data.tasks, now],
-  );
+  const todayKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
+  const creationActivity = useMemo(() => {
+    const [year, month, date] = todayKey.split("-").map(Number);
+    const today = new Date(year, month, date);
+    return Array.from({ length: 14 }, (_, index) => {
+      const day = new Date(today);
+      day.setDate(day.getDate() - (13 - index));
+      const next = new Date(day);
+      next.setDate(next.getDate() + 1);
+      const count = data.tasks.filter((task) => {
+        const created = new Date(task.created_at).getTime();
+        return created >= day.getTime() && created < next.getTime();
+      }).length;
+      return {
+        key: day.toISOString(),
+        label: new Intl.DateTimeFormat("vi-VN", { weekday: "short" })
+          .format(day)
+          .replace(".", ""),
+        date: new Intl.DateTimeFormat("vi-VN", {
+          day: "2-digit",
+          month: "2-digit",
+        }).format(day),
+        count,
+      };
+    });
+  }, [data.tasks, todayKey]);
   const maxCreated = Math.max(...creationActivity.map((item) => item.count), 1);
   const attentionTasks = useMemo(
     () =>
@@ -1670,7 +1695,7 @@ export default function Board() {
     }));
   };
   const taskCard = (task: Task) => (
-    <TaskCard
+    <LazyTaskCard
       key={task.id}
       task={task}
       members={data.members}

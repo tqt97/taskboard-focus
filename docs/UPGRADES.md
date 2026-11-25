@@ -6,6 +6,7 @@
 - Quick capture qua phím `N` hoặc nút **Ghi nhanh** chỉ yêu cầu tiêu đề và tạo task vào Inbox.
 - Local IndexedDB giữ 7 bản sao theo ngày/workspace, xem danh sách và khôi phục qua import preview; JSON export vẫn là bản sao độc lập để chuyển máy.
 - Browser reminder recheck permission khi tab quay lại, Notification Center mở task đích; Chatwork digest gồm đủ bốn mốc và chạy tối đa một lần/ngày theo timezone cấu hình.
+- Lazy-load Kanban, timeline, notification popover, import/conflict dialog theo nhu cầu; font có content hash và immutable cache một năm. Đồng hồ chỉ cập nhật mỗi phút, chart nhịp tạo task chỉ tính lại khi ngày hoặc task đổi. Build report cho thấy First Load JS giảm 208 → 202 kB; phần Board dùng chung vẫn là bundle lớn nhất cần tách tiếp nếu muốn giảm thêm đáng kể.
 - Tách UI page heading, quick capture, browser reminder và task card thành component/hook riêng để giảm trách nhiệm của Board.
 - Tách lịch sử và thảo luận task khỏi `TaskModal`; state của composer comment được đóng gói trong panel.
 - `/today` là workspace riêng cho task quá hạn, đến hạn hôm nay và task khẩn; task đã archive không xuất hiện.

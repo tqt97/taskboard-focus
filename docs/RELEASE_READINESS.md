@@ -35,7 +35,7 @@ Tài liệu này tách rõ phần đã có bằng chứng local/browser khỏi p
 | Multi-workspace            | Đã kiểm chứng local/browser             | workspace/task/template/view isolation E2E                                                         |
 | Realtime collaboration     | Contract đã triển khai, runtime pending | task + assignee subscriptions; cần Supabase multi-client smoke test                                |
 
-Trong cập nhật 2026-11-25, quick capture, snapshot backup và daily reminder digest đã được triển khai; riêng phần mới chỉ typecheck và kiểm tra format, chưa chạy browser E2E hoặc Chatwork/Supabase runtime.
+Trong cập nhật 2026-11-25, quick capture, snapshot backup, daily reminder digest và lazy route chunks đã được triển khai; typecheck/build pass, browser E2E và Chatwork/Supabase runtime chưa chạy. Build report First Load JS workspace giảm từ 208 kB xuống 202 kB.
 
 ## Required cloud gate
 

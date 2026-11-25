@@ -8,6 +8,9 @@
 - Nhắc việc: mở task từ Notification Center, cập nhật lại quyền browser khi quay lại tab, hướng dẫn khôi phục quyền và mở rộng Chatwork digest sang bốn mốc.
 - Bảo trì: tách page heading, quick capture, browser reminder và task card thành các component/hook riêng.
 - Bảo trì: tách lịch sử và thảo luận task khỏi TaskModal, chuyển trạng thái composer comment vào panel riêng.
+- Hiệu năng: lazy-load Kanban, timeline, notification popover, import/conflict dialogs; giảm cập nhật đồng hồ xuống mỗi phút và cache chart theo ngày.
+- Cache: self-hosted font assets có tên theo content hash và `Cache-Control: immutable` một năm.
+- Kết quả build: First Load JS trên các route workspace giảm từ 208 kB xuống 202 kB; các phần nặng còn lại vẫn nằm trong bundle Board dùng chung.
 
 ## 0.1.2 - 2026-11-20
 
