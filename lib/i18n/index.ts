@@ -47,7 +47,7 @@ export type UiCopy = {
     overdue: (days: number) => string;
     remaining: (days: number) => string;
   };
-  status: Record<"todo" | "in_progress" | "blocked" | "done", string>;
+  status: Record<"todo" | "in_progress" | "review" | "blocked" | "done", string>;
   priority: Record<"urgent" | "high" | "medium" | "low", string>;
 };
 
@@ -67,7 +67,8 @@ const copy: Record<AppLocale, UiCopy> = {
     status: {
       todo: "Chưa làm",
       in_progress: "Đang làm",
-      blocked: "Đang review",
+      review: "Đang review",
+      blocked: "Bị chặn",
       done: "Hoàn tất",
     },
     priority: { urgent: "Khẩn cấp", high: "Cao", medium: "Vừa", low: "Thấp" },
@@ -87,7 +88,8 @@ const copy: Record<AppLocale, UiCopy> = {
     status: {
       todo: "To do",
       in_progress: "In progress",
-      blocked: "In review",
+      review: "In review",
+      blocked: "Blocked",
       done: "Done",
     },
     priority: { urgent: "Urgent", high: "High", medium: "Medium", low: "Low" },
@@ -107,7 +109,8 @@ const copy: Record<AppLocale, UiCopy> = {
     status: {
       todo: "未着手",
       in_progress: "進行中",
-      blocked: "レビュー中",
+      review: "レビュー中",
+      blocked: "ブロック中",
       done: "完了",
     },
     priority: { urgent: "緊急", high: "高", medium: "中", low: "低" },

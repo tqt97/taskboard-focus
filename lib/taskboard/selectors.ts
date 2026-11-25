@@ -18,6 +18,10 @@ export const isOverdue = (task: Task, now = new Date()) =>
   new Date(task.deadline).getTime() < now.getTime() &&
   task.status !== "done";
 
+export const isSnoozed = (task: Task, now = new Date()) =>
+  Boolean(task.snoozed_until) &&
+  new Date(task.snoozed_until as string).getTime() > now.getTime();
+
 export const getDependencyState = (
   task: Task,
   tasksById: ReadonlyMap<string, Task>,
@@ -38,6 +42,7 @@ export const getTodayTasks = (tasks: Task[], now = new Date()) => {
   const active = getActiveTasks(tasks).filter(
     (task) =>
       task.status !== "done" &&
+      !isSnoozed(task, now) &&
       (isDueToday(task, now) || isOverdue(task, now) || task.priority === "urgent"),
   );
   return [...active].sort(

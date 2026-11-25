@@ -1,33 +1,39 @@
-import { demoData, parseBoardDataWithError, writeLocal } from "../data";
+import { demoData, parseBoardDataWithError } from "../data.ts";
 import type { BoardData } from "../types";
 
 export type StorageResult = { ok: true } | { ok: false; error: string };
 export type BoardLoadResult = { data: BoardData; error?: string };
 
 export interface BoardStorage {
-  load(): BoardData;
-  loadWithError(): BoardLoadResult;
-  save(data: BoardData): StorageResult;
+  load(workspaceId?: string): BoardData;
+  loadWithError(workspaceId?: string): BoardLoadResult;
+  save(data: BoardData, workspaceId?: string): StorageResult;
 }
 
 const storageKey = "taskboard-focus-v1";
+const scopedStorageKey = (workspaceId: string) => `${storageKey}:${workspaceId}`;
 
 export const localBoardStorage: BoardStorage = {
-  load() {
-    return this.loadWithError().data;
+  load(workspaceId = "default") {
+    return this.loadWithError(workspaceId).data;
   },
-  loadWithError() {
+  loadWithError(workspaceId = "default") {
     if (typeof window === "undefined") return { data: demoData };
     try {
-      const raw = window.localStorage.getItem(storageKey);
+      const scoped = window.localStorage.getItem(scopedStorageKey(workspaceId));
+      const legacy =
+        workspaceId === "default" ? window.localStorage.getItem(storageKey) : null;
+      const raw = scoped || legacy;
       if (!raw) return { data: demoData };
       const result = parseBoardDataWithError(JSON.parse(raw));
-      return result.data
-        ? { data: result.data }
-        : {
-            data: demoData,
-            error: result.error || "Dữ liệu local không hợp lệ.",
-          };
+      if (!result.data)
+        return { data: demoData, error: result.error || "Dữ liệu local không hợp lệ." };
+      if (!scoped && legacy) {
+        try {
+          window.localStorage.setItem(scopedStorageKey(workspaceId), legacy);
+        } catch {}
+      }
+      return { data: result.data };
     } catch {
       return {
         data: demoData,
@@ -35,9 +41,12 @@ export const localBoardStorage: BoardStorage = {
       };
     }
   },
-  save(data) {
-    return writeLocal(data)
-      ? { ok: true }
-      : { ok: false, error: "Không thể lưu dữ liệu vào bộ nhớ trình duyệt." };
+  save(data, workspaceId = "default") {
+    try {
+      window.localStorage.setItem(scopedStorageKey(workspaceId), JSON.stringify(data));
+      return { ok: true };
+    } catch {
+      return { ok: false, error: "Không thể lưu dữ liệu vào bộ nhớ trình duyệt." };
+    }
   },
 };

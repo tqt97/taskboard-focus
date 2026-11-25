@@ -1,4 +1,4 @@
-export type Status = "todo" | "in_progress" | "blocked" | "done";
+export type Status = "todo" | "in_progress" | "review" | "blocked" | "done";
 export type SortMode = "smart" | "deadline" | "manual";
 export type Priority = "urgent" | "high" | "medium" | "low";
 export type Severity = "critical" | "high" | "medium" | "low";
@@ -6,15 +6,35 @@ export type Member = {
   id: string;
   name: string;
   role: string;
+  /** Workspace permission, kept separate from the person's job title. */
+  access_role?: "owner" | "admin" | "member" | "viewer";
   color: string;
   active: boolean;
 };
 export type TaskLink = { label: string; url: string };
 export type TaskActivity = {
   id: string;
-  type: "created" | "updated" | "status_changed" | "priority_changed" | "assigned";
+  type:
+    | "created"
+    | "updated"
+    | "status_changed"
+    | "priority_changed"
+    | "assigned"
+    | "snoozed"
+    | "checklist_changed";
   at: string;
   summary: string;
+  changes?: TaskActivityChange[];
+};
+export type TaskActivityChange = {
+  field: string;
+  from: string;
+  to: string;
+};
+export type TaskChecklistItem = {
+  id: string;
+  title: string;
+  done: boolean;
 };
 export type SavedView = {
   id: string;
@@ -37,6 +57,7 @@ export type TaskAttachment = {
   id: string;
   name: string;
   url: string;
+  storage_path?: string;
   size?: number;
   mime_type?: string;
 };
@@ -78,6 +99,9 @@ export type Task = {
   recurrence?: RecurrenceRule;
   template_id?: string;
   attachments?: TaskAttachment[];
+  checklist?: TaskChecklistItem[];
+  inbox?: boolean;
+  snoozed_until?: string;
   custom_code?: boolean;
   created_at: string;
   updated_at: string;

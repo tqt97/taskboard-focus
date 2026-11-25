@@ -10,6 +10,7 @@ import {
   CalendarDays,
   Check,
   CheckCheck,
+  CheckCircle2,
   CloudDownload,
   CloudUpload,
   ChevronDown,
@@ -27,6 +28,8 @@ import {
   MoreHorizontal,
   Menu,
   Plus,
+  Play,
+  RotateCcw,
   Search,
   Save,
   Settings2,
@@ -36,7 +39,12 @@ import {
   Link2,
   ListFilter,
 } from "lucide-react";
-import { demoData, maxBackupBytes, parseBoardDataWithError } from "@/lib/data";
+import {
+  boardSchemaVersion,
+  demoData,
+  maxBackupBytes,
+  parseBoardDataWithError,
+} from "@/lib/data";
 import type {
   BoardData,
   Member,
@@ -51,7 +59,12 @@ import type {
 } from "@/lib/types";
 import { NotificationPopover, type BoardNotification } from "./NotificationPopover";
 import type { ReminderSettings } from "./WorkspaceDialogs";
-import { getTodayTasks, isArchived, isDueToday } from "@/lib/taskboard/selectors";
+import {
+  getTodayTasks,
+  isArchived,
+  isDueToday,
+  isSnoozed,
+} from "@/lib/taskboard/selectors";
 import { toDateInputValue } from "@/lib/taskboard/dates";
 import {
   getUiCopy,
@@ -61,16 +74,32 @@ import {
   type AppLocale,
 } from "@/lib/i18n";
 import { localBoardStorage } from "@/lib/storage/board-storage";
+import {
+  indexedDbBoardStorage,
+  type LocalWorkspaceSummary,
+} from "@/lib/storage/indexed-db-board-storage";
 import { localTemplateStorage } from "@/lib/storage/template-storage";
+import { matchesTaskSearch } from "@/lib/taskboard/search";
+import { isWithinQuietHours } from "@/lib/taskboard/notifications";
 import { useBoardSync } from "@/lib/taskboard/use-board-sync";
 import {
   createTaskFromTemplate,
   createTemplateFromTask,
 } from "@/lib/taskboard/templates";
 import { TaskBoardColumns } from "./TaskBoardColumns";
-import { getCurrentUser } from "@/lib/auth";
-import { uploadTaskAttachment } from "@/lib/storage/attachment-storage";
+import { getAccessToken, getCurrentUser } from "@/lib/auth";
+import {
+  deleteTaskAttachment,
+  resolveTaskAttachmentUrl,
+  uploadTaskAttachment,
+} from "@/lib/storage/attachment-storage";
 import { supabase } from "@/lib/supabase";
+import {
+  createSupabaseTaskRepository,
+  createSupabaseWorkspaceRepository,
+  type RemoteWorkspaceMember,
+} from "@/lib/repositories/task-repository";
+import { can, type WorkspaceRole } from "@/lib/taskboard/permissions";
 
 const StructuredTaskModal = dynamic(
   () => import("./TaskModal").then((module) => module.TaskModal),
@@ -117,10 +146,12 @@ const taskMilestones = (task: Task) =>
 const defaultReminderSettings: ReminderSettings = {
   browserEnabled: false,
   leadDays: { Deadline: 3, "Dev up": 1, "Staging up": 1, Release: 1 },
+  quietHours: { start: "22:00", end: "07:00" },
 };
 const reminderSettingsKey = "taskboard-reminder-settings-v1";
 const browserReminderKey = "taskboard-browser-reminders-v1";
 const savedViewsKey = "taskboard-saved-views-v1";
+const savedViewsStorageKey = (workspaceId: string) => `${savedViewsKey}:${workspaceId}`;
 const wideWorkspaceBreakpoint = 1440;
 const allowedLeadDays = [0, 1, 3, 7];
 const safeSetLocalStorage = (key: string, value: string) => {
@@ -145,6 +176,14 @@ const readReminderSettings = (): ReminderSettings => {
       ...defaultReminderSettings,
       browserEnabled: value?.browserEnabled === true,
       leadDays,
+      quietHours: {
+        start: /^\d{2}:\d{2}$/.test(value?.quietHours?.start)
+          ? value.quietHours.start
+          : defaultReminderSettings.quietHours.start,
+        end: /^\d{2}:\d{2}$/.test(value?.quietHours?.end)
+          ? value.quietHours.end
+          : defaultReminderSettings.quietHours.end,
+      },
     };
   } catch {
     return defaultReminderSettings;
@@ -179,6 +218,7 @@ const emptyTask = (prefix = "MENSQZIN-"): Task => ({
   links: [],
   primary_links: [],
   secondary_links: [],
+  inbox: true,
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
 });
@@ -231,12 +271,22 @@ export default function Board() {
     pathname = usePathname(),
     view = pathname.startsWith("/tasks")
       ? "tasks"
-      : pathname.startsWith("/today")
-        ? "today"
-        : "overview";
+      : pathname.startsWith("/inbox")
+        ? "inbox"
+        : pathname.startsWith("/today")
+          ? "today"
+          : "overview";
   const [data, setData] = useState<BoardData>(demoData),
     [now, setNow] = useState(new Date()),
     [ready, setReady] = useState(false),
+    [persistenceReady, setPersistenceReady] = useState(false),
+    [workspaceId, setWorkspaceId] = useState("default"),
+    [localWorkspaces, setLocalWorkspaces] = useState<LocalWorkspaceSummary[]>([]),
+    [remoteWorkspaceIds, setRemoteWorkspaceIds] = useState<string[]>([]),
+    [remoteWorkspaceRoles, setRemoteWorkspaceRoles] = useState<
+      Record<string, WorkspaceRole>
+    >({}),
+    [remoteMembers, setRemoteMembers] = useState<RemoteWorkspaceMember[]>([]),
     [search, setSearch] = useState(""),
     [statusFilter, setStatusFilter] = useState("all"),
     [priorityFilter, setPriorityFilter] = useState("all"),
@@ -246,6 +296,7 @@ export default function Board() {
     [modal, setModal] = useState<"task" | "settings" | "lock" | null>(null),
     [edit, setEdit] = useState<Task | null>(null),
     [confirm, setConfirm] = useState<string | null>(null),
+    [importPreview, setImportPreview] = useState<BoardData | null>(null),
     [settingsTab, setSettingsTab] = useState("members"),
     [dark, setDark] = useState(false),
     [toast, setToast] = useState(""),
@@ -278,9 +329,16 @@ export default function Board() {
     [locale, setLocale] = useState<AppLocale>("vi"),
     [cloudUserEmail, setCloudUserEmail] = useState(""),
     [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "error">("saved");
-  const { syncState, sync } = useBoardSync(data, setData);
+  const { syncState, sync, syncTask } = useBoardSync(data, setData, workspaceId);
   const cloudConfigured = Boolean(supabase);
   const copy = getUiCopy(locale);
+  const currentWorkspaceRole = remoteWorkspaceRoles[workspaceId] || "owner";
+  const canEditWorkspace =
+    !remoteWorkspaceIds.includes(workspaceId) ||
+    can(currentWorkspaceRole, "edit_tasks");
+  const canManageMembers =
+    !remoteWorkspaceIds.includes(workspaceId) ||
+    can(currentWorkspaceRole, "manage_members");
   const labels = copy.status;
   const priorityLabels = copy.priority;
   const greeting =
@@ -294,6 +352,16 @@ export default function Board() {
     const saved = loaded.data;
     setData(saved);
     setSortMode(saved.sort_mode || "smart");
+    void indexedDbBoardStorage.load().then((indexedData) => {
+      if (indexedData) {
+        setData(indexedData);
+        setSortMode(indexedData.sort_mode || "smart");
+      } else {
+        void indexedDbBoardStorage.save(saved);
+      }
+      setPersistenceReady(true);
+    });
+    void indexedDbBoardStorage.list().then(setLocalWorkspaces);
     if (loaded.error) {
       setToast(
         `${loaded.error} Hãy export backup nếu bạn còn bản dữ liệu cũ trước khi tiếp tục.`,
@@ -309,29 +377,35 @@ export default function Board() {
     setDisplayName(readDisplayName());
     setLocale(readStoredLocale());
     setReminderSettings(readReminderSettings());
-    setTemplates(localTemplateStorage.load());
     if (cloudConfigured) {
-      void getCurrentUser().then((user) => setCloudUserEmail(user?.email || ""));
+      void getCurrentUser().then((user) => {
+        setCloudUserEmail(user?.email || "");
+        if (!user) return;
+        void createSupabaseWorkspaceRepository(user.id)
+          .list()
+          .then((workspaces) => {
+            setRemoteWorkspaceIds(workspaces.map((workspace) => workspace.id));
+            setRemoteWorkspaceRoles(
+              Object.fromEntries(
+                workspaces.map((workspace) => [workspace.id, workspace.role]),
+              ),
+            );
+            setLocalWorkspaces((current) => [
+              ...current.filter(
+                (item) => !workspaces.some((workspace) => workspace.id === item.id),
+              ),
+              ...workspaces.map((workspace) => ({
+                id: workspace.id,
+                name: workspace.name,
+                updatedAt: workspace.updated_at,
+              })),
+            ]);
+          })
+          .catch(() => {
+            // Local mode remains usable when the remote workspace catalog is unavailable.
+          });
+      });
     }
-    try {
-      const storedViews = JSON.parse(localStorage.getItem(savedViewsKey) || "[]");
-      setSavedViews(
-        Array.isArray(storedViews)
-          ? storedViews.filter(
-              (view): view is SavedView =>
-                view &&
-                typeof view.id === "string" &&
-                typeof view.name === "string" &&
-                typeof view.search === "string" &&
-                typeof view.status === "string" &&
-                typeof view.priority === "string" &&
-                typeof view.assignee === "string" &&
-                typeof view.due === "string" &&
-                typeof view.focus === "boolean",
-            )
-          : [],
-      );
-    } catch {}
     if ("Notification" in window) setBrowserPermission(Notification.permission);
     else setBrowserPermission("unsupported");
     const syncDisplayName = () => setDisplayName(readDisplayName());
@@ -348,6 +422,37 @@ export default function Board() {
       window.removeEventListener("focus", syncDisplayName);
     };
   }, [cloudConfigured]);
+  useEffect(() => {
+    if (!ready) return;
+    try {
+      const scopedKey = savedViewsStorageKey(workspaceId);
+      const stored = localStorage.getItem(scopedKey);
+      const legacy =
+        workspaceId === "default" ? localStorage.getItem(savedViewsKey) : null;
+      const storedViews = JSON.parse(stored || legacy || "[]");
+      const validViews = Array.isArray(storedViews)
+        ? storedViews.filter(
+            (view): view is SavedView =>
+              view &&
+              typeof view.id === "string" &&
+              typeof view.name === "string" &&
+              typeof view.search === "string" &&
+              typeof view.status === "string" &&
+              typeof view.priority === "string" &&
+              typeof view.assignee === "string" &&
+              typeof view.due === "string" &&
+              typeof view.focus === "boolean",
+          )
+        : [];
+      setSavedViews(validViews);
+      if (!stored && legacy) safeSetLocalStorage(scopedKey, JSON.stringify(validViews));
+    } catch {
+      setSavedViews([]);
+    }
+  }, [ready, workspaceId]);
+  useEffect(() => {
+    if (ready) setTemplates(localTemplateStorage.load(workspaceId));
+  }, [ready, workspaceId]);
   useEffect(() => {
     document.documentElement.lang = locale;
     writeStoredLocale(locale);
@@ -372,19 +477,28 @@ export default function Board() {
     return () => clearInterval(timer);
   }, [locale]);
   useEffect(() => {
-    if (!ready) return;
+    if (!ready || !persistenceReady) return;
     setSaveStatus("saving");
     const timer = window.setTimeout(() => {
-      if (localBoardStorage.save(data).ok) setSaveStatus("saved");
-      else {
-        setSaveStatus("error");
-        setToast(
-          "Không thể lưu local; hãy export backup và kiểm tra dung lượng trình duyệt.",
-        );
-      }
+      const localResult = localBoardStorage.save(data, workspaceId);
+      const workspaceName =
+        localWorkspaces.find((workspace) => workspace.id === workspaceId)?.name ||
+        "Workspace cá nhân";
+      void indexedDbBoardStorage
+        .save(data, workspaceId, workspaceName)
+        .then((indexedSaved) => {
+          if (localResult.ok || indexedSaved) {
+            setSaveStatus("saved");
+            return;
+          }
+          setSaveStatus("error");
+          setToast(
+            "Không thể lưu local; hãy export backup và kiểm tra dung lượng trình duyệt.",
+          );
+        });
     }, 180);
     return () => window.clearTimeout(timer);
-  }, [data, ready]);
+  }, [data, localWorkspaces, persistenceReady, ready, workspaceId]);
   useEffect(() => {
     document.documentElement.dataset.theme = dark ? "dark" : "light";
     safeSetLocalStorage("taskboard-dark", dark ? "1" : "0");
@@ -473,6 +587,7 @@ export default function Board() {
       sorted.filter(
         (t) =>
           (archiveFilter === "active" ? !isArchived(t) : isArchived(t)) &&
+          (view !== "inbox" || t.inbox === true) &&
           (statusFilter === "all" || t.status === statusFilter) &&
           (priorityFilter === "all" || t.priority === priorityFilter) &&
           (assigneeFilter === "all" ||
@@ -486,9 +601,7 @@ export default function Board() {
               Boolean(t.deadline) &&
               new Date(t.deadline).getTime() - nowMs >= 0 &&
               new Date(t.deadline).getTime() - nowMs <= 7 * 86400000)) &&
-          `${t.code} ${t.title} ${t.description}`
-            .toLowerCase()
-            .includes(deferredSearch.toLowerCase()),
+          matchesTaskSearch(t, deferredSearch, now),
       ),
     [
       sorted,
@@ -497,6 +610,7 @@ export default function Board() {
       assigneeFilter,
       dueFilter,
       archiveFilter,
+      view,
       deferredSearch,
       nowMs,
     ],
@@ -520,10 +634,21 @@ export default function Board() {
     () => data.tasks.filter((t) => t.status !== "done" && !isArchived(t)),
     [data.tasks],
   );
+  const inboxTasks = useMemo(
+    () => data.tasks.filter((task) => task.inbox === true && !isArchived(task)),
+    [data.tasks],
+  );
   const todayTasks = useMemo(() => getTodayTasks(data.tasks, now), [data.tasks, now]);
   const isInReminderWindow = (date: string, label: ReminderLabel) => {
     const diff = new Date(date).getTime() - nowMs;
     return diff >= -86400000 && diff <= reminderSettings.leadDays[label] * 86400000;
+  };
+  const isQuietHours = (date = now) => {
+    return isWithinQuietHours(
+      date,
+      reminderSettings.quietHours.start,
+      reminderSettings.quietHours.end,
+    );
   };
   const reminderItems = useMemo(
     () =>
@@ -556,7 +681,12 @@ export default function Board() {
     [copy, nowMs, readNotificationIds, reminderItems],
   );
   useEffect(() => {
-    if (!ready || !reminderSettings.browserEnabled || browserPermission !== "granted")
+    if (
+      !ready ||
+      !reminderSettings.browserEnabled ||
+      browserPermission !== "granted" ||
+      isQuietHours()
+    )
       return;
     let sent: string[] = [];
     try {
@@ -606,6 +736,233 @@ export default function Board() {
       setToast("Không thể lưu cài đặt; hãy kiểm tra quyền lưu của trình duyệt.");
     }
   };
+  const switchWorkspace = async (nextId: string) => {
+    if (!nextId || nextId === workspaceId) return;
+    const currentName =
+      localWorkspaces.find((workspace) => workspace.id === workspaceId)?.name ||
+      "Workspace cá nhân";
+    const localSaved = localBoardStorage.save(data, workspaceId);
+    await indexedDbBoardStorage.save(data, workspaceId, currentName);
+    if (!localSaved.ok) {
+      setToast("Không thể lưu fallback workspace; IndexedDB vẫn sẽ được dùng.");
+    }
+    let nextData: BoardData | null = null;
+    if (remoteWorkspaceIds.includes(nextId) && cloudUserEmail) {
+      const user = await getCurrentUser();
+      if (user) {
+        try {
+          const workspaceRepository = createSupabaseWorkspaceRepository(user.id);
+          const [snapshot, memberships, taskMembers] = await Promise.all([
+            createSupabaseTaskRepository(user.id, nextId).loadWithRevision(),
+            workspaceRepository.listMembers(nextId),
+            workspaceRepository.listTaskMembers(nextId),
+          ]);
+          nextData = {
+            ...snapshot.data,
+            members: taskMembers.length ? taskMembers : snapshot.data.members,
+          };
+          setRemoteMembers(memberships);
+        } catch (error) {
+          setToast(
+            error instanceof Error ? error.message : "Không thể mở workspace cloud.",
+          );
+          return;
+        }
+      }
+    } else {
+      nextData = await indexedDbBoardStorage.load(nextId);
+      setRemoteMembers([]);
+    }
+    if (!nextData) {
+      setToast("Không thể mở workspace này; dữ liệu có thể đã bị xóa hoặc hỏng.");
+      return;
+    }
+    setWorkspaceId(nextId);
+    setData(nextData);
+    setSortMode(nextData.sort_mode || "smart");
+    setSelectedTaskIds([]);
+    setSelectionMode(false);
+    setToast(
+      `Đã chuyển sang ${localWorkspaces.find((workspace) => workspace.id === nextId)?.name || "workspace"}`,
+    );
+  };
+  const createWorkspace = async () => {
+    const name = window.prompt("Tên workspace mới", "Workspace mới")?.trim();
+    if (!name) return;
+    if (cloudConfigured && cloudUserEmail) {
+      const user = await getCurrentUser();
+      if (user) {
+        try {
+          const workspaceRepository = createSupabaseWorkspaceRepository(user.id);
+          const workspace = await workspaceRepository.create(name);
+          const initialData: BoardData = {
+            ...demoData,
+            tasks: [],
+            members: [],
+            code_prefix: data.code_prefix || "MENSQZIN-",
+            sort_mode: "smart",
+          };
+          try {
+            await createSupabaseTaskRepository(user.id, workspace.id).save(initialData);
+          } catch (snapshotError) {
+            await workspaceRepository.remove(workspace.id).catch(() => undefined);
+            throw snapshotError;
+          }
+          setRemoteWorkspaceIds((items) => [...items, workspace.id]);
+          setRemoteWorkspaceRoles((items) => ({ ...items, [workspace.id]: "owner" }));
+          setLocalWorkspaces((items) => [
+            ...items,
+            { id: workspace.id, name: workspace.name, updatedAt: workspace.updated_at },
+          ]);
+          setWorkspaceId(workspace.id);
+          setRemoteMembers([
+            {
+              workspace_id: workspace.id,
+              user_id: user.id,
+              role: "owner",
+              created_at: new Date().toISOString(),
+            },
+          ]);
+          setData(initialData);
+          setSortMode("smart");
+          setSelectedTaskIds([]);
+          setSelectionMode(false);
+          setToast(`Đã tạo ${name} trên cloud`);
+          return;
+        } catch (error) {
+          setToast(
+            error instanceof Error ? error.message : "Không thể tạo workspace cloud.",
+          );
+          return;
+        }
+      }
+    }
+    const id = crypto.randomUUID();
+    const emptyWorkspace: BoardData = {
+      ...demoData,
+      tasks: [],
+      members: [],
+      code_prefix: data.code_prefix || "MENSQZIN-",
+      sort_mode: "smart",
+    };
+    const saved = await indexedDbBoardStorage.save(emptyWorkspace, id, name);
+    if (!saved) {
+      setToast("Không thể tạo workspace; hãy kiểm tra quyền lưu trên trình duyệt.");
+      return;
+    }
+    setLocalWorkspaces((items) => [
+      ...items,
+      { id, name, updatedAt: new Date().toISOString() },
+    ]);
+    // Activate the newly-created record directly. Calling switchWorkspace here
+    // would read localWorkspaces from the current render and can therefore save
+    // the new workspace with a stale name or race the state update.
+    setWorkspaceId(id);
+    setData(emptyWorkspace);
+    setSortMode("smart");
+    setSelectedTaskIds([]);
+    setSelectionMode(false);
+    setToast(`Đã tạo ${name}`);
+  };
+  const updateRemoteMemberRole = async (
+    userId: string,
+    role: RemoteWorkspaceMember["role"],
+  ) => {
+    if (!remoteWorkspaceIds.includes(workspaceId) || !canManageMembers) {
+      setToast("Bạn không có quyền quản lý thành viên workspace này.");
+      return;
+    }
+    const user = await getCurrentUser();
+    if (!user) return;
+    try {
+      await createSupabaseWorkspaceRepository(user.id).setMemberRole(
+        workspaceId,
+        userId,
+        role,
+      );
+      setRemoteMembers((members) =>
+        members.some((member) => member.user_id === userId)
+          ? members.map((member) =>
+              member.user_id === userId ? { ...member, role } : member,
+            )
+          : [
+              ...members,
+              {
+                workspace_id: workspaceId,
+                user_id: userId,
+                role,
+                created_at: new Date().toISOString(),
+              },
+            ],
+      );
+      setToast("Đã cập nhật quyền thành viên.");
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "Không thể cập nhật quyền.");
+    }
+  };
+  const removeRemoteMember = async (userId: string) => {
+    if (!remoteWorkspaceIds.includes(workspaceId) || !canManageMembers) {
+      setToast("Bạn không có quyền quản lý thành viên workspace này.");
+      return;
+    }
+    const user = await getCurrentUser();
+    if (!user) return;
+    if (userId === user.id) {
+      setToast("Không thể tự xóa owner khỏi workspace.");
+      return;
+    }
+    try {
+      await createSupabaseWorkspaceRepository(user.id).removeMember(
+        workspaceId,
+        userId,
+      );
+      setRemoteMembers((members) =>
+        members.filter((member) => member.user_id !== userId),
+      );
+      setToast("Đã xóa thành viên khỏi workspace.");
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "Không thể xóa thành viên.");
+    }
+  };
+  const inviteRemoteMember = async (
+    email: string,
+    role: RemoteWorkspaceMember["role"],
+  ) => {
+    if (!remoteWorkspaceIds.includes(workspaceId) || !canManageMembers) {
+      setToast("Bạn không có quyền mời thành viên workspace này.");
+      return;
+    }
+    const token = await getAccessToken();
+    if (!token) {
+      setToast("Phiên cloud đã hết hạn; hãy đăng nhập lại rồi thử mời.");
+      return;
+    }
+    try {
+      const response = await fetch("/api/workspaces/invites", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ workspaceId, email, role }),
+      });
+      const payload = (await response.json()) as {
+        error?: string;
+        user_id?: string;
+      };
+      if (!response.ok) throw new Error(payload.error || "Không thể gửi lời mời.");
+      const user = await getCurrentUser();
+      if (user) {
+        const members = await createSupabaseWorkspaceRepository(user.id).listMembers(
+          workspaceId,
+        );
+        setRemoteMembers(members);
+      }
+      setToast(`Đã gửi lời mời tới ${email}.`);
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "Không thể gửi lời mời.");
+    }
+  };
   const toggleTaskSelection = (id: string) => {
     setSelectedTaskIds((ids) =>
       ids.includes(id) ? ids.filter((item) => item !== id) : [...ids, id],
@@ -641,7 +998,9 @@ export default function Board() {
     };
     const nextViews = [...savedViews, view].slice(-12);
     setSavedViews(nextViews);
-    if (!safeSetLocalStorage(savedViewsKey, JSON.stringify(nextViews))) {
+    if (
+      !safeSetLocalStorage(savedViewsStorageKey(workspaceId), JSON.stringify(nextViews))
+    ) {
       setToast("Không thể lưu view; hãy kiểm tra quyền lưu của trình duyệt.");
     } else {
       setToast(`Đã lưu view “${view.name}”`);
@@ -662,36 +1021,60 @@ export default function Board() {
   const rememberUndo = (message: string) => setUndoState({ data, message });
   const undoLast = () => {
     if (!undoState) return;
-    setData(undoState.data);
+    const timestamp = new Date().toISOString();
+    const restoredTasks = undoState.data.tasks.map((task) => ({
+      ...task,
+      updated_at: timestamp,
+    }));
+    const restoredIds = new Set(restoredTasks.map((task) => task.id));
+    const remoteOnlyTasks = data.tasks
+      .filter((task) => !restoredIds.has(task.id))
+      .map((task) => ({
+        ...task,
+        archived_at: task.archived_at || timestamp,
+        updated_at: timestamp,
+      }));
+    setData({ ...undoState.data, tasks: restoredTasks });
+    if (cloudConfigured && cloudUserEmail) {
+      syncRemoteTasks(restoredTasks);
+      remoteOnlyTasks.forEach((task) => void syncTask(task));
+    }
     setUndoState(null);
     setToast(`Đã hoàn tác: ${undoState.message}`);
   };
+  const syncRemoteTasks = (tasks: Task[]) => {
+    if (!cloudConfigured || !cloudUserEmail) return;
+    tasks.forEach((task) => void syncTask(task));
+  };
   const bulkUpdateTasks = (patch: Partial<Task>, message: string) => {
+    if (!canEditWorkspace) {
+      setToast("Bạn chỉ có quyền xem workspace này.");
+      return;
+    }
     if (!selectedTaskIds.length) return;
     rememberUndo(message);
     const selected = new Set(selectedTaskIds);
     const timestamp = new Date().toISOString();
-    setData((d) => ({
-      ...d,
-      tasks: d.tasks.map((task) =>
-        selected.has(task.id)
-          ? {
-              ...task,
-              ...patch,
-              updated_at: timestamp,
-              activity: [
-                ...(task.activity || []),
-                {
-                  id: crypto.randomUUID(),
-                  type: "updated" as const,
-                  at: timestamp,
-                  summary: message,
-                },
-              ].slice(-200),
-            }
-          : task,
-      ),
-    }));
+    const updatedTasks = data.tasks.map((task) =>
+      selected.has(task.id)
+        ? {
+            ...task,
+            ...patch,
+            updated_at: timestamp,
+            activity: [
+              ...(task.activity || []),
+              {
+                id: crypto.randomUUID(),
+                type: "updated" as const,
+                at: timestamp,
+                summary: message,
+              },
+            ].slice(-200),
+          }
+        : task,
+    );
+    setData((d) => ({ ...d, tasks: updatedTasks }));
+    syncRemoteTasks(updatedTasks.filter((task) => selected.has(task.id)));
     setSelectedTaskIds([]);
     setToast(message);
   };
@@ -785,89 +1168,220 @@ export default function Board() {
     [active, data.members, nowMs],
   );
   const saveTask = (task: Task) => {
+    if (!canEditWorkspace) {
+      setToast("Bạn chỉ có quyền xem workspace này.");
+      return;
+    }
     rememberUndo(edit && !templateCreateMode ? "cập nhật task" : "tạo task");
     const timestamp = new Date().toISOString();
-    setData((d) => {
-      const previous =
+    const previous =
+      edit && !templateCreateMode
+        ? data.tasks.find((item) => item.id === task.id)
+        : undefined;
+    if (previous) {
+      const nextPaths = new Set(
+        (task.attachments || []).map((item) => item.storage_path),
+      );
+      const removedPaths = (previous.attachments || [])
+        .map((item) => item.storage_path)
+        .filter((path): path is string => Boolean(path) && !nextPaths.has(path));
+      void Promise.all(removedPaths.map((path) => deleteTaskAttachment(path))).catch(
+        (error) =>
+          setToast(
+            error instanceof Error ? error.message : "Không thể dọn file đã xóa.",
+          ),
+      );
+    }
+    const activityType: TaskActivity["type"] = !previous
+      ? "created"
+      : previous.status !== task.status
+        ? "status_changed"
+        : previous.priority !== task.priority
+          ? "priority_changed"
+          : previous.assignee_ids?.join(",") !== task.assignee_ids?.join(",")
+            ? "assigned"
+            : "updated";
+    const changes = previous
+      ? [
+          previous.status !== task.status
+            ? {
+                field: "Trạng thái",
+                from: labels[previous.status],
+                to: labels[task.status],
+              }
+            : null,
+          previous.priority !== task.priority
+            ? {
+                field: "Ưu tiên",
+                from: priorityLabels[previous.priority],
+                to: priorityLabels[task.priority],
+              }
+            : null,
+          previous.deadline !== task.deadline
+            ? {
+                field: "Deadline",
+                from: previous.deadline || "Chưa đặt",
+                to: task.deadline || "Chưa đặt",
+              }
+            : null,
+          previous.assignee_ids?.join(",") !== task.assignee_ids?.join(",")
+            ? {
+                field: "Người phụ trách",
+                from: String(previous.assignee_ids?.length || 0),
+                to: String(task.assignee_ids?.length || 0),
+              }
+            : null,
+          (previous.checklist?.length || 0) !== (task.checklist?.length || 0)
+            ? {
+                field: "Checklist",
+                from: String(previous.checklist?.length || 0),
+                to: String(task.checklist?.length || 0),
+              }
+            : null,
+        ].filter((change): change is NonNullable<typeof change> => Boolean(change))
+      : [];
+    const activity: TaskActivity = {
+      id: crypto.randomUUID(),
+      type: activityType,
+      at: timestamp,
+      summary: !previous
+        ? "Đã tạo task"
+        : activityType === "status_changed"
+          ? `Đổi trạng thái thành ${labels[task.status]}`
+          : activityType === "priority_changed"
+            ? `Đổi ưu tiên thành ${priorityLabels[task.priority]}`
+            : activityType === "assigned"
+              ? "Cập nhật người phụ trách"
+              : "Cập nhật thông tin task",
+      changes: changes.length ? changes : undefined,
+    };
+    const nextTask: Task = {
+      ...task,
+      order_index: edit && !templateCreateMode ? task.order_index : data.tasks.length,
+      updated_at: timestamp,
+      activity: [...(task.activity || []), activity].slice(-200),
+    };
+    setData((d) => ({
+      ...d,
+      code_prefix: d.code_prefix || "MENSQZIN-",
+      sort_mode: d.sort_mode || sortMode,
+      tasks:
         edit && !templateCreateMode
-          ? d.tasks.find((item) => item.id === task.id)
-          : undefined;
-      const activityType: TaskActivity["type"] = !previous
-        ? "created"
-        : previous.status !== task.status
-          ? "status_changed"
-          : previous.priority !== task.priority
-            ? "priority_changed"
-            : previous.assignee_ids?.join(",") !== task.assignee_ids?.join(",")
-              ? "assigned"
-              : "updated";
-      const activity: TaskActivity = {
-        id: crypto.randomUUID(),
-        type: activityType,
-        at: timestamp,
-        summary: !previous
-          ? "Đã tạo task"
-          : activityType === "status_changed"
-            ? `Đổi trạng thái thành ${labels[task.status]}`
-            : activityType === "priority_changed"
-              ? `Đổi ưu tiên thành ${priorityLabels[task.priority]}`
-              : activityType === "assigned"
-                ? "Cập nhật người phụ trách"
-                : "Cập nhật thông tin task",
-      };
-      const nextTask = {
-        ...task,
-        updated_at: timestamp,
-        activity: [...(task.activity || []), activity].slice(-200),
-      };
-      return {
-        ...d,
-        code_prefix: d.code_prefix || "MENSQZIN-",
-        sort_mode: d.sort_mode || sortMode,
-        tasks:
-          edit && !templateCreateMode
-            ? d.tasks.map((item) => (item.id === task.id ? nextTask : item))
-            : [{ ...nextTask, order_index: d.tasks.length }, ...d.tasks],
-      };
-    });
+          ? d.tasks.map((item) => (item.id === task.id ? nextTask : item))
+          : [nextTask, ...d.tasks],
+    }));
+    syncRemoteTasks([nextTask]);
     setModal(null);
     setEdit(null);
     setTemplateCreateMode(false);
     setToast(edit && !templateCreateMode ? "Đã cập nhật task" : "Đã tạo task");
   };
+  const quickUpdateStatus = (task: Task) => {
+    if (!canEditWorkspace) {
+      setToast("Bạn chỉ có quyền xem workspace này.");
+      return;
+    }
+    const nextStatus: Status =
+      task.status === "todo" || task.status === "blocked" ? "in_progress" : "done";
+    const summary =
+      nextStatus === "in_progress"
+        ? task.status === "blocked"
+          ? "Đã gỡ chặn task"
+          : "Đã bắt đầu task"
+        : "Đã hoàn tất task";
+    rememberUndo(summary);
+    const timestamp = new Date().toISOString();
+    const activity: TaskActivity = {
+      id: crypto.randomUUID(),
+      type: "status_changed",
+      at: timestamp,
+      summary,
+      changes: [
+        {
+          field: "Trạng thái",
+          from: labels[task.status],
+          to: labels[nextStatus],
+        },
+      ],
+    };
+    const nextTask: Task = {
+      ...task,
+      status: nextStatus,
+      updated_at: timestamp,
+      activity: [...(task.activity || []), activity].slice(-200),
+    };
+    setData((d) => ({
+      ...d,
+      tasks: d.tasks.map((current) => (current.id === task.id ? nextTask : current)),
+    }));
+    setToast(summary);
+    syncRemoteTasks([nextTask]);
+  };
+  const quickSnooze = (task: Task) => {
+    if (!canEditWorkspace) {
+      setToast("Bạn chỉ có quyền xem workspace này.");
+      return;
+    }
+    const timestamp = new Date().toISOString();
+    const until = new Date(Date.now() + 86400000).toISOString();
+    rememberUndo("hoãn task 1 ngày");
+    const activity: TaskActivity = {
+      id: crypto.randomUUID(),
+      type: "snoozed",
+      at: timestamp,
+      summary: "Đã hoãn task 1 ngày",
+      changes: [
+        {
+          field: "Hoãn đến",
+          from: task.snoozed_until || "Chưa hoãn",
+          to: until,
+        },
+      ],
+    };
+    const nextTask: Task = {
+      ...task,
+      snoozed_until: until,
+      updated_at: timestamp,
+      activity: [...(task.activity || []), activity].slice(-200),
+    };
+    setData((d) => ({
+      ...d,
+      tasks: d.tasks.map((current) => (current.id === task.id ? nextTask : current)),
+    }));
+    setToast("Đã hoãn task 1 ngày; task sẽ quay lại Today sau đó.");
+    syncRemoteTasks([nextTask]);
+  };
   const removeTask = (id: string) => {
     rememberUndo("lưu trữ task");
     const timestamp = new Date().toISOString();
+    const archivedTask = data.tasks.find((task) => task.id === id);
+    if (!archivedTask) return;
+    const activity: TaskActivity = {
+      id: crypto.randomUUID(),
+      type: "updated",
+      at: timestamp,
+      summary: "Đã lưu trữ task",
+    };
+    const nextTask: Task = {
+      ...archivedTask,
+      archived_at: timestamp,
+      updated_at: timestamp,
+      activity: [...(archivedTask.activity || []), activity].slice(-200),
+    };
     setData((d) => ({
       ...d,
-      tasks: d.tasks.map((task) =>
-        task.id === id
-          ? {
-              ...task,
-              archived_at: timestamp,
-              updated_at: timestamp,
-              activity: [
-                ...(task.activity || []),
-                {
-                  id: crypto.randomUUID(),
-                  type: "updated" as const,
-                  at: timestamp,
-                  summary: "Đã lưu trữ task",
-                },
-              ],
-            }
-          : task,
-      ),
+      tasks: d.tasks.map((task) => (task.id === id ? nextTask : task)),
     }));
     setConfirm(null);
     setModal(null);
     setToast("Đã lưu trữ task");
+    syncRemoteTasks([nextTask]);
   };
   const saveTemplateFromTask = (task: Task) => {
     const name = window.prompt("Tên template", task.title.slice(0, 80));
     if (!name?.trim()) return;
     const next = [...templates, createTemplateFromTask(task, name)].slice(-50);
-    if (!localTemplateStorage.save(next)) {
+    if (!localTemplateStorage.save(next, workspaceId)) {
       setToast("Không thể lưu template vào trình duyệt.");
       return;
     }
@@ -875,43 +1389,55 @@ export default function Board() {
     setToast("Đã lưu template");
   };
   const uploadAttachment = async (file: File) => {
+    if (!canEditWorkspace) {
+      setToast("Bạn chỉ có quyền xem workspace này.");
+      return null;
+    }
     try {
       const user = await getCurrentUser();
       if (!user) throw new Error("Hãy đăng nhập Supabase để upload file.");
-      return await uploadTaskAttachment(file, user.id);
+      return await uploadTaskAttachment(
+        file,
+        user.id,
+        remoteWorkspaceIds.includes(workspaceId) ? workspaceId : undefined,
+      );
     } catch (error) {
       setToast(error instanceof Error ? error.message : "Upload file thất bại.");
       return null;
     }
   };
+  const resolveAttachmentUrl = async (storagePath: string) =>
+    resolveTaskAttachmentUrl(storagePath);
   const restoreTask = (id: string) => {
     rememberUndo("khôi phục task");
     const timestamp = new Date().toISOString();
+    const archivedTask = data.tasks.find((task) => task.id === id);
+    if (!archivedTask) return;
+    const activity: TaskActivity = {
+      id: crypto.randomUUID(),
+      type: "updated",
+      at: timestamp,
+      summary: "Đã khôi phục task",
+    };
+    const nextTask: Task = {
+      ...archivedTask,
+      archived_at: undefined,
+      updated_at: timestamp,
+      activity: [...(archivedTask.activity || []), activity].slice(-200),
+    };
     setData((d) => ({
       ...d,
-      tasks: d.tasks.map((task) =>
-        task.id === id
-          ? {
-              ...task,
-              archived_at: undefined,
-              updated_at: timestamp,
-              activity: [
-                ...(task.activity || []),
-                {
-                  id: crypto.randomUUID(),
-                  type: "updated" as const,
-                  at: timestamp,
-                  summary: "Đã khôi phục task",
-                },
-              ],
-            }
-          : task,
-      ),
+      tasks: d.tasks.map((task) => (task.id === id ? nextTask : task)),
     }));
+    syncRemoteTasks([nextTask]);
     setModal(null);
     setToast("Đã khôi phục task");
   };
   const reorder = (target: string) => {
+    if (!canEditWorkspace) {
+      setToast("Bạn chỉ có quyền xem workspace này.");
+      return;
+    }
     if (!dragId || dragId === target) return;
     rememberUndo("đổi thứ tự task");
     const list = [...ordered],
@@ -920,15 +1446,25 @@ export default function Board() {
     if (from < 0 || to < 0) return;
     const [item] = list.splice(from, 1);
     list.splice(to, 0, item);
-    setData((d) => ({
-      ...d,
-      sort_mode: "manual",
-      tasks: list.map((t, i) => ({ ...t, order_index: i })),
-    }));
+    const timestamp = new Date().toISOString();
+    const previousOrder = new Map(
+      data.tasks.map((task) => [task.id, task.order_index]),
+    );
+    const nextTasks = list.map((t, i) =>
+      previousOrder.get(t.id) === i
+        ? { ...t, order_index: i }
+        : { ...t, order_index: i, updated_at: timestamp },
+    );
+    setData((d) => ({ ...d, sort_mode: "manual", tasks: nextTasks }));
+    syncRemoteTasks(nextTasks.filter((task) => task.updated_at === timestamp));
     setSortMode("manual");
     setDragId(null);
   };
   const dropOnStatus = (status: Status, target?: string) => {
+    if (!canEditWorkspace) {
+      setToast("Bạn chỉ có quyền xem workspace này.");
+      return;
+    }
     if (!dragId) return;
     rememberUndo(status === "done" ? "hoàn tất task" : "chuyển trạng thái task");
     const list = [...ordered],
@@ -961,11 +1497,17 @@ export default function Board() {
       insertAt = same.length ? same[same.length - 1] + 1 : list.length;
     }
     list.splice(insertAt, 0, moved);
-    setData((d) => ({
-      ...d,
-      sort_mode: "manual",
-      tasks: list.map((t, i) => ({ ...t, order_index: i })),
-    }));
+    const previousOrder = new Map(
+      data.tasks.map((task) => [task.id, task.order_index]),
+    );
+    const nextTasks = list.map((t, i) => {
+      const changed = t.id === moved.id || previousOrder.get(t.id) !== i;
+      return changed
+        ? { ...t, order_index: i, updated_at: timestamp }
+        : { ...t, order_index: i };
+    });
+    setData((d) => ({ ...d, sort_mode: "manual", tasks: nextTasks }));
+    syncRemoteTasks(nextTasks.filter((task) => task.updated_at === timestamp));
     setSortMode("manual");
     setDragId(null);
     setToast(
@@ -975,6 +1517,7 @@ export default function Board() {
     );
   };
   const dropTask = (target: Task) => {
+    if (!canEditWorkspace) return;
     if (!dragId || dragId === target.id) return;
     const source = ordered.find((t) => t.id === dragId);
     if (!source) return;
@@ -1010,15 +1553,21 @@ export default function Board() {
     reader.onload = () => {
       try {
         const parsed = JSON.parse(String(reader.result));
-        if (!parsed || parsed.schema_version !== 1) {
-          throw new Error("File không đúng schema Taskboard v1.");
+        if (
+          !parsed ||
+          (parsed.schema_version !== 1 && parsed.schema_version !== boardSchemaVersion)
+        ) {
+          throw new Error(
+            `File không đúng schema Taskboard v1/v${boardSchemaVersion}.`,
+          );
         }
         const result = parseBoardDataWithError(parsed);
         if (!result.data)
           throw new Error(result.error || "Dữ liệu backup không hợp lệ.");
-        setData(result.data);
-        setSortMode(result.data.sort_mode || "smart");
-        setToast("Đã nhập dữ liệu");
+        setImportPreview(result.data);
+        setToast(
+          "Đã đọc backup. Hãy kiểm tra bản xem trước trước khi thay thế dữ liệu.",
+        );
       } catch (e) {
         setToast(e instanceof Error ? e.message : "Không thể đọc file");
       }
@@ -1026,13 +1575,18 @@ export default function Board() {
     reader.onerror = () => setToast("Không thể đọc file backup từ thiết bị.");
     reader.readAsText(file);
   };
-  const setMember = (m: Member) =>
+  const setMember = (m: Member) => {
+    if (!canManageMembers) {
+      setToast("Bạn không có quyền quản lý thành viên workspace này.");
+      return;
+    }
     setData((d) => ({
       ...d,
       members: d.members.some((x) => x.id === m.id)
         ? d.members.map((x) => (x.id === m.id ? m : x))
         : [...d.members, m],
     }));
+  };
   const taskCard = (t: Task) => (
     <article
       className={`task-card task-status-${t.status}`}
@@ -1107,6 +1661,7 @@ export default function Board() {
         <button
           className="icon-button mini"
           aria-label="Mở task"
+          title="Mở chi tiết task"
           onClick={(e) => {
             e.stopPropagation();
             setEdit(t);
@@ -1118,9 +1673,56 @@ export default function Board() {
       </div>
       <h3>{t.title}</h3>
       {t.next_action && <p className="task-next-action">→ {t.next_action}</p>}
+      {t.checklist?.length ? (
+        <p className="task-checklist-progress">
+          <CheckCheck size={12} /> {t.checklist.filter((item) => item.done).length}/
+          {t.checklist.length} bước hoàn tất
+        </p>
+      ) : null}
       {t.blocked_by?.length ? (
         <p className="task-dependency">Phụ thuộc {t.blocked_by.length} task</p>
       ) : null}
+      {!selectionMode && t.status !== "done" && (
+        <div className="task-card-actions" onClick={(event) => event.stopPropagation()}>
+          <button
+            type="button"
+            className={`task-quick-action${
+              t.status === "review" || t.status === "in_progress" ? " success" : ""
+            }`}
+            title={
+              t.status === "blocked"
+                ? "Gỡ chặn và bắt đầu task"
+                : t.status === "review" || t.status === "in_progress"
+                  ? "Đánh dấu task hoàn tất"
+                  : "Bắt đầu task"
+            }
+            onClick={() => quickUpdateStatus(t)}
+          >
+            {t.status === "blocked" ? (
+              <RotateCcw size={13} />
+            ) : t.status === "review" || t.status === "in_progress" ? (
+              <CheckCircle2 size={13} />
+            ) : (
+              <Play size={13} />
+            )}
+            {t.status === "blocked"
+              ? "Gỡ chặn"
+              : t.status === "review" || t.status === "in_progress"
+                ? "Hoàn tất"
+                : "Bắt đầu"}
+          </button>
+          <button
+            type="button"
+            className="task-quick-action secondary"
+            title="Hoãn task 1 ngày khỏi Today"
+            aria-label={`Hoãn ${t.code || "task"} 1 ngày`}
+            onClick={() => quickSnooze(t)}
+          >
+            <Clock3 size={13} />
+            Hoãn 1 ngày
+          </button>
+        </div>
+      )}
       <div className="task-meta">
         <span className="assignee" title="Người phụ trách">
           {(() => {
@@ -1207,6 +1809,13 @@ export default function Board() {
           >
             <CalendarDays size={18} />
             Hôm nay<span className="nav-count">{todayTasks.length}</span>
+          </button>
+          <button
+            className={view === "inbox" ? "nav-item active" : "nav-item"}
+            onClick={() => router.push("/inbox")}
+          >
+            <ListTodo size={18} />
+            Inbox<span className="nav-count">{inboxTasks.length}</span>
           </button>
         </nav>
         <div className="sidebar-bottom">
@@ -1307,6 +1916,16 @@ export default function Board() {
                     <CalendarDays size={17} /> Hôm nay
                     <span>{todayTasks.length}</span>
                   </button>
+                  <button
+                    className={view === "inbox" ? "active" : ""}
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      router.push("/inbox");
+                    }}
+                  >
+                    <ListTodo size={17} /> Inbox
+                    <span>{inboxTasks.length}</span>
+                  </button>
                 </nav>
               </>
             )}
@@ -1321,6 +1940,32 @@ export default function Board() {
                   ? "Lỗi lưu"
                   : "Đã lưu"}
             </span>
+            <div className="workspace-switcher-wrap">
+              <select
+                className="workspace-switcher"
+                aria-label="Chọn workspace"
+                value={workspaceId}
+                onChange={(event) => void switchWorkspace(event.target.value)}
+              >
+                {!localWorkspaces.some((workspace) => workspace.id === "default") && (
+                  <option value="default">Workspace cá nhân</option>
+                )}
+                {localWorkspaces.map((workspace) => (
+                  <option value={workspace.id} key={workspace.id}>
+                    {workspace.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                className="icon-button mini"
+                type="button"
+                aria-label="Tạo workspace"
+                title="Tạo workspace mới"
+                onClick={() => void createWorkspace()}
+              >
+                <Plus size={14} />
+              </button>
+            </div>
             <span
               className={`sync-status sync-${syncState.status}`}
               title={
@@ -1444,6 +2089,8 @@ export default function Board() {
                   </>
                 ) : view === "today" ? (
                   "Hôm nay"
+                ) : view === "inbox" ? (
+                  "Inbox cần triage"
                 ) : (
                   "Danh sách task"
                 )}{" "}
@@ -1454,16 +2101,19 @@ export default function Board() {
                   ? "Một cái nhìn nhanh về tiến độ, rủi ro và các mốc sắp tới."
                   : view === "today"
                     ? "Các việc quá hạn, đến hạn hôm nay và ưu tiên khẩn cần được xử lý trước."
-                    : "Tìm, lọc, tạo và cập nhật mọi task trong workspace."}
+                    : view === "inbox"
+                      ? "Các task mới cần được phân loại, giao người và đặt bước tiếp theo."
+                      : "Tìm, lọc, tạo và cập nhật mọi task trong workspace."}
               </p>
             </div>
-            {(view === "tasks" || view === "today") && (
+            {(view === "tasks" || view === "today" || view === "inbox") && (
               <div className="page-actions">
                 {templates.length > 0 && (
                   <select
                     className="template-select"
                     aria-label="Tạo task từ template"
                     defaultValue=""
+                    disabled={!canEditWorkspace}
                     onChange={(event) => {
                       const template = templates.find(
                         (item) => item.id === event.target.value,
@@ -1490,13 +2140,14 @@ export default function Board() {
                 )}
                 <button
                   className="primary-button"
+                  disabled={!canEditWorkspace}
                   onClick={() => {
                     setTemplateCreateMode(false);
                     setEdit(null);
                     setModal("task");
                   }}
                 >
-                  <Plus size={17} /> Tạo task
+                  <Plus size={17} /> {canEditWorkspace ? "Tạo task" : "Chỉ xem"}
                 </button>
               </div>
             )}
@@ -1732,10 +2383,12 @@ export default function Board() {
           )}
           <div
             className={
-              view === "tasks" || view === "today" ? "tasks-layout" : "overview-layout"
+              view === "tasks" || view === "today" || view === "inbox"
+                ? "tasks-layout"
+                : "overview-layout"
             }
           >
-            {(view === "tasks" || view === "today") && (
+            {(view === "tasks" || view === "today" || view === "inbox") && (
               <section className="tasks-panel panel">
                 <div className="panel-heading">
                   <div>
@@ -2064,6 +2717,8 @@ export default function Board() {
                     </div>
                     <button
                       className="icon-button"
+                      aria-label="Mở quản lý thành viên"
+                      title="Mở quản lý thành viên"
                       onClick={() => {
                         setSettingsTab("members");
                         setModal("settings");
@@ -2139,7 +2794,20 @@ export default function Board() {
           onRestore={() => restoreTask(edit?.id || "")}
           onSaveTemplate={() => edit && saveTemplateFromTask(edit)}
           onUploadAttachment={uploadAttachment}
+          onResolveAttachmentUrl={resolveAttachmentUrl}
+          onDiscardAttachments={(storagePaths) => {
+            void Promise.all(
+              storagePaths.map((path) => deleteTaskAttachment(path)),
+            ).catch((error) =>
+              setToast(
+                error instanceof Error
+                  ? error.message
+                  : "Không thể dọn file upload chưa lưu.",
+              ),
+            );
+          }}
           locale={locale}
+          readOnly={!canEditWorkspace}
         />
       )}
       {modal === "settings" && (
@@ -2150,8 +2818,16 @@ export default function Board() {
           onMember={setMember}
           onClose={() => setModal(null)}
           onExport={exportData}
-          onImport={importData}
+          onImport={
+            canEditWorkspace
+              ? importData
+              : () => setToast("Bạn chỉ có quyền xem workspace này.")
+          }
           onClear={() => {
+            if (!canEditWorkspace) {
+              setToast("Bạn chỉ có quyền xem workspace này.");
+              return;
+            }
             setModal(null);
             setConfirm("clear");
           }}
@@ -2173,6 +2849,13 @@ export default function Board() {
           onToast={setToast}
           locale={locale}
           onLocaleChange={setLocale}
+          remoteMembers={remoteMembers}
+          canManageRemoteMembers={
+            remoteWorkspaceIds.includes(workspaceId) && canManageMembers
+          }
+          onRemoteMemberRole={updateRemoteMemberRole}
+          onRemoveRemoteMember={removeRemoteMember}
+          onInviteRemoteMember={inviteRemoteMember}
         />
       )}
       {modal === "lock" && (
@@ -2196,6 +2879,19 @@ export default function Board() {
                 setConfirm(null),
                 setToast("Đã xóa dữ liệu local"))
           }
+        />
+      )}
+      {importPreview && (
+        <ConfirmDialog
+          title="Xác nhận nhập backup?"
+          body={`Backup hợp lệ gồm ${importPreview.tasks.length} task và ${importPreview.members.length} thành viên. Xác nhận sẽ thay thế dữ liệu workspace hiện tại; hãy export bản sao trước nếu cần giữ dữ liệu đang có.`}
+          onCancel={() => setImportPreview(null)}
+          onConfirm={() => {
+            setData(importPreview);
+            setSortMode(importPreview.sort_mode || "smart");
+            setImportPreview(null);
+            setToast("Đã nhập dữ liệu từ backup");
+          }}
         />
       )}
       {toast && (

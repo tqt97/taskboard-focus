@@ -1,4 +1,11 @@
-import type { BoardData, Member, RecurrenceRule, Task, TaskAttachment } from "./types";
+import type {
+  BoardData,
+  Member,
+  RecurrenceRule,
+  Task,
+  TaskAttachment,
+  TaskChecklistItem,
+} from "./types";
 import { validateBoardRelations } from "./taskboard/constraints.ts";
 export const demoData: BoardData = {
   code_prefix: "MENSQZIN-",
@@ -112,7 +119,7 @@ const maxLengths = {
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;
-const statuses = ["todo", "in_progress", "blocked", "done"];
+const statuses = ["todo", "in_progress", "review", "blocked", "done"];
 const priorities = ["urgent", "high", "medium", "low"];
 const severities = ["critical", "high", "medium", "low"];
 const isBoundedString = (value: unknown, max: number): value is string =>
@@ -133,12 +140,35 @@ const isActivity = (value: unknown) =>
   isRecord(value) &&
   isBoundedString(value.id, maxLengths.id) &&
   Boolean(value.id.trim()) &&
-  ["created", "updated", "status_changed", "priority_changed", "assigned"].includes(
-    String(value.type),
-  ) &&
+  [
+    "created",
+    "updated",
+    "status_changed",
+    "priority_changed",
+    "assigned",
+    "snoozed",
+    "checklist_changed",
+  ].includes(String(value.type)) &&
   isRequiredDateValue(value.at) &&
   isBoundedString(value.summary, 500) &&
-  Boolean(value.summary.trim());
+  Boolean(value.summary.trim()) &&
+  (value.changes === undefined ||
+    (Array.isArray(value.changes) &&
+      value.changes.length <= 20 &&
+      value.changes.every(
+        (change) =>
+          isRecord(change) &&
+          isBoundedString(change.field, 120) &&
+          isBoundedString(change.from, 500) &&
+          isBoundedString(change.to, 500),
+      )));
+const isChecklistItem = (value: unknown): value is TaskChecklistItem =>
+  isRecord(value) &&
+  isBoundedString(value.id, maxLengths.id) &&
+  Boolean(value.id.trim()) &&
+  isBoundedString(value.title, 500) &&
+  Boolean(value.title.trim()) &&
+  typeof value.done === "boolean";
 const isRecurrence = (value: unknown): value is RecurrenceRule =>
   isRecord(value) &&
   ["daily", "weekly", "monthly"].includes(String(value.frequency)) &&
@@ -154,6 +184,9 @@ const isAttachment = (value: unknown): value is TaskAttachment =>
   Boolean(value.name.trim()) &&
   isBoundedString(value.url, maxLengths.url) &&
   /^https?:\/\//i.test(value.url.trim()) &&
+  (value.storage_path === undefined ||
+    (isBoundedString(value.storage_path, maxLengths.url) &&
+      Boolean(value.storage_path.trim()))) &&
   (value.size === undefined ||
     (Number.isSafeInteger(value.size) && Number(value.size) >= 0)) &&
   (value.mime_type === undefined || isBoundedString(value.mime_type, 120));
@@ -165,6 +198,8 @@ const isMember = (value: unknown): value is Member =>
   isBoundedString(value.name, maxLengths.name) &&
   Boolean(value.name.trim()) &&
   isBoundedString(value.role, maxLengths.role) &&
+  (value.access_role === undefined ||
+    ["owner", "admin", "member", "viewer"].includes(String(value.access_role))) &&
   colors.includes(String(value.color)) &&
   typeof value.active === "boolean";
 
@@ -189,6 +224,7 @@ const isTask = (value: unknown): value is Task =>
         (id) => isBoundedString(id, maxLengths.id) && Boolean(id.trim()),
       ))) &&
   (value.assignee_id === undefined ||
+    value.assignee_id === "" ||
     (typeof value.assignee_id === "string" &&
       isBoundedString(value.assignee_id, maxLengths.id) &&
       Boolean(value.assignee_id.trim()))) &&
@@ -234,7 +270,13 @@ const isTask = (value: unknown): value is Task =>
   (value.attachments === undefined ||
     (Array.isArray(value.attachments) &&
       value.attachments.length <= 50 &&
-      value.attachments.every(isAttachment)));
+      value.attachments.every(isAttachment))) &&
+  (value.checklist === undefined ||
+    (Array.isArray(value.checklist) &&
+      value.checklist.length <= 100 &&
+      value.checklist.every(isChecklistItem))) &&
+  (value.inbox === undefined || typeof value.inbox === "boolean") &&
+  (value.snoozed_until === undefined || isDateValue(value.snoozed_until));
 
 type ParseBoardResult = { data: BoardData | null; error?: string };
 
@@ -247,6 +289,7 @@ export function migrateBoardData(value: unknown): unknown {
               ...task,
               blocked_by: task.blocked_by ?? [],
               attachments: task.attachments ?? [],
+              checklist: task.checklist ?? [],
             }
           : task,
       )
@@ -317,7 +360,10 @@ export function parseBoardDataWithError(value: unknown): ParseBoardResult {
   return {
     data: {
       tasks: normalizedTasks,
-      members,
+      members: members.map((member) => ({
+        ...member,
+        access_role: member.access_role || "member",
+      })),
       code_prefix:
         typeof value.code_prefix === "string" && value.code_prefix.trim()
           ? value.code_prefix.trim().slice(0, maxLengths.code)

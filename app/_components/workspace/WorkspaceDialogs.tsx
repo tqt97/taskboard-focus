@@ -18,11 +18,13 @@ import {
   X,
 } from "lucide-react";
 import type { BoardData, Member } from "@/lib/types";
+import type { RemoteWorkspaceMember } from "@/lib/repositories/task-repository";
 import { localeLabels, supportedLocales, type AppLocale } from "@/lib/i18n";
 
 export type ReminderSettings = {
   browserEnabled: boolean;
   leadDays: Record<"Deadline" | "Dev up" | "Staging up" | "Release", number>;
+  quietHours: { start: string; end: string };
 };
 
 const reminderLabels = ["Deadline", "Dev up", "Staging up", "Release"] as const;
@@ -53,6 +55,11 @@ export function SettingsModal({
   onToast,
   locale,
   onLocaleChange,
+  remoteMembers = [],
+  canManageRemoteMembers = false,
+  onRemoteMemberRole,
+  onRemoveRemoteMember,
+  onInviteRemoteMember,
 }: {
   data: BoardData;
   tab: string;
@@ -71,6 +78,17 @@ export function SettingsModal({
   onToast: (message: string) => void;
   locale: AppLocale;
   onLocaleChange: (locale: AppLocale) => void;
+  remoteMembers?: RemoteWorkspaceMember[];
+  canManageRemoteMembers?: boolean;
+  onRemoteMemberRole?: (
+    userId: string,
+    role: RemoteWorkspaceMember["role"],
+  ) => Promise<void>;
+  onRemoveRemoteMember?: (userId: string) => Promise<void>;
+  onInviteRemoteMember?: (
+    email: string,
+    role: RemoteWorkspaceMember["role"],
+  ) => Promise<void>;
 }) {
   const [newName, setNewName] = useState(""),
     [newRole, setNewRole] = useState("Developer"),
@@ -98,7 +116,11 @@ export function SettingsModal({
           return "";
         }
       })(),
-    );
+    ),
+    [remoteUserId, setRemoteUserId] = useState(""),
+    [inviteEmail, setInviteEmail] = useState(""),
+    [inviteRole, setInviteRole] = useState<RemoteWorkspaceMember["role"]>("member"),
+    [inviteSending, setInviteSending] = useState(false);
   return (
     <div
       className="overlay"
@@ -115,7 +137,12 @@ export function SettingsModal({
             <span className="eyebrow">WORKSPACE</span>
             <h2 id="settings-modal-title">Cài đặt</h2>
           </div>
-          <button className="icon-button" title="Đóng cài đặt" onClick={onClose}>
+          <button
+            className="icon-button"
+            aria-label="Đóng cài đặt"
+            title="Đóng cài đặt"
+            onClick={onClose}
+          >
             <X size={19} />
           </button>
         </header>
@@ -165,6 +192,114 @@ export function SettingsModal({
                   <h3>Thành viên nhóm</h3>
                   <p>Danh sách này dùng để gán người phụ trách task.</p>
                 </div>
+                {(remoteMembers.length > 0 || canManageRemoteMembers) && (
+                  <div className="remote-members-panel">
+                    <div className="setting-intro">
+                      <h4>Quyền thành viên cloud</h4>
+                      <p>
+                        Mời bằng email sẽ gửi lời mời qua Supabase Auth và gán quyền
+                        ngay khi tài khoản được tạo. User ID vẫn dùng được cho tài khoản
+                        đã có.
+                      </p>
+                    </div>
+                    {remoteMembers.map((member) => (
+                      <div className="remote-member-row" key={member.user_id}>
+                        <code>{member.user_id}</code>
+                        <select
+                          aria-label={`Quyền cloud của ${member.user_id}`}
+                          disabled={!canManageRemoteMembers || member.role === "owner"}
+                          value={member.role}
+                          onChange={(event) =>
+                            void onRemoteMemberRole?.(
+                              member.user_id,
+                              event.target.value as RemoteWorkspaceMember["role"],
+                            )
+                          }
+                        >
+                          <option value="owner">Owner</option>
+                          <option value="admin">Admin</option>
+                          <option value="member">Member</option>
+                          <option value="viewer">Viewer</option>
+                        </select>
+                        <button
+                          className="icon-button mini"
+                          type="button"
+                          title="Xóa thành viên cloud"
+                          aria-label={`Xóa thành viên ${member.user_id}`}
+                          disabled={!canManageRemoteMembers || member.role === "owner"}
+                          onClick={() => void onRemoveRemoteMember?.(member.user_id)}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    ))}
+                    {canManageRemoteMembers && (
+                      <div className="remote-member-invite">
+                        <input
+                          aria-label="Email thành viên mới"
+                          type="email"
+                          placeholder="email@example.com"
+                          value={inviteEmail}
+                          onChange={(event) => setInviteEmail(event.target.value)}
+                        />
+                        <select
+                          aria-label="Quyền thành viên được mời"
+                          value={inviteRole}
+                          onChange={(event) =>
+                            setInviteRole(
+                              event.target.value as RemoteWorkspaceMember["role"],
+                            )
+                          }
+                        >
+                          <option value="admin">Admin</option>
+                          <option value="member">Member</option>
+                          <option value="viewer">Viewer</option>
+                        </select>
+                        <button
+                          className="secondary-button"
+                          type="button"
+                          disabled={!inviteEmail.trim() || inviteSending}
+                          onClick={async () => {
+                            setInviteSending(true);
+                            try {
+                              await onInviteRemoteMember?.(
+                                inviteEmail.trim(),
+                                inviteRole,
+                              );
+                              setInviteEmail("");
+                            } finally {
+                              setInviteSending(false);
+                            }
+                          }}
+                        >
+                          <Send size={14} />{" "}
+                          {inviteSending ? "Đang gửi…" : "Mời qua email"}
+                        </button>
+                      </div>
+                    )}
+                    {canManageRemoteMembers && (
+                      <div className="remote-member-add">
+                        <input
+                          aria-label="Supabase user ID mới"
+                          placeholder="Supabase user ID"
+                          value={remoteUserId}
+                          onChange={(event) => setRemoteUserId(event.target.value)}
+                        />
+                        <button
+                          className="secondary-button"
+                          type="button"
+                          disabled={!remoteUserId.trim()}
+                          onClick={() => {
+                            void onRemoteMemberRole?.(remoteUserId.trim(), "member");
+                            setRemoteUserId("");
+                          }}
+                        >
+                          <Plus size={14} /> Thêm member
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
                 {data.members.map((m) => (
                   <div className="setting-member" key={m.id}>
                     <span className={`avatar avatar-${m.color}`}>
@@ -178,6 +313,23 @@ export function SettingsModal({
                       value={m.role}
                       onChange={(e) => onMember({ ...m, role: e.target.value })}
                     />
+                    <select
+                      aria-label={`Quyền workspace của ${m.name}`}
+                      value={m.access_role || "member"}
+                      onChange={(e) =>
+                        onMember({
+                          ...m,
+                          access_role: e.target.value as NonNullable<
+                            Member["access_role"]
+                          >,
+                        })
+                      }
+                    >
+                      <option value="owner">Owner</option>
+                      <option value="admin">Admin</option>
+                      <option value="member">Member</option>
+                      <option value="viewer">Viewer</option>
+                    </select>
                     <button
                       className={m.active ? "tiny-toggle on" : "tiny-toggle"}
                       onClick={() => onMember({ ...m, active: !m.active })}
@@ -205,6 +357,7 @@ export function SettingsModal({
                           id: crypto.randomUUID(),
                           name: newName.trim(),
                           role: newRole,
+                          access_role: "member",
                           color: ["blue", "violet", "orange", "green"][
                             data.members.length % 4
                           ],
@@ -287,6 +440,43 @@ export function SettingsModal({
                       }
                     }}
                   />
+                </div>
+                <div className="setting-row quiet-hours-row">
+                  <span>
+                    <b>Quiet hours</b>
+                    <small>Không hiện browser reminder trong khoảng này</small>
+                  </span>
+                  <div className="quiet-hours-inputs">
+                    <input
+                      type="time"
+                      aria-label="Bắt đầu quiet hours"
+                      value={reminderSettings.quietHours.start}
+                      onChange={(e) =>
+                        onReminderSettings({
+                          ...reminderSettings,
+                          quietHours: {
+                            ...reminderSettings.quietHours,
+                            start: e.target.value,
+                          },
+                        })
+                      }
+                    />
+                    <span>đến</span>
+                    <input
+                      type="time"
+                      aria-label="Kết thúc quiet hours"
+                      value={reminderSettings.quietHours.end}
+                      onChange={(e) =>
+                        onReminderSettings({
+                          ...reminderSettings,
+                          quietHours: {
+                            ...reminderSettings.quietHours,
+                            end: e.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </div>
                 </div>
                 <p className="muted-note">
                   Chatwork test và gửi định kỳ cần token server-side. Cấu hình trong tab

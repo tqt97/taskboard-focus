@@ -33,6 +33,7 @@ export function NotificationPopover({
         </div>
         <div className="notification-actions">
           <button
+            aria-label="Đánh dấu tất cả đã xem"
             onClick={onReadAll}
             disabled={!items.some((item) => !item.read)}
             title="Đánh dấu tất cả đã xem"
