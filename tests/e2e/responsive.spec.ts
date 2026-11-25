@@ -111,6 +111,40 @@ test("inbox shows triage state and checklist controls", async ({ page }) => {
   await expect(dialog.getByLabel("Hoàn thành bước 1")).toBeVisible();
 });
 
+test("timeline shows milestone calendar and release timeline controls", async ({
+  page,
+}) => {
+  await page.goto("/timeline");
+  await expect(page.getByRole("heading", { name: "Lịch & timeline" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Tạo task/i })).toHaveCount(0);
+  await expect(page.getByRole("tab", { name: /Lịch tuần/ })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  const timeline = page.getByRole("region", { name: "Lịch và timeline công việc" });
+  const legend = timeline.locator(".timeline-legend");
+  await expect(legend.getByText("Dev up", { exact: true })).toBeVisible();
+  await expect(legend.getByText("Staging up", { exact: true })).toBeVisible();
+  await expect(legend.getByText("Release", { exact: true })).toBeVisible();
+  await expect(legend.getByText("Deadline", { exact: true })).toBeVisible();
+  if ((page.viewportSize()?.width || 0) >= 601) {
+    const deadlineEvent = timeline.getByRole("button", { name: /Deadline/ }).first();
+    await expect(deadlineEvent).toHaveAttribute("draggable", "true");
+    await deadlineEvent.dragTo(timeline.locator(".calendar-day").first());
+    await expect(page.getByText(/Đã đổi deadline/)).toBeVisible();
+  }
+  const timelineTab = page.getByRole("tab", { name: /Timeline release/ });
+  await expect(timelineTab).toBeVisible();
+  await timelineTab.click({ force: true });
+  await expect(timelineTab).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByText("Task / phụ thuộc")).toBeVisible();
+  await expect(
+    timeline.locator(".release-milestone.milestone-dev_up").first(),
+  ).toHaveAttribute("draggable", "false");
+  await expect(page.getByRole("combobox", { name: "Người phụ trách" })).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "Mốc hiển thị" })).toBeVisible();
+});
+
 test("local workspace survives a reload through the persistence layer", async ({
   page,
 }) => {

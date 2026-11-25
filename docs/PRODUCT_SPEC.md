@@ -23,6 +23,7 @@ Một workspace cá nhân giúp ghi task nhanh, nhìn tình hình chung và khô
 8. Reminder trực quan theo mốc trong 7 ngày và đánh dấu quá hạn.
 9. Focus view, quick capture bằng phím tắt, bulk update và task có bước tiếp theo.
 10. Lưu activity history tối giản cho các thay đổi quan trọng của task.
+11. Calendar/Timeline theo dõi Dev up, Staging up, Release và Deadline; hỗ trợ lọc theo người phụ trách/mốc và kéo Deadline để đổi ngày.
 
 ## Nâng cấp sau MVP
 

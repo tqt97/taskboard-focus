@@ -15,6 +15,8 @@
 - Kéo thẻ task để thay đổi thứ tự hiển thị. Thứ tự này không tự đổi priority.
 - Nhấn `N` để tạo task nhanh; nhấn `Ctrl/Cmd + K` để focus ô tìm kiếm.
 - Chọn **Focus** để chỉ xem task urgent/high, chờ review, chưa giao hoặc gần/quá hạn.
+- Chọn **Lịch & timeline** để xem các mốc Dev up, Staging up, Release và Deadline. **Lịch tuần** phù hợp để xem mốc theo từng ngày; **Timeline release** phù hợp để nhìn toàn bộ task và dependency trên cùng trục thời gian.
+- Dùng bộ lọc **Người phụ trách** hoặc **Mốc hiển thị** để thu hẹp thông tin. Kéo mốc **Deadline** sang ngày khác để cập nhật deadline; thay đổi vẫn được lưu vào activity và đồng bộ cloud khi workspace đã đăng nhập.
 - Action chính của task đi theo flow: **Bắt đầu** → **Gửi review** → **Hoàn tất**. Task bị chặn sẽ quay lại trạng thái trước đó sau khi **Gỡ chặn**; nếu muốn hoàn tất, cần đi qua bước review.
 - Bấm **Chọn nhiều** rồi tick các task để dùng bulk action chuyển sang **Đang làm** hoặc đặt **Ưu tiên cao**; tắt chế độ này để giao diện gọn hơn.
 - Trên màn hình hẹp, assignee/deadline nằm trong **Bộ lọc nâng cao**. Mã task dùng monospace và có nút copy để dán vào ô tìm kiếm.

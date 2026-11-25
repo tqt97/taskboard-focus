@@ -8,6 +8,7 @@ import {
   ArrowDownUp,
   Bell,
   CalendarDays,
+  CalendarRange,
   Check,
   CheckCheck,
   CheckCircle2,
@@ -87,6 +88,7 @@ import {
   createTemplateFromTask,
 } from "@/lib/taskboard/templates";
 import { TaskBoardColumns } from "./TaskBoardColumns";
+import { TimelineView } from "./TimelineView";
 import { getAccessToken, getCurrentUser } from "@/lib/auth";
 import {
   deleteTaskAttachment,
@@ -279,7 +281,9 @@ export default function Board() {
         ? "inbox"
         : pathname.startsWith("/today")
           ? "today"
-          : "overview";
+          : pathname.startsWith("/timeline")
+            ? "timeline"
+            : "overview";
   const [data, setData] = useState<BoardData>(demoData),
     [now, setNow] = useState(new Date()),
     [ready, setReady] = useState(false),
@@ -1303,6 +1307,42 @@ export default function Board() {
     setTemplateCreateMode(false);
     setToast(edit && !templateCreateMode ? "Đã cập nhật task" : "Đã tạo task");
   };
+  const updateTaskDeadline = (task: Task, date: Date) => {
+    if (!canEditWorkspace) {
+      setToast("Bạn chỉ có quyền chỉnh deadline trong workspace này.");
+      return;
+    }
+    const timestamp = new Date().toISOString();
+    const nextDeadline = date.toISOString();
+    const nextTask: Task = {
+      ...task,
+      deadline: nextDeadline,
+      updated_at: timestamp,
+      activity: [
+        ...(task.activity || []),
+        {
+          id: crypto.randomUUID(),
+          type: "updated" as const,
+          at: timestamp,
+          summary: "Đã đổi deadline trên timeline",
+          changes: [
+            {
+              field: "Deadline",
+              from: task.deadline || "Chưa đặt",
+              to: nextDeadline,
+            },
+          ],
+        },
+      ].slice(-200),
+    };
+    rememberUndo("đổi deadline");
+    setData((current) => ({
+      ...current,
+      tasks: current.tasks.map((item) => (item.id === task.id ? nextTask : item)),
+    }));
+    syncRemoteTasks([nextTask]);
+    setToast(`Đã đổi deadline ${task.code || "task"}`);
+  };
   const quickUpdateStatus = (task: Task) => {
     if (!canEditWorkspace) {
       setToast("Bạn chỉ có quyền xem workspace này.");
@@ -1827,6 +1867,13 @@ export default function Board() {
             <ListTodo size={18} />
             Inbox<span className="nav-count">{inboxTasks.length}</span>
           </button>
+          <button
+            className={view === "timeline" ? "nav-item active" : "nav-item"}
+            onClick={() => router.push("/timeline")}
+          >
+            <CalendarRange size={18} />
+            Lịch & timeline
+          </button>
         </nav>
         <div className="sidebar-bottom">
           <div className="profile">
@@ -1867,7 +1914,9 @@ export default function Board() {
               ? "Tổng quan"
               : view === "today"
                 ? "Hôm nay"
-                : "Danh sách task"}
+                : view === "timeline"
+                  ? "Lịch & timeline"
+                  : "Danh sách task"}
           </div>
           <div className="top-actions">
             <button
@@ -1935,6 +1984,15 @@ export default function Board() {
                   >
                     <ListTodo size={17} /> Inbox
                     <span>{inboxTasks.length}</span>
+                  </button>
+                  <button
+                    className={view === "timeline" ? "active" : ""}
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      router.push("/timeline");
+                    }}
+                  >
+                    <CalendarRange size={17} /> Lịch & timeline
                   </button>
                 </nav>
               </>
@@ -2101,6 +2159,8 @@ export default function Board() {
                   "Hôm nay"
                 ) : view === "inbox" ? (
                   "Inbox cần triage"
+                ) : view === "timeline" ? (
+                  "Lịch & timeline"
                 ) : (
                   "Danh sách task"
                 )}{" "}
@@ -2113,7 +2173,9 @@ export default function Board() {
                     ? "Các việc quá hạn, đến hạn hôm nay và ưu tiên khẩn cần được xử lý trước."
                     : view === "inbox"
                       ? "Các task mới cần được phân loại, giao người và đặt bước tiếp theo."
-                      : "Tìm, lọc, tạo và cập nhật mọi task trong workspace."}
+                      : view === "timeline"
+                        ? "Nhìn toàn bộ mốc Dev, Staging, Release và Deadline trên trục thời gian."
+                        : "Tìm, lọc, tạo và cập nhật mọi task trong workspace."}
               </p>
             </div>
             {(view === "tasks" || view === "today" || view === "inbox") && (
@@ -2390,6 +2452,19 @@ export default function Board() {
                 </section>
               </div>
             </>
+          )}
+          {view === "timeline" && (
+            <TimelineView
+              tasks={active}
+              members={data.members}
+              readOnly={!canEditWorkspace}
+              locale={locale}
+              onOpenTask={(task) => {
+                setEdit(task);
+                setModal("task");
+              }}
+              onUpdateDeadline={updateTaskDeadline}
+            />
           )}
           <div
             className={

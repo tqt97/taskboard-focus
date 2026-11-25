@@ -7,6 +7,7 @@
 - Supabase schema và hướng dẫn tích hợp.
 - Focus view, quick capture, saved views, bulk update, undo, dependency, workload và activity history đã bắt đầu đi vào local-first workflow.
 - P0 completion workflow: `Review`/`Blocked` tách riêng, Inbox triage, Today action center, checklist/subtask, quick start/complete/snooze và activity diff.
+- Calendar/Timeline `/timeline` hiển thị các mốc Dev up, Staging up, Release và Deadline theo tuần hoặc trục release; có filter assignee/milestone và kéo Deadline để cập nhật task.
 - Import backup có preview/xác nhận; task cũ được migrate không đổi identity.
 - IndexedDB persistence đã được thêm với localStorage fallback để tăng quota và giảm phụ thuộc vào chuỗi JSON đồng bộ.
 - Local workspace selector đã tách dữ liệu từng workspace; cloud workspace catalog/snapshot được tách qua `workspace_id` khi Supabase được cấu hình.
