@@ -5,9 +5,12 @@
 - Next.js App Router 15 + React 19 + TypeScript.
 - Route entries giữ mỏng ở `app/page.tsx` và `app/tasks/page.tsx`; workspace UI nằm trong `app/_components/workspace/`.
 - Layout cross-route nằm trong `app/_components/layout/`; `app/layout.tsx`, `app/loading.tsx`, `app/error.tsx` và `app/manifest.ts` chỉ là thin entries cho App Router.
-- `Board.tsx` điều phối state/view; `TaskModal.tsx` phụ trách CRUD form; `NotificationPopover.tsx` phụ trách notification UI. CSS dùng chung ở `app/globals.css`.
+- `Board.tsx` điều phối state/view; `TaskModal.tsx` phụ trách CRUD form; `WorkspaceDialogs.tsx` giữ settings/confirm/lock dialog; `NotificationPopover.tsx` phụ trách notification UI. CSS dùng chung ở `app/globals.css`.
 - `lib/data.ts` giữ demo seed và adapter localStorage.
 - `lib/types.ts` là hợp đồng dữ liệu.
+- `lib/taskboard/constraints.ts` kiểm tra các quan hệ xuyên entity (assignee, dependency, activity) sau khi từng entity đã hợp lệ.
+- `lib/taskboard/dates.ts` là seam dùng chung cho input ngày giữa Board và TaskModal; TaskModal được lazy-load vì không cần cho initial render.
+- `lib/i18n/index.ts` là seam locale chung: locale hợp lệ, nhãn lựa chọn, Intl mapping, catalog copy và persistence key. Domain data vẫn lưu enum ổn định, không lưu text đã dịch.
 - `supabase/schema.sql` là schema mục tiêu cho database.
 - Workflow local-first hiện có seam cho Focus view, saved views, bulk update, undo snapshot và activity/next-action; các field mới vẫn optional để tương thích dữ liệu v1.
 
@@ -17,6 +20,25 @@
 - Route page chỉ import feature root và giữ URL hiện tại (`/`, `/tasks`).
 - Logic dữ liệu dùng chung đặt trong `lib/`; không đọc/ghi localStorage trực tiếp trong nhiều component nếu có thể gom qua adapter.
 - Khi feature đủ lớn, tách tiếp `hooks/`, `components/`, `validators/` trong feature folder trước khi mở thêm tab.
+
+## Invariants và error boundary
+
+- ID của member/task là duy nhất trong workspace.
+- Assignee phải trỏ tới member tồn tại, không lặp và `assignee_id` legacy phải nhất quán với phần tử đầu của `assignee_ids`.
+- Dependency phải trỏ tới task tồn tại, không tự trỏ, không lặp và không tạo cycle.
+- Activity ID không lặp trong cùng task; schema version chỉ chấp nhận version được hỗ trợ.
+- Local storage hỏng hoặc không hợp lệ không bị im lặng thay bằng dữ liệu mẫu: adapter trả lỗi để UI thông báo rõ và người dùng có cơ hội export/khôi phục.
+
+Validation shape nằm ở `lib/data.ts`; validation relation nằm ở `lib/taskboard/constraints.ts`. Hai lớp này là cùng một seam import/remote/local, nên không được bypass khi thêm adapter mới.
+
+## Performance budget hiện tại
+
+- Route dashboard/tasks/today được prerender; initial JS sau build khoảng 188 kB First Load JS.
+- Task modal được tải theo nhu cầu bằng dynamic import để initial render không phải tải form CRUD và attachment controls.
+- Settings/confirm/lock dialog cũng được tải theo nhu cầu; route metadata có title, description và canonical riêng cho `/tasks`, `/today`, `/login`.
+- Font ngoài không còn được tải bằng CSS `@import`; UI dùng system font stack để tránh request render-blocking và vẫn giữ fallback tốt trên desktop/mobile.
+- Locale hiện có `vi`, `en`, `ja`; language setting đã lưu lựa chọn, đổi `html lang` và định dạng ngày/giờ. Copy toàn bộ màn hình sẽ được migrate qua catalog theo từng feature, không dịch trực tiếp trong domain logic.
+- Search dùng `useDeferredValue`; derived task lists dùng `useMemo`. Khi vượt vài trăm task, bước tiếp theo là virtualize card list và chuyển filtering/sorting sang selector thuần để benchmark độc lập.
 
 ## Luồng hiện tại
 
@@ -29,7 +51,7 @@ flowchart LR
  Validate --> State
 ```
 
-MVP hiện tại là local-first. Mỗi trình duyệt/máy có vùng lưu riêng. Export/import là cách di chuyển dữ liệu. Supabase schema đã có contract single-account với `owner_id = auth.uid()` và RLS; adapter CRUD chưa nối vào giao diện. Local mode không cần credentials.
+MVP hiện tại là local-first. Mỗi trình duyệt/máy có vùng lưu riêng. Export/import là cách di chuyển dữ liệu. Supabase schema đã có contract single-account với `owner_id = auth.uid()` và RLS; cloud mode hiện dùng snapshot repository qua nút push/pull, không phải CRUD realtime theo từng task. Local mode không cần credentials.
 
 ## Mô hình dữ liệu
 
@@ -47,7 +69,7 @@ Ngày do người dùng nhập là ngày lịch; hiện MVP chuyển thành UTC 
 
 1. Bật Supabase Auth cho account deploy duy nhất và session server-side.
 2. Chạy schema, kiểm tra RLS bằng request authenticated và anonymous.
-3. Tạo `lib/repositories/task-repository.ts` với adapter local và Supabase.
+3. Mở rộng `lib/repositories/task-repository.ts` từ snapshot sync sang CRUD nếu cần truy vấn remote theo từng task.
 4. Thêm migration cho owner_id, domain fields mới, file metadata, notification settings.
 5. Xử lý optimistic update và lỗi đồng bộ; không báo “đã lưu” nếu remote write thất bại.
 6. Với uploads, Storage policy phải cùng quyền truy cập bảng task.

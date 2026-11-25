@@ -27,7 +27,7 @@ Một workspace cá nhân giúp ghi task nhanh, nhìn tình hình chung và khô
 ## Sau MVP
 
 - Supabase Auth, CRUD đồng bộ và RLS.
-- Upload file vào Supabase Storage với giới hạn MIME/size.
+- Upload file vào Supabase Storage với giới hạn MIME/size khi cloud mode đã cấu hình; local MVP chỉ lưu URL metadata.
 - Gửi Chatwork qua server-side function và lịch cron; Gmail sau khi có yêu cầu cụ thể.
 - Audit log, khôi phục task đã xóa, nhiều workspace, quyền thành viên.
 

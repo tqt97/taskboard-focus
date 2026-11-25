@@ -4,6 +4,7 @@
 
 ```bash
 npm run test
+npm run test:e2e
 npm run check
 ```
 
@@ -17,5 +18,8 @@ npm run check
 - date không hợp lệ, link legacy/primary không an toàn;
 - task title vượt giới hạn, payload vượt giới hạn số lượng;
 - sort mode không được hỗ trợ được fallback về `smart`.
+- migration defaults cho schema v2, Today/archive selector, dependency readiness, recurrence và template provenance.
+- schema version không hỗ trợ, duplicate assignee/dependency relation và monthly recurrence cuối tháng.
+- locale normalization, Intl mapping và fallback về Tiếng Việt khi gặp locale không hỗ trợ.
 
-UI/browser, Supabase instance và Chatwork thật vẫn cần smoke test ở môi trường tương ứng; `npm run check` chỉ xác nhận typecheck, test domain, format và production build.
+`npm run test:e2e` chạy 6 responsive cases trên Chromium desktop/tablet/mobile và kiểm tra hamburger right drawer không bị che. Supabase Auth/Storage và Chatwork thật vẫn cần smoke test với credentials tương ứng; local CI không được xem là bằng chứng production delivery.

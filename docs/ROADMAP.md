@@ -9,8 +9,8 @@
 
 ## v0.2 — Đồng bộ có xác thực
 
-- Supabase Auth, private RLS và single-account `owner_id` contract.
-- Remote repository adapter, trạng thái đồng bộ và lỗi/retry.
+- Hoàn thiện Supabase Auth, private RLS và single-account `owner_id` contract cho production.
+- Mở rộng snapshot repository hiện có thành CRUD remote theo từng task, kèm trạng thái đồng bộ và lỗi/retry.
 - Trạng thái đồng bộ, lỗi/retry, concurrency policy.
 
 ## v0.3 — Notification
@@ -22,7 +22,7 @@
 
 ## v0.4 — Tài liệu và cộng tác
 
-- Upload/download attachments với Storage policy.
+- Quản lý thư viện attachment, signed URL lifecycle và import preview; upload metadata qua Supabase Storage đã có ở cloud mode.
 - Soft delete/restore, history, import preview và merge strategy.
 
 ## Ngoài phạm vi hiện tại

@@ -29,3 +29,7 @@ Trong Cài đặt → Dữ liệu, xuất JSON. Trên máy khác mở app và nh
 ## Dữ liệu và khóa màn hình
 
 MVP lưu trong localStorage của trình duyệt. Xóa dữ liệu trình duyệt có thể làm mất workspace nếu chưa backup. Lock screen chỉ là lớp giao diện, không bảo vệ endpoint hay dữ liệu trong DevTools.
+
+## Ngôn ngữ và thiết bị
+
+Trong **Cài đặt → Giao diện**, chọn Tiếng Việt, English hoặc 日本語. Lựa chọn được lưu riêng trên thiết bị; dữ liệu task, enum và backup không phụ thuộc ngôn ngữ. Một số copy nâng cao đang được migrate dần qua catalog để tránh làm thay đổi dữ liệu hiện hữu.

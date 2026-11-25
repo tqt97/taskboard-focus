@@ -2,7 +2,7 @@
 
 Ứng dụng web cá nhân để tổng hợp task, theo dõi người phụ trách, ưu tiên, độ nghiêm trọng và các mốc Dev up / Staging up / Release / Deadline. Bản MVP ưu tiên đọc nhanh, thao tác trực tiếp và chuyển dữ liệu giữa máy bằng JSON.
 
-> **Lưu ý:** Đây là bản local-first. Task được lưu trong localStorage của trình duyệt. Supabase schema đã chuẩn bị nhưng CRUD chưa đồng bộ lên Supabase. Không dùng dữ liệu nhạy cảm hoặc chia sẻ public khi chưa bổ sung Auth và RLS.
+> **Lưu ý:** Mặc định vẫn là local-first. Task được lưu qua storage adapter trong localStorage; Supabase/Auth, cron và remote repository là các lớp opt-in cần cấu hình credentials và kiểm chứng RLS trước khi dùng.
 
 ## Tính năng
 
@@ -18,6 +18,10 @@
 - Bước tiếp theo, ghi chú review và activity history tối giản trên từng task.
 - Chỉnh sửa danh sách thành viên qua UI.
 - Dark mode, giao diện responsive.
+- Today workspace tại `/today`, archive/restore soft-delete và autosave status.
+- Dependency readiness, recurrence, attachment URL metadata và template storage utility.
+- Supabase Storage upload attachment tối đa 10 MB khi đã đăng nhập cloud.
+- Playwright responsive regression cho desktop/tablet/mobile.
 - Export/import backup JSON schema v1.
 - Prefix task cấu hình được, link chính/link phụ, tên hiển thị và passcode lock-screen local.
 - Loading/error fallback, validation import/form, keyboard interaction và format code bằng Prettier.
@@ -49,6 +53,7 @@ npm run typecheck
 npm run test
 npm run build
 npm run format:check
+npm run test:e2e
 # hoặc chạy toàn bộ check liên tiếp
 npm run check
 ```
@@ -69,18 +74,20 @@ Dữ liệu local gắn với trình duyệt và profile máy tính. Xóa site d
 
 ## Supabase
 
-`supabase/schema.sql` tạo bảng `members`, `tasks`, index, owner contract và RLS cho single-account deploy. Giao diện local chưa nối CRUD Supabase. Trước khi bật remote sync:
+`supabase/schema.sql` tạo bảng `members`, `tasks`, `board_snapshots`, index, owner contract và RLS cho single-account deploy. `/login` và nút cloud dùng snapshot repository để giữ nguyên ID/dependency của local workspace. Trước khi bật remote sync:
 
 1. Cấu hình Supabase Auth.
 2. Dùng `owner_id = auth.uid()` và kiểm tra RLS bằng cả request authenticated/anonymous.
-3. Viết repository adapter và xử lý lỗi đồng bộ.
+3. Dùng snapshot repository, kiểm tra owner/RLS và xử lý lỗi đồng bộ; UI có nút push/pull cloud.
 4. Chỉ dùng anon key ở client khi policies đã được kiểm chứng; không đưa service role key vào frontend.
+
+Scheduled notifications cần `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET` và `TASKBOARD_OWNER_ID`; Vercel cron gọi `/api/notifications` mỗi giờ. Endpoint tạo candidates từ Supabase và có thể gửi Chatwork khi `CHATWORK_API_TOKEN` cùng `CHATWORK_ROOM_ID` được cấu hình; Gmail chưa được hỗ trợ.
 
 Xem [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 ## Chatwork, Gmail và tệp đính kèm
 
-Chatwork đã có nút gửi thông báo test qua server route; reminder định kỳ vẫn chưa bật vì task MVP chỉ nằm trong localStorage. Gmail và upload attachment chưa triển khai. Token phải nằm ở server secrets, notification định kỳ cần scheduler và chống gửi trùng. Xem [docs/NOTIFICATIONS.md](docs/NOTIFICATIONS.md) và [docs/ROADMAP.md](docs/ROADMAP.md).
+Chatwork đã có nút gửi thông báo test qua server route; reminder định kỳ vẫn chưa bật vì task MVP chỉ nằm trong localStorage. Upload attachment chỉ hoạt động ở cloud mode sau khi đăng nhập Supabase và chạy đúng Storage policy; local mode chỉ lưu URL metadata. Gmail chưa triển khai. Token phải nằm ở server secrets, notification định kỳ cần scheduler và chống gửi trùng. Xem [docs/NOTIFICATIONS.md](docs/NOTIFICATIONS.md) và [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Màn hình khóa
 

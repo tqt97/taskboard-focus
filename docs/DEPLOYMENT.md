@@ -26,7 +26,7 @@ Mở http://localhost:3000. Không cần điền biến môi trường để dù
 ## Supabase (schema chuẩn bị)
 
 - Tạo project, chạy `supabase/schema.sql` trong SQL Editor.
-- Schema bật RLS theo `auth.uid()` cho account deploy duy nhất và không cấp quyền anon. Giao diện local hiện chưa đồng bộ CRUD với Supabase.
+- Schema bật RLS theo `auth.uid()` cho account deploy duy nhất và không cấp quyền anon. Giao diện hiện hỗ trợ cloud snapshot push/pull sau khi đăng nhập; CRUD remote theo từng task chưa triển khai.
 - Schema hiện phù hợp cho project mới; nếu project Supabase đã có bảng từ trước, phải tạo migration riêng để backfill `owner_id` trước khi đặt `not null`, không chạy mù `create table if not exists` trên dữ liệu production.
 - Trước khi bật adapter: cấu hình Supabase Auth, chạy schema, kiểm tra owner isolation bằng request authenticated/anonymous rồi mới đưa keys vào Vercel.
 - Không dùng service role key trong `NEXT_PUBLIC_*`.
