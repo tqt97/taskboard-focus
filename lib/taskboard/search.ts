@@ -26,22 +26,27 @@ export const parseTaskSearch = (query: string) => {
   return { filters, text: normalized.replace(/\s+/g, " ").trim().toLowerCase() };
 };
 
-export const matchesTaskSearch = (task: Task, query: string, now = new Date()) => {
+export const createTaskSearchMatcher = (query: string, now = new Date()) => {
   const { filters, text } = parseTaskSearch(query);
-  if (filters.status && task.status !== filters.status) return false;
-  if (filters.priority && task.priority !== filters.priority) return false;
-  if (filters.inbox !== undefined && task.inbox !== filters.inbox) return false;
-  if (filters.due === "today" && !isDueToday(task, now)) return false;
-  if (filters.due === "overdue" && !isOverdue(task, now)) return false;
-  if (
-    filters.due === "week" &&
-    (!task.deadline ||
-      new Date(task.deadline).getTime() < now.getTime() ||
-      new Date(task.deadline).getTime() > now.getTime() + 7 * 86400000)
-  )
-    return false;
-  if (!text) return true;
-  return `${task.code} ${task.title} ${task.description} ${task.next_action || ""}`
-    .toLowerCase()
-    .includes(text);
+  return (task: Task) => {
+    if (filters.status && task.status !== filters.status) return false;
+    if (filters.priority && task.priority !== filters.priority) return false;
+    if (filters.inbox !== undefined && task.inbox !== filters.inbox) return false;
+    if (filters.due === "today" && !isDueToday(task, now)) return false;
+    if (filters.due === "overdue" && !isOverdue(task, now)) return false;
+    if (
+      filters.due === "week" &&
+      (!task.deadline ||
+        new Date(task.deadline).getTime() < now.getTime() ||
+        new Date(task.deadline).getTime() > now.getTime() + 7 * 86400000)
+    )
+      return false;
+    if (!text) return true;
+    return `${task.code} ${task.title} ${task.description} ${task.next_action || ""}`
+      .toLowerCase()
+      .includes(text);
+  };
 };
+
+export const matchesTaskSearch = (task: Task, query: string, now = new Date()) =>
+  createTaskSearchMatcher(query, now)(task);

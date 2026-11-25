@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { demoData, parseBoardDataWithError } from "../lib/data.ts";
+import { parseBoardBackupText, restoreBoardSnapshot } from "../lib/taskboard/backup.ts";
 
 const fixture = () => JSON.parse(JSON.stringify(demoData)) as typeof demoData;
 
@@ -10,6 +11,41 @@ test("accepts a valid legacy backup and normalizes assignee_id", () => {
   assert.ok(result.data);
   assert.deepEqual(result.data.tasks[0].assignee_ids, ["m1"]);
   assert.equal(result.data.tasks[0].assignee_id, "m1");
+});
+
+test("imports a legacy backup without schema_version", () => {
+  const payload = fixture() as Record<string, unknown>;
+  delete payload.schema_version;
+
+  const result = parseBoardBackupText(JSON.stringify(payload));
+
+  assert.ok(result.data);
+  assert.deepEqual(result.data.tasks[0].assignee_ids, ["m1"]);
+});
+
+test("reports malformed JSON and unknown schema during backup restore", () => {
+  assert.match(parseBoardBackupText("{broken").error || "", /JSON hợp lệ/);
+  assert.match(
+    parseBoardBackupText(JSON.stringify({ ...fixture(), schema_version: 999 })).error ||
+      "",
+    /schema Taskboard/,
+  );
+});
+
+test("undo restores the previous board and archives tasks from mistaken replacement", () => {
+  const snapshot = fixture();
+  const imported = fixture();
+  imported.tasks = [
+    { ...imported.tasks[0], id: "replacement-task", title: "Imported task" },
+  ];
+  const timestamp = "2026-11-25T12:00:00.000Z";
+
+  const restored = restoreBoardSnapshot(snapshot, imported.tasks, timestamp);
+
+  assert.equal(restored.data.tasks[0].id, snapshot.tasks[0].id);
+  assert.equal(restored.restoredTasks[0].updated_at, timestamp);
+  assert.equal(restored.remoteOnlyTasks[0].id, "replacement-task");
+  assert.equal(restored.remoteOnlyTasks[0].archived_at, timestamp);
 });
 
 test("accepts task comments with mentions and reply relationship", () => {

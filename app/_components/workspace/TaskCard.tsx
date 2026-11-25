@@ -6,9 +6,13 @@ import {
   CheckCircle2,
   Copy,
   MoreHorizontal,
+  Pencil,
   Play,
   RotateCcw,
+  Save,
+  X,
 } from "lucide-react";
+import { useState } from "react";
 import type { AppLocale, UiCopy } from "@/lib/i18n";
 import { intlLocale } from "@/lib/i18n";
 import type { Member, Task } from "@/lib/types";
@@ -22,6 +26,7 @@ export function TaskCard({
   copy,
   now,
   selectionMode,
+  canEdit,
   selected,
   dueText,
   dueState,
@@ -29,6 +34,7 @@ export function TaskCard({
   onOpen,
   onCopyCode,
   onQuickUpdate,
+  onUpdateTitle,
   onDragStart,
   onDragEnd,
   onDrop,
@@ -39,6 +45,7 @@ export function TaskCard({
   copy: UiCopy;
   now: Date;
   selectionMode: boolean;
+  canEdit: boolean;
   selected: boolean;
   dueText: (value: string, copy: UiCopy) => string;
   dueState: (value: string) => string;
@@ -46,10 +53,13 @@ export function TaskCard({
   onOpen: (task: Task) => void;
   onCopyCode: (code: string) => void;
   onQuickUpdate: (task: Task) => void;
+  onUpdateTitle: (task: Task, title: string) => void;
   onDragStart: (taskId: string) => void;
   onDragEnd: () => void;
   onDrop: (task: Task) => void;
 }) {
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [draftTitle, setDraftTitle] = useState(task.title);
   const assignees = (
     task.assignee_ids?.length
       ? task.assignee_ids
@@ -127,7 +137,66 @@ export function TaskCard({
           <MoreHorizontal size={17} />
         </button>
       </div>
-      <h3>{task.title}</h3>
+      {editingTitle ? (
+        <form
+          className="task-inline-title-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            onUpdateTitle(task, draftTitle);
+            setEditingTitle(false);
+          }}
+          onClick={(event) => event.stopPropagation()}
+          onKeyDown={(event) => event.stopPropagation()}
+        >
+          <input
+            autoFocus
+            maxLength={500}
+            aria-label={`Sửa tiêu đề ${task.code || "TASK"}`}
+            value={draftTitle}
+            onChange={(event) => setDraftTitle(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                event.preventDefault();
+                setEditingTitle(false);
+                setDraftTitle(task.title);
+              }
+            }}
+          />
+          <button type="submit" className="icon-button mini" aria-label="Lưu tiêu đề">
+            <Save size={14} />
+          </button>
+          <button
+            type="button"
+            className="icon-button mini"
+            aria-label="Hủy sửa tiêu đề"
+            onClick={() => {
+              setEditingTitle(false);
+              setDraftTitle(task.title);
+            }}
+          >
+            <X size={14} />
+          </button>
+        </form>
+      ) : (
+        <div className="task-title-row">
+          <h3>{task.title}</h3>
+          {canEdit && !selectionMode && (
+            <button
+              type="button"
+              className="icon-button mini task-inline-edit"
+              aria-label={`Sửa nhanh ${task.code || "TASK"}`}
+              title="Sửa tiêu đề nhanh"
+              onClick={(event) => {
+                event.stopPropagation();
+                setDraftTitle(task.title);
+                setEditingTitle(true);
+              }}
+            >
+              <Pencil size={13} />
+            </button>
+          )}
+        </div>
+      )}
       {task.next_action && <p className="task-next-action">→ {task.next_action}</p>}
       {task.checklist?.length ? (
         <p className="task-checklist-progress">

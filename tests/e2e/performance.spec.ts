@@ -56,22 +56,21 @@ test.describe("browser performance benchmark", () => {
     );
     const results: Array<Record<string, number>> = [];
     await page.goto("/tasks");
+    await expect(page.getByRole("heading", { name: /Danh sách task/ })).toBeVisible();
+    await page.waitForTimeout(350);
 
     for (const size of [100, 1000, 10000]) {
       const board = makeBoard(size);
       await page.evaluate(async (value) => {
-        await new Promise<void>((resolve) => {
-          const request = indexedDB.deleteDatabase("taskboard-focus-v2");
-          request.onsuccess = () => resolve();
-          request.onerror = () => resolve();
-          request.onblocked = () => resolve();
-        });
         window.localStorage.clear();
         await new Promise<void>((resolve, reject) => {
-          const request = indexedDB.open("taskboard-focus-v2", 1);
+          const request = indexedDB.open("taskboard-focus-v2", 2);
           request.onupgradeneeded = () => {
             if (!request.result.objectStoreNames.contains("workspace")) {
               request.result.createObjectStore("workspace");
+            }
+            if (!request.result.objectStoreNames.contains("daily-backups")) {
+              request.result.createObjectStore("daily-backups");
             }
           };
           request.onerror = () => reject(request.error);
@@ -98,14 +97,25 @@ test.describe("browser performance benchmark", () => {
       const loadStarted = Date.now();
       await page.reload();
       await expect(page.getByRole("heading", { name: /Danh sách task/ })).toBeVisible();
+      await expect(page.locator(".tasks-panel .panel-heading p")).toContainText(
+        `${size} task`,
+      );
       const loadMs = Date.now() - loadStarted;
 
-      const searchBox = page.getByRole("textbox", { name: "⌘ K" });
+      const searchBox = page.getByRole("textbox", { name: "Ctrl/⌘ K" });
       const searchStarted = Date.now();
       await searchBox.fill(`Payment task ${size - 1}`);
       const matchingCard = page
         .locator(".task-card")
         .filter({ hasText: `Payment task ${size - 1}` });
+      const matchingColumn = page
+        .locator(".kanban-column")
+        .filter({ hasText: size - 1 === 0 ? "Chờ review" : "Đang làm" })
+        .first();
+      await matchingColumn
+        .locator(".task-render-item")
+        .first()
+        .scrollIntoViewIfNeeded();
       await expect.poll(() => matchingCard.count(), { timeout: 10_000 }).toBe(1);
       const searchMs = Date.now() - searchStarted;
 
@@ -117,11 +127,24 @@ test.describe("browser performance benchmark", () => {
       const dialog = page.getByRole("dialog", { name: "Thông tin task" });
       await expect(dialog).toBeVisible();
       const modalMs = Date.now() - modalStarted;
+      expect(await dialog.locator(".dependency-option").count()).toBeLessThanOrEqual(
+        100,
+      );
+      let dependencySearchMs = 0;
+      if (size === 10000) {
+        const dependencySearch = dialog.getByRole("searchbox", {
+          name: "Tìm task phụ thuộc",
+        });
+        const dependencyStarted = Date.now();
+        await dependencySearch.fill("Payment task 5000");
+        await expect(dialog.locator(".dependency-option")).toHaveCount(1);
+        dependencySearchMs = Date.now() - dependencyStarted;
+      }
       const tabStarted = Date.now();
       await dialog.getByRole("tab", { name: /Lịch sử thay đổi/ }).click();
       await expect(dialog.getByText("Chưa có lịch sử thay đổi")).toBeVisible();
       const tabMs = Date.now() - tabStarted;
-      results.push({ size, loadMs, searchMs, modalMs, tabMs });
+      results.push({ size, loadMs, searchMs, modalMs, dependencySearchMs, tabMs });
       console.log(`[browser-benchmark] ${JSON.stringify(results.at(-1))}`);
       await page.getByRole("button", { name: "Đóng cửa sổ task" }).click();
     }

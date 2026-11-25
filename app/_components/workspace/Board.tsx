@@ -10,7 +10,6 @@ import {
 import { usePathname, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import {
-  Activity,
   AlertTriangle,
   ArrowDownUp,
   Bell,
@@ -23,7 +22,6 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  Clock3,
   Download,
   Filter,
   LogIn,
@@ -41,12 +39,7 @@ import {
   X,
   ListFilter,
 } from "lucide-react";
-import {
-  boardSchemaVersion,
-  demoData,
-  maxBackupBytes,
-  parseBoardDataWithError,
-} from "@/lib/data";
+import { demoData, maxBackupBytes } from "@/lib/data";
 import type {
   BoardData,
   Member,
@@ -75,7 +68,7 @@ import {
   type LocalWorkspaceSummary,
 } from "@/lib/storage/indexed-db-board-storage";
 import { localTemplateStorage } from "@/lib/storage/template-storage";
-import { matchesTaskSearch } from "@/lib/taskboard/search";
+import { createTaskSearchMatcher } from "@/lib/taskboard/search";
 import { getReadNotificationStorageKey } from "@/lib/taskboard/notifications";
 import { useBoardSync } from "@/lib/taskboard/use-board-sync";
 import {
@@ -108,9 +101,13 @@ import { useWorkspacePersistence } from "./hooks/useWorkspacePersistence";
 import { useWorkspaceNotifications } from "./hooks/useWorkspaceNotifications";
 import { useBrowserReminders } from "./hooks/useBrowserReminders";
 import { createQuickCaptureTask } from "@/lib/taskboard/quick-capture";
+import { updateTaskTitleInline } from "@/lib/taskboard/inline-edit";
+import { parseBoardBackupText, restoreBoardSnapshot } from "@/lib/taskboard/backup";
 import { QuickCapture } from "./QuickCapture";
 import { WorkspacePageHeading } from "./WorkspacePageHeading";
 import { TaskCard } from "./TaskCard";
+import { persistSavedViews, useSavedViews } from "./hooks/useSavedViews";
+import { useWorkspaceShortcuts } from "./hooks/useWorkspaceShortcuts";
 
 const StructuredTaskModal = dynamic(
   () => import("./TaskModal").then((module) => module.TaskModal),
@@ -130,6 +127,10 @@ const ConfirmDialog = dynamic(
 const LockModal = dynamic(
   () => import("./WorkspaceDialogs").then((module) => module.LockModal),
   { ssr: false },
+);
+const WorkspaceOverview = dynamic(
+  () => import("./WorkspaceOverview").then((module) => module.WorkspaceOverview),
+  { ssr: false, loading: () => <div className="board-loading" aria-busy="true" /> },
 );
 const TaskBoardColumns = dynamic(
   () => import("./TaskBoardColumns").then((module) => module.TaskBoardColumns),
@@ -198,8 +199,6 @@ const defaultReminderSettings: ReminderSettings = {
 const reminderSettingsKey = "taskboard-reminder-settings-v1";
 const reminderSettingsStorageKey = (workspaceId: string) =>
   `${reminderSettingsKey}:${workspaceId}`;
-const savedViewsKey = "taskboard-saved-views-v1";
-const savedViewsStorageKey = (workspaceId: string) => `${savedViewsKey}:${workspaceId}`;
 const backupExportKey = "taskboard-last-json-export-v1";
 const backupNudgeKey = "taskboard-json-export-nudge-v1";
 const wideWorkspaceBreakpoint = 1440;
@@ -372,7 +371,7 @@ export default function Board() {
     [selectionMode, setSelectionMode] = useState(false),
     [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false),
     [mobileMenuOpen, setMobileMenuOpen] = useState(false),
-    [savedViews, setSavedViews] = useState<SavedView[]>([]),
+    [selectedSavedViewId, setSelectedSavedViewId] = useState(""),
     [templates, setTemplates] = useState<TaskTemplate[]>([]),
     [templateCreateMode, setTemplateCreateMode] = useState(false),
     [undoState, setUndoState] = useState<{ data: BoardData; message: string } | null>(
@@ -394,6 +393,8 @@ export default function Board() {
     [cloudUserId, setCloudUserId] = useState(""),
     [cloudUserEmail, setCloudUserEmail] = useState(""),
     [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "error">("saved");
+  const { savedViews, setSavedViews } = useSavedViews(workspaceId, ready);
+  useEffect(() => setSelectedSavedViewId(""), [workspaceId]);
   const {
     syncState,
     sync,
@@ -422,6 +423,13 @@ export default function Board() {
   const canManageMembers =
     !remoteWorkspaceIds.includes(workspaceId) ||
     can(currentWorkspaceRole, "manage_members");
+  const openQuickCapture = useCallback(() => setModal("quick-capture"), []);
+  useWorkspaceShortcuts({
+    canEdit: canEditWorkspace,
+    modalOpen: Boolean(modal),
+    searchRef,
+    onQuickCapture: openQuickCapture,
+  });
   const labels = copy.status;
   const priorityLabels = copy.priority;
   const greeting =
@@ -542,34 +550,6 @@ export default function Board() {
     } catch {}
   }, [ready, workspaceId]);
   useEffect(() => {
-    if (!ready) return;
-    try {
-      const scopedKey = savedViewsStorageKey(workspaceId);
-      const stored = localStorage.getItem(scopedKey);
-      const legacy =
-        workspaceId === "default" ? localStorage.getItem(savedViewsKey) : null;
-      const storedViews = JSON.parse(stored || legacy || "[]");
-      const validViews = Array.isArray(storedViews)
-        ? storedViews.filter(
-            (view): view is SavedView =>
-              view &&
-              typeof view.id === "string" &&
-              typeof view.name === "string" &&
-              typeof view.search === "string" &&
-              typeof view.status === "string" &&
-              typeof view.priority === "string" &&
-              typeof view.assignee === "string" &&
-              typeof view.due === "string" &&
-              typeof view.focus === "boolean",
-          )
-        : [];
-      setSavedViews(validViews);
-      if (!stored && legacy) safeSetLocalStorage(scopedKey, JSON.stringify(validViews));
-    } catch {
-      setSavedViews([]);
-    }
-  }, [ready, workspaceId]);
-  useEffect(() => {
     if (ready) setTemplates(localTemplateStorage.load(workspaceId));
   }, [ready, workspaceId]);
   useEffect(() => {
@@ -621,27 +601,6 @@ export default function Board() {
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, [modal]);
   useEffect(() => {
-    const handleShortcut = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null;
-      const typing =
-        target?.tagName === "INPUT" ||
-        target?.tagName === "TEXTAREA" ||
-        target?.tagName === "SELECT" ||
-        target?.isContentEditable;
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
-        event.preventDefault();
-        searchRef.current?.focus();
-        return;
-      }
-      if (!typing && !modal && canEditWorkspace && event.key.toLowerCase() === "n") {
-        event.preventDefault();
-        setModal("quick-capture");
-      }
-    };
-    window.addEventListener("keydown", handleShortcut);
-    return () => window.removeEventListener("keydown", handleShortcut);
-  }, [canEditWorkspace, modal]);
-  useEffect(() => {
     if (!notificationsOpen) return;
     const closeOnOutsidePointer = (event: PointerEvent) => {
       const target = event.target;
@@ -677,6 +636,10 @@ export default function Board() {
   );
   const nowMs = now.getTime();
   const deferredSearch = useDeferredValue(search);
+  const taskSearchMatcher = useMemo(
+    () => createTaskSearchMatcher(deferredSearch, now),
+    [deferredSearch, now],
+  );
   const filtered = useMemo(
     () =>
       sorted.filter(
@@ -696,7 +659,7 @@ export default function Board() {
               Boolean(t.deadline) &&
               new Date(t.deadline).getTime() - nowMs >= 0 &&
               new Date(t.deadline).getTime() - nowMs <= 7 * 86400000)) &&
-          matchesTaskSearch(t, deferredSearch, now),
+          taskSearchMatcher(t),
       ),
     [
       sorted,
@@ -708,6 +671,7 @@ export default function Board() {
       view,
       deferredSearch,
       nowMs,
+      taskSearchMatcher,
     ],
   );
   const visibleTasks = useMemo(
@@ -1084,15 +1048,15 @@ export default function Board() {
     };
     const nextViews = [...savedViews, view].slice(-12);
     setSavedViews(nextViews);
-    if (
-      !safeSetLocalStorage(savedViewsStorageKey(workspaceId), JSON.stringify(nextViews))
-    ) {
+    setSelectedSavedViewId(view.id);
+    if (!persistSavedViews(workspaceId, nextViews)) {
       setToast("Không thể lưu view; hãy kiểm tra quyền lưu của trình duyệt.");
     } else {
       setToast(`Đã lưu view “${view.name}”`);
     }
   };
   const applySavedView = (id: string) => {
+    setSelectedSavedViewId(id);
     const view = savedViews.find((item) => item.id === id);
     if (!view) return;
     setSearch(view.search);
@@ -1104,26 +1068,28 @@ export default function Board() {
     setFocusMode(view.focus);
     setAdvancedFiltersOpen(view.assignee !== "all" || view.due !== "all");
   };
+  const deleteSavedView = () => {
+    if (!selectedSavedViewId) return;
+    const nextViews = savedViews.filter((item) => item.id !== selectedSavedViewId);
+    setSavedViews(nextViews);
+    setSelectedSavedViewId("");
+    if (!persistSavedViews(workspaceId, nextViews)) {
+      setToast(
+        "Không thể cập nhật view đã lưu; hãy kiểm tra quyền lưu của trình duyệt.",
+      );
+      return;
+    }
+    setToast("Đã xóa bộ lọc đã lưu");
+  };
   const rememberUndo = (message: string) => setUndoState({ data, message });
   const undoLast = () => {
     if (!undoState) return;
     const timestamp = new Date().toISOString();
-    const restoredTasks = undoState.data.tasks.map((task) => ({
-      ...task,
-      updated_at: timestamp,
-    }));
-    const restoredIds = new Set(restoredTasks.map((task) => task.id));
-    const remoteOnlyTasks = data.tasks
-      .filter((task) => !restoredIds.has(task.id))
-      .map((task) => ({
-        ...task,
-        archived_at: task.archived_at || timestamp,
-        updated_at: timestamp,
-      }));
-    setData({ ...undoState.data, tasks: restoredTasks });
+    const restored = restoreBoardSnapshot(undoState.data, data.tasks, timestamp);
+    setData(restored.data);
     if (cloudConfigured && cloudUserEmail) {
-      syncRemoteTasks(restoredTasks);
-      remoteOnlyTasks.forEach((task) => void syncTask(task));
+      syncRemoteTasks(restored.restoredTasks);
+      restored.remoteOnlyTasks.forEach((task) => void syncTask(task));
     }
     setUndoState(null);
     setToast(`Đã hoàn tác: ${undoState.message}`);
@@ -1257,74 +1223,6 @@ export default function Board() {
       return false;
     }
   };
-  const statusSummary = useMemo(
-    () =>
-      Object.entries(labels).map(([status, label]) => ({
-        status: status as Status,
-        label,
-        count: data.tasks.filter((t) => t.status === status).length,
-      })),
-    [data.tasks],
-  );
-  const todayKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
-  const creationActivity = useMemo(() => {
-    const [year, month, date] = todayKey.split("-").map(Number);
-    const today = new Date(year, month, date);
-    return Array.from({ length: 14 }, (_, index) => {
-      const day = new Date(today);
-      day.setDate(day.getDate() - (13 - index));
-      const next = new Date(day);
-      next.setDate(next.getDate() + 1);
-      const count = data.tasks.filter((task) => {
-        const created = new Date(task.created_at).getTime();
-        return created >= day.getTime() && created < next.getTime();
-      }).length;
-      return {
-        key: day.toISOString(),
-        label: new Intl.DateTimeFormat("vi-VN", { weekday: "short" })
-          .format(day)
-          .replace(".", ""),
-        date: new Intl.DateTimeFormat("vi-VN", {
-          day: "2-digit",
-          month: "2-digit",
-        }).format(day),
-        count,
-      };
-    });
-  }, [data.tasks, todayKey]);
-  const maxCreated = Math.max(...creationActivity.map((item) => item.count), 1);
-  const attentionTasks = useMemo(
-    () =>
-      [...active]
-        .sort(
-          (a, b) =>
-            priorityRank[a.priority] - priorityRank[b.priority] ||
-            new Date(a.deadline || "9999-12-31").getTime() -
-              new Date(b.deadline || "9999-12-31").getTime(),
-        )
-        .slice(0, 4),
-    [active],
-  );
-  const workload = useMemo(
-    () =>
-      data.members
-        .map((member) => {
-          const tasks = active.filter((task) =>
-            taskAssigneeIds(task).includes(member.id),
-          );
-          return {
-            member,
-            total: tasks.length,
-            urgent: tasks.filter((task) => task.priority === "urgent").length,
-            overdue: tasks.filter(
-              (task) => task.deadline && new Date(task.deadline).getTime() < nowMs,
-            ).length,
-          };
-        })
-        .filter((item) => item.total > 0)
-        .sort((a, b) => b.total - a.total || b.overdue - a.overdue),
-    [active, data.members, nowMs],
-  );
   const saveTask = (task: Task) => {
     if (!canEditWorkspace) {
       setToast("Bạn chỉ có quyền xem workspace này.");
@@ -1597,6 +1495,23 @@ export default function Board() {
     setToast("Đã lưu trữ task");
     syncRemoteTasks([nextTask]);
   };
+  const saveInlineTitle = (task: Task, title: string) => {
+    if (!canEditWorkspace) return;
+    const previous = data.tasks.find((item) => item.id === task.id);
+    if (!previous) return;
+    const updated = updateTaskTitleInline(previous, title);
+    if (!updated) {
+      if (!title.trim()) setToast("Tiêu đề task không được để trống.");
+      return;
+    }
+    rememberUndo("sửa nhanh tiêu đề task");
+    setData((current) => ({
+      ...current,
+      tasks: current.tasks.map((item) => (item.id === task.id ? updated : item)),
+    }));
+    syncRemoteTasks([updated]);
+    setToast("Đã cập nhật tiêu đề task");
+  };
   const saveTemplateFromTask = (task: Task) => {
     const name = window.prompt("Tên template", task.title.slice(0, 80));
     if (!name?.trim()) return;
@@ -1802,19 +1717,12 @@ export default function Board() {
     }
     const reader = new FileReader();
     reader.onload = () => {
+      const result = parseBoardBackupText(String(reader.result));
+      if (!result.data) {
+        setToast(result.error || "Dữ liệu backup không hợp lệ.");
+        return;
+      }
       try {
-        const parsed = JSON.parse(String(reader.result));
-        if (
-          !parsed ||
-          (parsed.schema_version !== 1 && parsed.schema_version !== boardSchemaVersion)
-        ) {
-          throw new Error(
-            `File không đúng schema Taskboard v1/v${boardSchemaVersion}.`,
-          );
-        }
-        const result = parseBoardDataWithError(parsed);
-        if (!result.data)
-          throw new Error(result.error || "Dữ liệu backup không hợp lệ.");
         setImportPreview(result.data);
         setToast(
           "Đã đọc backup. Hãy kiểm tra bản xem trước trước khi thay thế dữ liệu.",
@@ -1847,6 +1755,7 @@ export default function Board() {
       copy={copy}
       now={now}
       selectionMode={selectionMode}
+      canEdit={canEditWorkspace}
       selected={selectedTaskIds.includes(task.id)}
       dueText={dueText}
       dueState={dueState}
@@ -1857,6 +1766,7 @@ export default function Board() {
       }}
       onCopyCode={(code) => void copyTaskCode(code)}
       onQuickUpdate={quickUpdateStatus}
+      onUpdateTitle={saveInlineTitle}
       onDragStart={setDragId}
       onDragEnd={() => setDragId(null)}
       onDrop={dropTask}
@@ -2201,9 +2111,10 @@ export default function Board() {
               <button
                 className="secondary-button quick-capture-trigger"
                 disabled={!canEditWorkspace}
+                title="Ghi nhanh task (N)"
                 onClick={() => setModal("quick-capture")}
               >
-                <Plus size={16} /> Ghi nhanh
+                <Plus size={16} /> Ghi nhanh <kbd>N</kbd>
               </button>
               {(view === "tasks" || view === "today" || view === "inbox") && (
                 <>
@@ -2260,233 +2171,18 @@ export default function Board() {
             </div>
           </div>
           {view === "overview" && (
-            <>
-              <div className="stats-grid">
-                <div className="stat-card">
-                  <div className="stat-label">
-                    Đang thực hiện{" "}
-                    <span className="stat-icon blue-bg">
-                      <Activity size={17} />
-                    </span>
-                  </div>
-                  <strong>
-                    {active.filter((t) => t.status === "in_progress").length}
-                    <small> task</small>
-                  </strong>
-                  <span className="stat-foot">trên {data.tasks.length} công việc</span>
-                </div>
-                <div className="stat-card">
-                  <div className="stat-label">
-                    Cần chú ý{" "}
-                    <span className="stat-icon orange-bg">
-                      <AlertTriangle size={17} />
-                    </span>
-                  </div>
-                  <strong>
-                    {
-                      active.filter(
-                        (t) =>
-                          t.priority === "urgent" ||
-                          t.severity === "critical" ||
-                          taskAssigneeIds(t).length === 0 ||
-                          (t.deadline && new Date(t.deadline).getTime() < Date.now()),
-                      ).length
-                    }
-                    <small> task</small>
-                  </strong>
-                  <span className="stat-foot">khẩn, quá hạn hoặc chưa giao</span>
-                </div>
-                <div className="stat-card">
-                  <div className="stat-label">
-                    Sắp đến hạn{" "}
-                    <span className="stat-icon purple-bg">
-                      <Clock3 size={17} />
-                    </span>
-                  </div>
-                  <strong>
-                    {
-                      active.filter(
-                        (t) =>
-                          t.deadline &&
-                          new Date(t.deadline).getTime() - Date.now() < 4 * 86400000,
-                      ).length
-                    }
-                    <small> task</small>
-                  </strong>
-                  <span className="stat-foot">trong 3 ngày tới hoặc quá hạn</span>
-                </div>
-                <div className="stat-card">
-                  <div className="stat-label">
-                    Đã hoàn tất{" "}
-                    <span className="stat-icon green-bg">
-                      <CheckCheck size={17} />
-                    </span>
-                  </div>
-                  <strong>
-                    {data.tasks.filter((t) => t.status === "done").length}
-                    <small> task</small>
-                  </strong>
-                  <span className="stat-foot">hoàn thành tổng thể</span>
-                </div>
-              </div>
-              <div className="overview-grid">
-                <section className="panel status-chart">
-                  <div className="panel-heading">
-                    <div>
-                      <h2>Tiến độ công việc</h2>
-                      <p>Phân bổ task theo trạng thái</p>
-                    </div>
-                    <span className="round-icon">
-                      <Activity size={17} />
-                    </span>
-                  </div>
-                  <div className="chart-bars">
-                    {statusSummary.map((item) => (
-                      <div className="chart-row" key={item.status}>
-                        <div className="chart-label">
-                          <span className={`status status-${item.status}`}>
-                            <i />
-                            {item.label}
-                          </span>
-                          <b>{item.count}</b>
-                        </div>
-                        <div className="chart-track">
-                          <span
-                            className={`chart-fill fill-${item.status}`}
-                            style={{
-                              width: `${data.tasks.length ? Math.max((item.count / data.tasks.length) * 100, item.count ? 8 : 0) : 0}%`,
-                            }}
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-                <section className="panel creation-chart">
-                  <div className="panel-heading">
-                    <div>
-                      <h2>Nhịp tạo task</h2>
-                      <p>Số task được tạo trong 14 ngày gần nhất</p>
-                    </div>
-                    <span className="round-icon">
-                      <Activity size={17} />
-                    </span>
-                  </div>
-                  <div className="creation-chart-grid">
-                    {creationActivity.map((item) => (
-                      <div
-                        className="creation-bar-wrap"
-                        key={item.key}
-                        title={item.date + " : " + item.count + " task"}
-                      >
-                        <span
-                          className="creation-bar"
-                          style={{
-                            height:
-                              Math.max(
-                                (item.count / maxCreated) * 100,
-                                item.count ? 8 : 2,
-                              ) + "%",
-                          }}
-                        />
-                        <small>{item.label}</small>
-                        <em>{item.count || ""}</em>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="creation-chart-foot">
-                    <span>
-                      <b>
-                        {creationActivity.reduce((sum, item) => sum + item.count, 0)}
-                      </b>{" "}
-                      task mới trong 14 ngày
-                    </span>
-                    <span>
-                      Ngày cao nhất:{" "}
-                      <b>{Math.max(...creationActivity.map((item) => item.count))}</b>
-                    </span>
-                  </div>
-                </section>
-                <section className="panel attention-panel">
-                  <div className="panel-heading">
-                    <div>
-                      <h2>Cần xử lý trước</h2>
-                      <p>Ưu tiên cao và task đang mở</p>
-                    </div>
-                    <button
-                      className="text-button"
-                      onClick={() => router.push("/tasks")}
-                    >
-                      <ArrowDownUp size={15} /> Mở danh sách
-                    </button>
-                  </div>
-                  {attentionTasks.length ? (
-                    <div className="attention-list">
-                      {attentionTasks.map((t) => (
-                        <button
-                          className="attention-row"
-                          key={t.id}
-                          onClick={() => {
-                            setEdit(t);
-                            setModal("task");
-                          }}
-                        >
-                          <span className={`pill priority-${t.priority}`}>
-                            {priorityLabels[t.priority]}
-                          </span>
-                          <span>
-                            <b>
-                              {t.code || "TASK"} · {t.title}
-                            </b>
-                            <small>
-                              {labels[t.status]} ·{" "}
-                              {t.deadline ? dueText(t.deadline, copy) : copy.due.unset}
-                            </small>
-                          </span>
-                          <ChevronDown size={15} />
-                        </button>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="empty-small">Không có task cần xử lý.</div>
-                  )}
-                </section>
-                <section className="panel workload-panel">
-                  <div className="panel-heading">
-                    <div>
-                      <h2>Tải công việc</h2>
-                      <p>Task đang mở theo người phụ trách</p>
-                    </div>
-                    <span className="round-icon">
-                      <Users size={17} />
-                    </span>
-                  </div>
-                  {workload.length ? (
-                    <div className="workload-list">
-                      {workload.map(({ member, total, urgent, overdue }) => (
-                        <div className="workload-row" key={member.id}>
-                          <span className={`avatar avatar-${member.color}`}>
-                            {member.name.slice(0, 1)}
-                          </span>
-                          <span className="workload-name">
-                            <b>{member.name}</b>
-                            <small>{member.role}</small>
-                          </span>
-                          <span className="workload-count">{total}</span>
-                          {(urgent > 0 || overdue > 0) && (
-                            <small className="workload-risk">
-                              {urgent ? `${urgent} khẩn` : `${overdue} quá hạn`}
-                            </small>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="empty-small">Chưa có task đang mở theo người.</div>
-                  )}
-                </section>
-              </div>
-            </>
+            <WorkspaceOverview
+              tasks={data.tasks}
+              members={data.members}
+              now={now}
+              copy={copy}
+              dueText={reminderDueText}
+              onOpenTask={(task) => {
+                setEdit(task);
+                setModal("task");
+              }}
+              onBrowseTasks={() => router.push("/tasks")}
+            />
           )}
           {view === "timeline" && (
             <TimelineView
@@ -2557,7 +2253,7 @@ export default function Board() {
                   <span>Saved views</span>
                   <select
                     aria-label="Chọn saved view"
-                    defaultValue=""
+                    value={selectedSavedViewId}
                     onChange={(e) => applySavedView(e.target.value)}
                   >
                     <option value="">Chọn view đã lưu</option>
@@ -2571,6 +2267,15 @@ export default function Board() {
                     <Save size={14} />
                     Lưu view hiện tại
                   </button>
+                  <button
+                    className="text-button"
+                    onClick={deleteSavedView}
+                    disabled={!selectedSavedViewId}
+                    aria-label="Xóa bộ lọc đã lưu"
+                  >
+                    <X size={14} />
+                    Xóa view
+                  </button>
                 </div>
                 <div className="filters">
                   <label className="search-box">
@@ -2581,7 +2286,7 @@ export default function Board() {
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
                     />
-                    <kbd>⌘ K</kbd>
+                    <kbd>Ctrl/⌘ K</kbd>
                   </label>
                   <label className="select-wrap">
                     <Filter size={15} />

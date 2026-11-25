@@ -1,23 +1,26 @@
 # Kiến trúc
 
-Typography dùng Geist Sans self-host với Latin và Latin Extended subsets; giao diện không gọi dịch vụ font bên ngoài khi người dùng mở app. Workspace presentation được tách dần thành page heading, quick-capture dialog, task card và notification hook; Board giữ phần điều phối dữ liệu và route-level state.
+Typography dùng Geist Sans self-host với Latin và Latin Extended subsets; giao diện không gọi dịch vụ font bên ngoài khi người dùng mở app. Workspace presentation được tách dần thành page heading, quick-capture dialog, task card, dashboard analytics và notification hook; Board giữ phần điều phối dữ liệu và route-level state.
 
 Task details tách activity history và comments panel khỏi `TaskModal`; panel comments tự quản lý composer/reply state, còn mutation callback giữ đồng bộ form và workspace state.
 
-Các view/dialog ít dùng được tải bằng dynamic import để giảm JavaScript ban đầu. Font public có content hash và cache immutable; dữ liệu task/workspace không cache phía server vì thay đổi theo thiết bị/tài khoản. Selector hiện dùng `useMemo`, còn biểu đồ 14 ngày chỉ phụ thuộc vào ngày hiện tại và tập task.
+Các view/dialog ít dùng được tải bằng dynamic import để giảm JavaScript ban đầu. `WorkspaceOverview` chỉ tải ở route tổng quan; Timeline, Kanban, modal và dialog vẫn lazy-load theo nhu cầu. Saved views và phím tắt nằm trong hook riêng. Font public có content hash và cache immutable; dữ liệu task/workspace không cache phía server vì thay đổi theo thiết bị/tài khoản. Search compile điều kiện một lần cho query hiện tại rồi lọc task; selector và biểu đồ dùng memoization.
 
 ## Hiện trạng package
 
 - Next.js App Router 15 + React 19 + TypeScript.
 - Route entries giữ mỏng ở `app/page.tsx` và `app/tasks/page.tsx`; workspace UI nằm trong `app/_components/workspace/`.
 - Layout cross-route nằm trong `app/_components/layout/`; `app/layout.tsx`, `app/loading.tsx`, `app/error.tsx` và `app/manifest.ts` chỉ là thin entries cho App Router.
-- `Board.tsx` điều phối state/view; `TaskModal.tsx` phụ trách CRUD form; `WorkspaceDialogs.tsx` giữ settings/confirm/lock dialog; `NotificationPopover.tsx` phụ trách notification UI. CSS dùng chung ở `app/globals.css`.
+- `Board.tsx` điều phối state/view; dashboard analytics, saved views, shortcuts, backup restore và push delivery đã tách module/hook riêng. `TaskModal.tsx` phụ trách CRUD form và giới hạn dependency candidates theo search; `WorkspaceDialogs.tsx` giữ settings/confirm/lock dialog; `NotificationPopover.tsx` phụ trách notification UI. CSS dùng chung ở `app/globals.css`.
 - `lib/data.ts` giữ demo seed và adapter dữ liệu; persistence local ưu tiên IndexedDB, localStorage được giữ làm fallback/migration cho môi trường không hỗ trợ IndexedDB.
 - `lib/types.ts` là hợp đồng dữ liệu.
 - `lib/taskboard/constraints.ts` kiểm tra các quan hệ xuyên entity (assignee, dependency, activity) sau khi từng entity đã hợp lệ.
 - `lib/taskboard/permissions.ts` tách quyền workspace (`owner/admin/member/viewer`) khỏi chức danh công việc của member.
 - `lib/taskboard/remote-sync-queue.ts` giữ remote task mutation khi offline/lỗi mạng, scope theo account + workspace, dedupe theo task và retry exponential backoff; conflict revision được pause để tránh retry vô hạn và tự mở lại khi có task version mới.
 - `lib/taskboard/dates.ts` là seam dùng chung cho input ngày giữa Board và TaskModal; TaskModal được lazy-load vì không cần cho initial render.
+- `lib/taskboard/backup.ts` chuẩn hóa JSON backup legacy/current và khôi phục snapshot undo; `lib/taskboard/web-push-delivery.ts` tách kiểm tra cấu hình, dedupe state và delivery adapter để test không cần gọi push provider thật.
+- `lib/taskboard/search.ts` cung cấp `createTaskSearchMatcher`; Board tạo matcher một lần theo deferred query thay vì parse lặp cho mỗi task.
+- Mỗi Kanban column dùng một `IntersectionObserver` chung để mount card trong overscan; đổi index về đầu danh sách sau khi lọc sẽ mount lại kết quả mới.
 - `lib/i18n/index.ts` là seam locale chung: locale hợp lệ, nhãn lựa chọn, Intl mapping, catalog copy và persistence key. Domain data vẫn lưu enum ổn định, không lưu text đã dịch.
 - `supabase/schema.sql` là schema mục tiêu cho database.
 - Workflow local-first hiện có seam cho Focus view, saved views, bulk update, undo snapshot và activity/next-action; các field mới vẫn optional để tương thích dữ liệu v1.

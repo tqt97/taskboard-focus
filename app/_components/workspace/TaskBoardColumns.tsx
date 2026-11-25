@@ -1,5 +1,5 @@
 import { ListTodo } from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import type { Status, Task } from "@/lib/types";
 
 const labels: Record<Status, string> = {
@@ -18,6 +18,40 @@ function VirtualizedTaskColumn({
   taskCard: (task: Task) => ReactNode;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const observerRef = useRef<IntersectionObserver | null>(null);
+  const visibilityCallbacks = useRef(new Map<Element, (isVisible: boolean) => void>());
+  const observeItem = useCallback(
+    (element: HTMLDivElement, setVisible: (visible: boolean) => void) => {
+      if (typeof IntersectionObserver === "undefined" || !scrollRef.current)
+        return () => {};
+      if (!observerRef.current) {
+        observerRef.current = new IntersectionObserver(
+          (entries) => {
+            entries.forEach((entry) => {
+              const setVisible = visibilityCallbacks.current.get(entry.target);
+              if (setVisible) setVisible(entry.isIntersecting);
+            });
+          },
+          { root: scrollRef.current, rootMargin: "720px 0px" },
+        );
+      }
+      visibilityCallbacks.current.set(element, setVisible);
+      observerRef.current.observe(element);
+      return () => {
+        visibilityCallbacks.current.delete(element);
+        observerRef.current?.unobserve(element);
+      };
+    },
+    [],
+  );
+  useEffect(
+    () => () => {
+      observerRef.current?.disconnect();
+      observerRef.current = null;
+      visibilityCallbacks.current.clear();
+    },
+    [],
+  );
   return (
     <div className="kanban-cards" ref={scrollRef}>
       {tasks.map((task, index) => (
@@ -26,7 +60,7 @@ function VirtualizedTaskColumn({
           index={index}
           task={task}
           taskCard={taskCard}
-          rootRef={scrollRef}
+          observeItem={observeItem}
         />
       ))}
     </div>
@@ -37,29 +71,30 @@ function VirtualizedTaskItem({
   index,
   task,
   taskCard,
-  rootRef,
+  observeItem,
 }: {
   index: number;
   task: Task;
   taskCard: (task: Task) => ReactNode;
-  rootRef: RefObject<HTMLDivElement | null>;
+  observeItem: (
+    element: HTMLDivElement,
+    setVisible: (visible: boolean) => void,
+  ) => () => void;
 }) {
   const itemRef = useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = useState(index < 12);
   useEffect(() => {
-    const item = itemRef.current;
-    const root = rootRef.current;
-    if (!item || !root || typeof IntersectionObserver === "undefined") {
+    if (index < 12) {
       setMounted(true);
       return;
     }
-    const observer = new IntersectionObserver(
-      ([entry]) => setMounted(entry.isIntersecting),
-      { root, rootMargin: "720px 0px" },
-    );
-    observer.observe(item);
-    return () => observer.disconnect();
-  }, [rootRef]);
+    const item = itemRef.current;
+    if (!item || typeof IntersectionObserver === "undefined") {
+      setMounted(true);
+      return;
+    }
+    return observeItem(item, setMounted);
+  }, [index, observeItem]);
   return (
     <div
       className="task-render-item"

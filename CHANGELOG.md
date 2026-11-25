@@ -17,6 +17,15 @@
 - Notifications: thêm Web Push nền cho owner cloud, Service Worker, đăng ký/thu hồi subscription và cron digest có dedupe/retry.
 - Bảo mật: Chatwork test yêu cầu owner Auth và cooldown atomic 60 giây; pin PostCSS bản vá để `npm audit` không còn advisory.
 - Backup: nhắc người dùng tải JSON ngoài trình duyệt mỗi 7 ngày.
+- Refactor: tách dashboard analytics thành `WorkspaceOverview` lazy-load; chuyển saved views và keyboard shortcuts sang hooks riêng.
+- Năng suất: thêm sửa nhanh tiêu đề ngay trên task card, xóa saved view đã chọn và hiển thị phím tắt `N`/`Ctrl/⌘ K`.
+- Hiệu năng: compile task search query một lần thay vì parse lặp lại cho từng task; benchmark cục bộ 10.000 task giảm từ 22,28 ms xuống 3,39 ms cho workload search.
+- Backup/restore: hỗ trợ file legacy không có `schema_version`, trả lỗi JSON/schema rõ ràng và kiểm thử undo sau khi thay workspace nhầm.
+- Notifications: thêm test cho cấu hình thiếu/sai, dedupe run, gửi push, lỗi tạm thời và subscription hết hạn 404/410.
+- Kiểm thử UI: thêm Playwright cho quick capture, inline title edit, xóa saved view và undo sau khi thay backup; các luồng mới đã pass trên Chromium desktop.
+- Kanban: dùng một `IntersectionObserver` cho mỗi cột thay vì mỗi task; khi lọc/sắp xếp, card mới lọt vào 12 vị trí đầu được mount lại để không biến mất khỏi kết quả.
+- TaskModal: giới hạn 100 lựa chọn dependency ban đầu và thêm search theo mã/tiêu đề để tránh mount hàng nghìn checkbox cùng lúc.
+- Kết quả build lần tối ưu này: workspace First Load JS vẫn được làm tròn ở 203 kB; dashboard chart chuyển sang lazy chunk riêng cho route tổng quan, chưa tạo mức giảm tổng đo được.
 - Kết quả build lần rà soát 2026-11-25: First Load JS workspace 203 kB (mốc trước tối ưu 208 kB); phần Board dùng chung vẫn chiếm phần lớn bundle.
 
 ## 0.1.2 - 2026-11-20

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Archive,
   Check,
@@ -120,6 +120,7 @@ export function TaskModal({
     [resourcesOpen, setResourcesOpen] = useState(
       Boolean((task.attachments || []).length || legacyLinks(task).length),
     ),
+    [dependencySearch, setDependencySearch] = useState(""),
     [assigneeIds, setAssigneeIds] = useState<string[]>(
       task.assignee_ids?.length
         ? task.assignee_ids
@@ -153,7 +154,27 @@ export function TaskModal({
   const field = <K extends keyof Task>(key: K, value: Task[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
   const dependencyIds = form.blocked_by || [];
-  const dependencyCandidates = tasks.filter((candidate) => candidate.id !== form.id);
+  const dependencyMatches = useMemo(() => {
+    const query = dependencySearch.trim().toLowerCase();
+    return tasks.filter(
+      (candidate) =>
+        candidate.id !== form.id &&
+        (!query ||
+          `${candidate.code} ${candidate.title}`.toLowerCase().includes(query)),
+    );
+  }, [dependencySearch, form.id, tasks]);
+  const dependencyCandidates = useMemo(() => {
+    const selected = tasks.filter(
+      (candidate) => candidate.id !== form.id && dependencyIds.includes(candidate.id),
+    );
+    const selectedIds = new Set(selected.map((candidate) => candidate.id));
+    return [
+      ...selected,
+      ...dependencyMatches
+        .filter((candidate) => !selectedIds.has(candidate.id))
+        .slice(0, Math.max(0, 100 - selected.length)),
+    ];
+  }, [dependencyIds, dependencyMatches, form.id, tasks]);
   const toggleDependency = (id: string) =>
     field(
       "blocked_by",
@@ -818,6 +839,21 @@ export function TaskModal({
                       className="dependency-picker"
                       aria-describedby="dependency-help"
                     >
+                      <input
+                        type="search"
+                        className="dependency-search"
+                        aria-label="Tìm task phụ thuộc"
+                        placeholder="Tìm theo mã hoặc tiêu đề..."
+                        value={dependencySearch}
+                        onChange={(event) => setDependencySearch(event.target.value)}
+                      />
+                      {(dependencySearch || dependencyMatches.length > 100) && (
+                        <small className="dependency-result-count">
+                          {dependencyMatches.length > 100
+                            ? `Có ${dependencyMatches.length} task phù hợp; đang hiển thị tối đa 100.`
+                            : `${dependencyMatches.length} task phù hợp.`}
+                        </small>
+                      )}
                       {dependencyCandidates.length ? (
                         <div className="dependency-list">
                           {dependencyCandidates.map((candidate) => {

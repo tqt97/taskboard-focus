@@ -92,6 +92,96 @@ test("new task modal groups fields and supports multiple dependencies", async ({
   await expect(dialog.getByText("2 task đã chọn")).toBeVisible();
 });
 
+test("quick capture shortcut and inline task title edit work on the board", async ({
+  page,
+}) => {
+  await page.goto("/tasks");
+  await page.keyboard.press("n");
+  const quickCapture = page.getByRole("dialog", { name: "Ghi nhanh vào Inbox" });
+  await expect(quickCapture).toBeVisible();
+  await quickCapture.getByLabel("Tên công việc").fill("Quick shortcut task");
+  await quickCapture.getByRole("button", { name: "Lưu vào Inbox" }).click();
+  await expect(page.getByRole("status")).toContainText("Đã ghi vào Inbox");
+
+  const inlineEdit = page.getByRole("button", { name: "Sửa nhanh MENSQZIN-248" });
+  await inlineEdit.click();
+  await page
+    .getByRole("textbox", { name: "Sửa tiêu đề MENSQZIN-248" })
+    .fill("Inline edited task");
+  await page.getByRole("button", { name: "Lưu tiêu đề" }).click();
+  await expect(
+    page.getByRole("button", { name: "Mở task MENSQZIN-248: Inline edited task" }),
+  ).toBeVisible();
+});
+
+test("saved filters can be selected and removed", async ({ page }) => {
+  await page.goto("/tasks");
+  page.once("dialog", (dialog) => void dialog.accept("Review queue"));
+  await page.getByRole("button", { name: "Lưu view hiện tại" }).click();
+  const savedViews = page.getByRole("combobox", { name: "Chọn saved view" });
+  await expect(savedViews).toHaveValue(/.+/);
+  await savedViews.selectOption({ label: "Review queue" });
+  await page.getByRole("button", { name: "Xóa bộ lọc đã lưu" }).click();
+  await expect(savedViews.locator("option", { hasText: "Review queue" })).toHaveCount(
+    0,
+  );
+});
+
+test("replacing a backup can be undone to restore the prior workspace", async ({
+  page,
+}, testInfo) => {
+  testInfo.skip(
+    testInfo.project.name === "chromium-mobile",
+    "Settings file input automation is covered on desktop and tablet.",
+  );
+  await page.goto("/tasks");
+  await page.getByRole("button", { name: "Cài đặt" }).click({ force: true });
+  const settings = page.getByRole("dialog", { name: "Cài đặt" });
+  await settings.getByRole("button", { name: "Dữ liệu" }).click();
+  await settings.locator('input[type="file"]').setInputFiles({
+    name: "replacement-backup.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(
+      JSON.stringify({
+        schema_version: 2,
+        tasks: [
+          {
+            id: "replacement-only-task",
+            code: "REPLACE-1",
+            title: "Replacement workspace task",
+            description: "",
+            status: "todo",
+            priority: "medium",
+            severity: "medium",
+            assignee_ids: [],
+            assignee_id: "",
+            dev_up: "",
+            staging_up: "",
+            release_at: "",
+            deadline: "",
+            order_index: 0,
+            links: [],
+            created_at: "2026-11-25T00:00:00.000Z",
+            updated_at: "2026-11-25T00:00:00.000Z",
+          },
+        ],
+        members: [],
+      }),
+    ),
+  });
+  const preview = page.getByRole("dialog", { name: "Kiểm tra backup trước khi nhập" });
+  await preview.getByRole("button", { name: "Thay thế toàn bộ" }).click();
+  await expect(page.getByRole("status")).toContainText("bạn có thể Hoàn tác");
+  await page.getByRole("button", { name: "Hoàn tác" }).click();
+  await expect(page.getByRole("status")).toContainText("Đã hoàn tác");
+  await expect(
+    page.getByRole("button", {
+      name: "Mở task MENSQZIN-248: Hoàn thiện luồng thanh toán",
+    }),
+  ).toBeVisible();
+  await expect(page.getByText("Replacement workspace task")).toHaveCount(0);
+});
+
 test("inbox shows triage state and checklist controls", async ({ page }) => {
   await page.goto("/inbox");
   await expect(page.getByRole("heading", { name: "Inbox cần triage" })).toBeVisible();
