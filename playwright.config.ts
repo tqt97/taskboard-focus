@@ -2,7 +2,10 @@ import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./tests/e2e",
-  fullyParallel: true,
+  // The local dev server and browser persistence layer are shared resources;
+  // serial workers keep the responsive release gate deterministic.
+  fullyParallel: false,
+  workers: 1,
   reporter: "list",
   use: {
     baseURL: "http://127.0.0.1:3100",
