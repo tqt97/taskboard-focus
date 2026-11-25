@@ -3,6 +3,7 @@
 import { useState } from "react";
 import {
   AlertTriangle,
+  Check,
   Download,
   FileUp,
   LockKeyhole,
@@ -109,7 +110,7 @@ export function SettingsModal({
             <span className="eyebrow">WORKSPACE</span>
             <h2 id="settings-modal-title">Cài đặt</h2>
           </div>
-          <button className="icon-button" onClick={onClose}>
+          <button className="icon-button" title="Đóng cài đặt" onClick={onClose}>
             <X size={19} />
           </button>
         </header>
@@ -424,6 +425,7 @@ export function SettingsModal({
                       }
                     }}
                   >
+                    <Check size={15} />
                     Lưu passcode
                   </button>
                 </div>
@@ -453,6 +455,7 @@ export function SettingsModal({
         <footer className="modal-footer">
           <span />
           <button className="primary-button" onClick={onClose}>
+            <Check size={15} />
             Hoàn tất
           </button>
         </footer>
@@ -486,9 +489,11 @@ export function ConfirmDialog({
         <p>{body}</p>
         <footer>
           <button className="secondary-button" onClick={onCancel}>
+            <X size={15} />
             Hủy
           </button>
           <button className="danger-button" onClick={onConfirm}>
+            <Trash2 size={15} />
             Xác nhận
           </button>
         </footer>
@@ -528,6 +533,7 @@ export function LockModal({
         />
         <footer>
           <button className="secondary-button" onClick={onClose}>
+            <X size={15} />
             Đóng
           </button>
           <button
@@ -548,6 +554,7 @@ export function LockModal({
               } else onToast("Passcode chưa đúng");
             }}
           >
+            <Check size={15} />
             Mở khóa
           </button>
         </footer>

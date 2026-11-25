@@ -39,7 +39,7 @@ export function NotificationPopover({
           >
             <CheckCheck size={15} />
           </button>
-          <button onClick={onClose} aria-label="Đóng thông báo">
+          <button onClick={onClose} aria-label="Đóng thông báo" title="Đóng thông báo">
             <X size={15} />
           </button>
         </div>

@@ -19,6 +19,7 @@ import {
   Copy,
   Download,
   Filter,
+  LogIn,
   LayoutDashboard,
   ListTodo,
   LockKeyhole,
@@ -27,6 +28,7 @@ import {
   Menu,
   Plus,
   Search,
+  Save,
   Settings2,
   Sun,
   Users,
@@ -68,6 +70,7 @@ import {
 import { TaskBoardColumns } from "./TaskBoardColumns";
 import { getCurrentUser } from "@/lib/auth";
 import { uploadTaskAttachment } from "@/lib/storage/attachment-storage";
+import { supabase } from "@/lib/supabase";
 
 const StructuredTaskModal = dynamic(
   () => import("./TaskModal").then((module) => module.TaskModal),
@@ -273,8 +276,10 @@ export default function Board() {
     [sidebarCollapsed, setSidebarCollapsed] = useState(false),
     [displayName, setDisplayName] = useState("Tuấn"),
     [locale, setLocale] = useState<AppLocale>("vi"),
+    [cloudUserEmail, setCloudUserEmail] = useState(""),
     [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "error">("saved");
   const { syncState, sync } = useBoardSync(data, setData);
+  const cloudConfigured = Boolean(supabase);
   const copy = getUiCopy(locale);
   const labels = copy.status;
   const priorityLabels = copy.priority;
@@ -305,6 +310,9 @@ export default function Board() {
     setLocale(readStoredLocale());
     setReminderSettings(readReminderSettings());
     setTemplates(localTemplateStorage.load());
+    if (cloudConfigured) {
+      void getCurrentUser().then((user) => setCloudUserEmail(user?.email || ""));
+    }
     try {
       const storedViews = JSON.parse(localStorage.getItem(savedViewsKey) || "[]");
       setSavedViews(
@@ -339,7 +347,7 @@ export default function Board() {
       window.removeEventListener("storage", syncDisplayName);
       window.removeEventListener("focus", syncDisplayName);
     };
-  }, []);
+  }, [cloudConfigured]);
   useEffect(() => {
     document.documentElement.lang = locale;
     writeStoredLocale(locale);
@@ -1246,6 +1254,7 @@ export default function Board() {
             <button
               className="mobile-menu-button"
               aria-label={mobileMenuOpen ? "Đóng menu" : "Mở menu"}
+              title={mobileMenuOpen ? "Đóng menu" : "Mở menu"}
               aria-expanded={mobileMenuOpen}
               onClick={() => setMobileMenuOpen((open) => !open)}
             >
@@ -1314,35 +1323,60 @@ export default function Board() {
             </span>
             <span
               className={`sync-status sync-${syncState.status}`}
-              title={syncState.status === "error" ? syncState.message : undefined}
+              title={
+                syncState.status === "error"
+                  ? syncState.message
+                  : !cloudConfigured
+                    ? "Local mode: dữ liệu được lưu trong trình duyệt này"
+                    : cloudUserEmail
+                      ? `Cloud đã kết nối: ${cloudUserEmail}`
+                      : "Cloud đã cấu hình nhưng chưa đăng nhập"
+              }
               aria-live="polite"
             >
-              {syncState.status === "syncing"
-                ? "Đang sync"
-                : syncState.status === "synced"
-                  ? "Cloud đã sync"
-                  : syncState.status === "error"
-                    ? "Sync lỗi"
-                    : "Local"}
+              {!cloudConfigured
+                ? "Local"
+                : syncState.status === "syncing"
+                  ? "Đang sync"
+                  : syncState.status === "synced"
+                    ? "Cloud đã sync"
+                    : syncState.status === "error"
+                      ? "Sync lỗi"
+                      : cloudUserEmail
+                        ? "Cloud đã kết nối"
+                        : "Cloud cần đăng nhập"}
             </span>
-            <button
-              className="icon-button"
-              aria-label="Đẩy workspace lên cloud"
-              title="Đẩy workspace lên cloud"
-              onClick={() => void sync("push")}
-              disabled={syncState.status === "syncing"}
-            >
-              <CloudUpload size={17} />
-            </button>
-            <button
-              className="icon-button"
-              aria-label="Tải workspace từ cloud"
-              title="Tải workspace từ cloud"
-              onClick={() => void sync("pull")}
-              disabled={syncState.status === "syncing"}
-            >
-              <CloudDownload size={17} />
-            </button>
+            {cloudConfigured && cloudUserEmail ? (
+              <>
+                <button
+                  className="icon-button"
+                  aria-label="Đẩy workspace lên cloud"
+                  title="Đẩy workspace lên cloud"
+                  onClick={() => void sync("push")}
+                  disabled={syncState.status === "syncing"}
+                >
+                  <CloudUpload size={17} />
+                </button>
+                <button
+                  className="icon-button"
+                  aria-label="Tải workspace từ cloud"
+                  title="Tải workspace từ cloud"
+                  onClick={() => void sync("pull")}
+                  disabled={syncState.status === "syncing"}
+                >
+                  <CloudDownload size={17} />
+                </button>
+              </>
+            ) : cloudConfigured ? (
+              <button
+                className="icon-button"
+                aria-label="Đăng nhập cloud"
+                title="Đăng nhập cloud để đồng bộ workspace"
+                onClick={() => router.push("/login")}
+              >
+                <LogIn size={17} />
+              </button>
+            ) : null}
             <button
               className="icon-button"
               aria-label="Tải dữ liệu"
@@ -1379,6 +1413,7 @@ export default function Board() {
             <button
               className="icon-button"
               aria-label="Đổi giao diện"
+              title={dark ? "Chuyển sang giao diện sáng" : "Chuyển sang giao diện tối"}
               onClick={() => setDark(!dark)}
             >
               {dark ? <Sun size={18} /> : <Moon size={18} />}
@@ -1386,6 +1421,7 @@ export default function Board() {
             <button
               className="icon-button"
               aria-label="Cài đặt"
+              title="Mở cài đặt workspace"
               onClick={() => setModal("settings")}
             >
               <Settings2 size={18} />
@@ -1623,7 +1659,7 @@ export default function Board() {
                       className="text-button"
                       onClick={() => router.push("/tasks")}
                     >
-                      Mở danh sách <ArrowDownUp size={15} />
+                      <ArrowDownUp size={15} /> Mở danh sách
                     </button>
                   </div>
                   {attentionTasks.length ? (
@@ -1759,6 +1795,7 @@ export default function Board() {
                     ))}
                   </select>
                   <button className="text-button" onClick={saveCurrentView}>
+                    <Save size={14} />
                     Lưu view hiện tại
                   </button>
                 </div>
@@ -1870,7 +1907,7 @@ export default function Board() {
                   >
                     <strong>{selectedTaskIds.length} task đã chọn</strong>
                     <button
-                      className="secondary-button"
+                      className="secondary-button action-progress"
                       onClick={() =>
                         bulkUpdateTasks(
                           { status: "in_progress" },
@@ -1878,20 +1915,23 @@ export default function Board() {
                         )
                       }
                     >
+                      <Check size={14} />
                       Đang làm
                     </button>
                     <button
-                      className="secondary-button"
+                      className="secondary-button action-priority"
                       onClick={() =>
                         bulkUpdateTasks({ priority: "high" }, "Đã đặt ưu tiên cao")
                       }
                     >
+                      <AlertTriangle size={14} />
                       Ưu tiên cao
                     </button>
                     <button
-                      className="text-button"
+                      className="text-button action-clear"
                       onClick={() => setSelectedTaskIds([])}
                     >
+                      <X size={14} />
                       Bỏ chọn
                     </button>
                   </div>

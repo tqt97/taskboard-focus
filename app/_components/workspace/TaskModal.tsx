@@ -2,7 +2,9 @@
 import { useState } from "react";
 import {
   Archive,
+  Check,
   ChevronDown,
+  Copy,
   ExternalLink,
   FileText,
   Link2,
@@ -251,7 +253,7 @@ export function TaskModal({
             </span>
             <h2 id="task-modal-title">{isNew ? "Thêm task mới" : "Thông tin task"}</h2>
           </div>
-          <button className="icon-button" onClick={onClose}>
+          <button className="icon-button" title="Đóng cửa sổ task" onClick={onClose}>
             <X size={19} />
           </button>
         </header>
@@ -725,6 +727,7 @@ export function TaskModal({
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 aria-label={`Mở file đính kèm ${index + 1} trong tab mới`}
+                                title="Mở file trong tab mới"
                                 onClick={(event) => event.stopPropagation()}
                               >
                                 <ExternalLink size={15} />
@@ -739,6 +742,7 @@ export function TaskModal({
                               className="icon-button mini"
                               type="button"
                               aria-label="Xóa file đính kèm"
+                              title="Xóa file đính kèm"
                               onClick={() =>
                                 setAttachments((items) =>
                                   items.filter((_, itemIndex) => itemIndex !== index),
@@ -833,6 +837,7 @@ export function TaskModal({
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 aria-label={`Mở liên kết ${index + 1} trong tab mới`}
+                                title="Mở liên kết trong tab mới"
                                 onClick={(event) => event.stopPropagation()}
                               >
                                 <ExternalLink size={15} />
@@ -844,6 +849,7 @@ export function TaskModal({
                               className="icon-button mini"
                               type="button"
                               aria-label={`Xóa liên kết ${index + 1}`}
+                              title="Xóa liên kết"
                               onClick={() => removeLink(index)}
                             >
                               <Trash2 size={14} />
@@ -909,11 +915,13 @@ export function TaskModal({
           )}
           {!isNew && (
             <button className="text-button" type="button" onClick={onSaveTemplate}>
+              <Copy size={14} />
               Lưu thành template
             </button>
           )}
           <span />
           <button className="secondary-button" onClick={onClose}>
+            <X size={15} />
             Hủy
           </button>
           <button
@@ -921,6 +929,7 @@ export function TaskModal({
             disabled={!form.title.trim()}
             onClick={save}
           >
+            <Check size={15} />
             Lưu task
           </button>
         </footer>

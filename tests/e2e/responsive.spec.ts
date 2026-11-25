@@ -6,6 +6,18 @@ test("task workspace stays usable at tablet width", async ({ page }) => {
   await expect(page.locator(".tasks-layout")).toBeVisible();
   await expect(page.locator("body")).toHaveCSS("overflow-x", "visible");
   await expect(page.locator(".task-code-copy").first()).toBeVisible();
+  await expect(page.locator(".sync-status")).toBeAttached();
+  await expect(page.getByRole("button", { name: "Đổi giao diện" })).toHaveAttribute(
+    "title",
+  );
+  if ((await page.locator(".sync-status").textContent())?.trim() === "Local") {
+    await expect(
+      page.getByRole("button", { name: "Đẩy workspace lên cloud" }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "Tải workspace từ cloud" }),
+    ).toHaveCount(0);
+  }
 });
 
 test("mobile uses a right-side menu instead of a clipped sidebar control", async ({
@@ -52,8 +64,12 @@ test("new task modal groups fields and supports multiple dependencies", async ({
   await dialog.getByText("Tài liệu & liên kết").click();
   await expect(dialog.getByText("Chưa có file đính kèm")).toBeVisible();
 
+  const modalBody = dialog.locator(".modal-body");
+  const detailsHeight = (await modalBody.boundingBox())?.height || 0;
   await dialog.getByRole("tab", { name: /Lịch sử thay đổi/ }).click();
   await expect(dialog.getByText("Chưa có lịch sử thay đổi")).toBeVisible();
+  const historyHeight = (await modalBody.boundingBox())?.height || 0;
+  expect(Math.abs(detailsHeight - historyHeight)).toBeLessThan(1);
   await dialog.getByRole("tab", { name: "Thông tin task" }).click();
   await expect(dialog.getByRole("heading", { name: "Thông tin chính" })).toBeVisible();
 
