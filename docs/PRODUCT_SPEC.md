@@ -6,9 +6,9 @@ Một workspace cá nhân giúp ghi task nhanh, nhìn tình hình chung và khô
 
 ## Người dùng và phạm vi
 
-- Một người quản lý workspace; thành viên chỉ là danh mục để gán người phụ trách, không phải tài khoản đăng nhập.
+- Một workspace có owner, admin, member và viewer; thành viên cloud là tài khoản Supabase có thể được mời qua email hoặc gán bằng user ID. Danh mục member local vẫn được giữ để backward compatibility và để gán người phụ trách.
 - MVP chạy local-first bằng localStorage, không cần cấu hình dịch vụ ngoài.
-- Supabase là đích lưu dữ liệu lâu dài khi được cấu hình; trước khi đưa dữ liệu riêng tư lên mạng cần bật Auth và RLS.
+- Supabase là đích lưu dữ liệu lâu dài khi được cấu hình; workspace cloud có snapshot, remote CRUD từng task, realtime subscription, optimistic revision và RLS theo role.
 - Không cung cấp xác thực thật bằng passcode client; lock-screen UI chỉ mang tính tiện lợi.
 
 ## Chức năng MVP
@@ -18,18 +18,19 @@ Một workspace cá nhân giúp ghi task nhanh, nhìn tình hình chung và khô
 3. Tìm kiếm, lọc trạng thái/ưu tiên, đổi thứ tự bằng kéo thả.
 4. Chỉnh sửa danh sách thành viên trên UI, bật/tắt thành viên.
 5. Confirm khi xóa task hoặc xóa dữ liệu; nhập dữ liệu có hướng dẫn xác nhận.
-6. Export/import JSON versioned; import thay thế workspace hiện tại.
+6. Export/import JSON versioned; import có preview và chỉ thay thế workspace sau khi người dùng xác nhận.
 7. Dark mode, giao diện tiếng Việt, layout responsive.
 8. Reminder trực quan theo mốc trong 7 ngày và đánh dấu quá hạn.
 9. Focus view, quick capture bằng phím tắt, bulk update và task có bước tiếp theo.
 10. Lưu activity history tối giản cho các thay đổi quan trọng của task.
 
-## Sau MVP
+## Nâng cấp sau MVP
 
-- Supabase Auth, CRUD đồng bộ và RLS.
+- IndexedDB workspace, Inbox/Today action center, triage, checklist, Review/Blocked và quick actions.
+- Supabase Auth, CRUD đồng bộ từng task, conflict handling, realtime và RLS theo workspace.
 - Upload file vào Supabase Storage với giới hạn MIME/size khi cloud mode đã cấu hình; local MVP chỉ lưu URL metadata.
 - Gửi Chatwork qua server-side function và lịch cron; Gmail sau khi có yêu cầu cụ thể.
-- Audit log, khôi phục task đã xóa, nhiều workspace, quyền thành viên.
+- Email invite, quyền thành viên, nhiều workspace, signed URL và offline retry queue.
 
 ## Tiêu chí chấp nhận
 

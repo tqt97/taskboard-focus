@@ -5,6 +5,8 @@
 ```bash
 npm run test
 npm run test:e2e
+npm run test:supabase
+npm run test:supabase:required
 npm run check
 ```
 
@@ -21,5 +23,8 @@ npm run check
 - migration defaults cho schema v2, Today/archive selector, dependency readiness, recurrence và template provenance.
 - schema version không hỗ trợ, duplicate assignee/dependency relation và monthly recurrence cuối tháng.
 - locale normalization, Intl mapping và fallback về Tiếng Việt khi gặp locale không hỗ trợ.
+- workspace permission boundary (`owner/admin/member/viewer`), remote queue dedupe theo workspace/task và account isolation khi nhiều user dùng cùng browser.
 
-`npm run test:e2e` chạy 6 responsive cases trên Chromium desktop/tablet/mobile và kiểm tra hamburger right drawer không bị che. Supabase Auth/Storage và Chatwork thật vẫn cần smoke test với credentials tương ứng; local CI không được xem là bằng chứng production delivery.
+`npm run test:e2e` chạy 21 matrix cases trên Chromium desktop/tablet/mobile, gồm modal, Inbox/checklist, persistence, workspace selector/template isolation và hamburger right drawer. Supabase Auth/Storage/realtime và Chatwork thật vẫn cần smoke test với credentials tương ứng; local CI không được xem là bằng chứng production delivery.
+
+Integration smoke test Supabase nằm ở `tests/supabase.integration.test.mts`; chạy riêng bằng `npm run test:supabase`, hướng dẫn đầy đủ ở [SUPABASE_SMOKE_TEST.md](SUPABASE_SMOKE_TEST.md). Dùng `npm run test:supabase:required` trong CI/release để fail rõ ràng nếu thiếu URL, anon key hoặc ba tài khoản dedicated owner/member/viewer; không dùng tài khoản production vì test tạo rồi xóa một workspace riêng.

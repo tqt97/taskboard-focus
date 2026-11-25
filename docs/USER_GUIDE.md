@@ -22,13 +22,15 @@
 
 Trong Cài đặt → Đội ngũ, sửa tên/vai trò, ẩn thành viên hoặc thêm người. Thành viên đã ẩn không xuất hiện trong lựa chọn gán mới.
 
+Với cloud workspace, phần **Quyền thành viên cloud** cho phép owner/admin mời bằng email, cập nhật hoặc xóa member theo Supabase user ID. Viewer chỉ xem dữ liệu. Email invite cần cấu hình `SUPABASE_SERVICE_ROLE_KEY` ở server; key này không được đưa vào trình duyệt.
+
 ## Sao lưu và chuyển máy
 
 Trong Cài đặt → Dữ liệu, xuất JSON. Trên máy khác mở app và nhập file. Import thay toàn bộ task và thành viên ở trình duyệt hiện tại; hãy export dữ liệu đích trước khi nhập.
 
 ## Dữ liệu và khóa màn hình
 
-MVP lưu trong localStorage của trình duyệt. Xóa dữ liệu trình duyệt có thể làm mất workspace nếu chưa backup. Lock screen chỉ là lớp giao diện, không bảo vệ endpoint hay dữ liệu trong DevTools.
+Local workspace ưu tiên lưu trong IndexedDB và giữ localStorage làm fallback/migration. Xóa dữ liệu trình duyệt có thể làm mất workspace nếu chưa backup. Cloud workspace cần Supabase Auth và RLS. Lock screen chỉ là lớp giao diện, không bảo vệ endpoint hay dữ liệu trong DevTools.
 
 ## Ngôn ngữ và thiết bị
 

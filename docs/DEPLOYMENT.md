@@ -26,13 +26,13 @@ Mở http://localhost:3000. Không cần điền biến môi trường để dù
 ## Supabase (schema chuẩn bị)
 
 - Tạo project, chạy `supabase/schema.sql` trong SQL Editor.
-- Schema bật RLS theo `auth.uid()` cho account deploy duy nhất và không cấp quyền anon. Giao diện hiện hỗ trợ cloud snapshot push/pull sau khi đăng nhập; CRUD remote theo từng task chưa triển khai.
+- Schema bật RLS, giữ legacy `owner_id` snapshot và có contract multi-workspace qua `workspaces`, `workspace_members`, `workspace_snapshots` và `workspace_id`. Sau khi đăng nhập, UI hỗ trợ workspace catalog, snapshot push/pull, remote CRUD từng task, offline retry queue và role read-only cho viewer.
 - Schema hiện phù hợp cho project mới; nếu project Supabase đã có bảng từ trước, phải tạo migration riêng để backfill `owner_id` trước khi đặt `not null`, không chạy mù `create table if not exists` trên dữ liệu production.
-- Trước khi bật adapter: cấu hình Supabase Auth, chạy schema, kiểm tra owner isolation bằng request authenticated/anonymous rồi mới đưa keys vào Vercel.
+- Trước khi bật adapter: cấu hình Supabase Auth, chạy schema, kiểm tra owner/member isolation bằng request authenticated/anonymous và kiểm tra viewer không ghi/xóa rồi mới đưa keys vào Vercel.
 - Không dùng service role key trong `NEXT_PUBLIC_*`.
 
 ## Chatwork/Gmail
 
-Chatwork đã có server route gửi thông báo test tại `/api/notifications/chatwork-test`. Token đặt ở server environment variables, không dùng `NEXT_PUBLIC_*`. Reminder Chatwork định kỳ chưa bật vì task MVP chỉ nằm trong localStorage; cần repository server-side, scheduler, auth, rate limit và delivery log trước khi triển khai. Xem [NOTIFICATIONS.md](NOTIFICATIONS.md).
+Chatwork đã có server route gửi thông báo test tại `/api/notifications/chatwork-test` và scheduled endpoint `/api/notifications`; cần cấu hình `CRON_SECRET`, service role, owner ID, scheduler và delivery credentials. Token đặt ở server environment variables, không dùng `NEXT_PUBLIC_*`. Xem [NOTIFICATIONS.md](NOTIFICATIONS.md).
 
-Gmail chưa triển khai. Cron định kỳ có thể dùng Vercel Cron hoặc Supabase Scheduled Functions sau khi hoàn thiện dữ liệu remote và idempotency.
+Gmail chưa triển khai. Cron định kỳ có thể dùng Vercel Cron hoặc Supabase Scheduled Functions; route đã có retry, delivery log và lease idempotency, nhưng vẫn cần cấu hình scheduler/credentials và chạy integration smoke test trước production.
