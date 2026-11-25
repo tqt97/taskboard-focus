@@ -105,9 +105,9 @@ import { updateTaskTitleInline } from "@/lib/taskboard/inline-edit";
 import { parseBoardBackupText, restoreBoardSnapshot } from "@/lib/taskboard/backup";
 import { QuickCapture } from "./QuickCapture";
 import { WorkspacePageHeading } from "./WorkspacePageHeading";
-import { TaskCard } from "./TaskCard";
 import { persistSavedViews, useSavedViews } from "./hooks/useSavedViews";
 import { useWorkspaceShortcuts } from "./hooks/useWorkspaceShortcuts";
+import { WorkspaceLoading } from "./WorkspaceLoading";
 
 const StructuredTaskModal = dynamic(
   () => import("./TaskModal").then((module) => module.TaskModal),
@@ -1773,14 +1773,7 @@ export default function Board() {
     />
   );
   if (!ready) {
-    return (
-      <main className="app-shell loading-shell" aria-busy="true">
-        <div className="loading-card">
-          <div className="loading-mark" aria-hidden="true" />
-          <span>Đang tải workspace…</span>
-        </div>
-      </main>
-    );
+    return <WorkspaceLoading />;
   }
 
   return (

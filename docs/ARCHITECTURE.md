@@ -1,6 +1,6 @@
 # Kiến trúc
 
-Typography dùng Geist Sans self-host với Latin và Latin Extended subsets; giao diện không gọi dịch vụ font bên ngoài khi người dùng mở app. Workspace presentation được tách dần thành page heading, quick-capture dialog, task card, dashboard analytics và notification hook; Board giữ phần điều phối dữ liệu và route-level state.
+Typography dùng Geist Sans self-host với Latin và Latin Extended subsets; giao diện không gọi dịch vụ font bên ngoài khi người dùng mở app. `WorkspaceShell` là route entry nhẹ, hiển thị loading shell có cấu trúc và tải `WorkspaceCoordinator` bằng dynamic import. Coordinator giữ state và domain mutations; task modal, settings/dialogs, Kanban, timeline, dashboard analytics và notification popover vẫn được tách theo nhu cầu.
 
 Task details tách activity history và comments panel khỏi `TaskModal`; panel comments tự quản lý composer/reply state, còn mutation callback giữ đồng bộ form và workspace state.
 
@@ -11,7 +11,7 @@ Các view/dialog ít dùng được tải bằng dynamic import để giảm Jav
 - Next.js App Router 15 + React 19 + TypeScript.
 - Route entries giữ mỏng ở `app/page.tsx` và `app/tasks/page.tsx`; workspace UI nằm trong `app/_components/workspace/`.
 - Layout cross-route nằm trong `app/_components/layout/`; `app/layout.tsx`, `app/loading.tsx`, `app/error.tsx` và `app/manifest.ts` chỉ là thin entries cho App Router.
-- `Board.tsx` điều phối state/view; dashboard analytics, saved views, shortcuts, backup restore và push delivery đã tách module/hook riêng. `TaskModal.tsx` phụ trách CRUD form và giới hạn dependency candidates theo search; `WorkspaceDialogs.tsx` giữ settings/confirm/lock dialog; `NotificationPopover.tsx` phụ trách notification UI. CSS dùng chung ở `app/globals.css`.
+- Các route workspace dùng `WorkspaceShell.tsx` làm entry point và defer `WorkspaceCoordinator.tsx` khỏi bundle khởi tạo. Coordinator điều phối state/view; dashboard analytics, saved views, shortcuts, backup restore và push delivery đã tách module/hook riêng. `TaskModal.tsx` phụ trách CRUD form và giới hạn dependency candidates theo search; `WorkspaceDialogs.tsx` giữ settings/confirm/lock dialog; `NotificationPopover.tsx` phụ trách notification UI. Design tokens và component styles dùng chung ở `app/globals.css`.
 - `lib/data.ts` giữ demo seed và adapter dữ liệu; persistence local ưu tiên IndexedDB, localStorage được giữ làm fallback/migration cho môi trường không hỗ trợ IndexedDB.
 - `lib/types.ts` là hợp đồng dữ liệu.
 - `lib/taskboard/constraints.ts` kiểm tra các quan hệ xuyên entity (assignee, dependency, activity) sau khi từng entity đã hợp lệ.

@@ -52,10 +52,10 @@
 
 P0 và phần lớn P1 đã có code/test local/E2E. P2 đã có contract chạy được cho local/cloud workspace, role-aware schema, remote CRUD queue, conditional conflict guard và lazy/windowed card rendering. Chưa tuyên bố hoàn tất remote collaboration vì chưa có Supabase integration test và kiểm chứng race condition đa client trên backend thật.
 
-## Ưu tiên sau rà soát 2026-11-25
+## Ưu tiên sau rà soát 2026-11-26
 
-1. **P0 — xác minh lưu trữ trên browser:** unit tests đã cover backup legacy, JSON lỗi, undo thay nhầm, nhưng cần chạy browser tests cho IndexedDB primary, localStorage fallback, workspace switch và daily backup. Hiện máy thiếu Chromium nên chưa xác nhận E2E.
-2. **P1 — giảm bundle theo route:** dashboard analytics đã được tách sang `WorkspaceOverview` lazy-load, nhưng build vẫn báo 203 kB First Load JS do làm tròn; chưa có mức giảm tổng đo được. Phần orchestration chung vẫn chiếm phần lớn. Tiếp theo tách task-list workspace và settings khỏi shell trước khi đánh giá tối ưu sâu hơn.
+1. **P0 — xác minh lưu trữ trên browser:** unit tests cover backup legacy, JSON lỗi, undo thay nhầm, IndexedDB, local fallback và workspace switch. E2E chạy được trên Chromium nhưng runner từng treo ở bước teardown; xác nhận exit code sạch trong CI.
+2. **P1 — giảm tải khởi tạo theo route:** `WorkspaceShell` giờ tải `WorkspaceCoordinator` thành async chunk. Build giảm First Load JS workspace từ 203 kB xuống 105 kB; coordinator vẫn tải sau khi shell hydrate, vì vậy cần benchmark production waterfall và cân nhắc tải task/settings orchestration đúng route/modal.
 3. **P1 — giảm rủi ro bảo trì:** saved views và keyboard shortcuts đã chuyển sang hooks; backup, push delivery và dashboard analytics đã thành module riêng. `Board.tsx` vẫn là component điều phối lớn; tiếp tục tách toolbar/filter bar, task-list content và workspace dialogs thành seams có props rõ, giữ domain rules trong `lib/taskboard/`.
 4. **P1 — hoàn tất cloud gate:** chạy `npm run test:supabase:required` với project test, owner/member/viewer và multi-client race; chỉ sau đó nâng trạng thái cloud collaboration từ contract sang runtime-verified.
 5. **P1 — bảo vệ notification test:** Chatwork test giờ yêu cầu owner Auth, room cố định và atomic cooldown 60 giây; unit tests kiểm tra Web Push config, dedupe state, delivery, lỗi tạm thời và subscription 404/410. Cần chạy integration test với project Supabase.

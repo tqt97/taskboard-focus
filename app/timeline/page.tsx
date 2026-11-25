@@ -1,4 +1,4 @@
-import Board from "@/app/_components/workspace/Board";
+import { WorkspaceShell } from "@/app/_components/workspace/WorkspaceShell";
 
 export const metadata = {
   title: "Calendar & timeline | Taskboard",
@@ -8,5 +8,5 @@ export const metadata = {
 };
 
 export default function TimelinePage() {
-  return <Board />;
+  return <WorkspaceShell />;
 }

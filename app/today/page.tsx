@@ -1,4 +1,4 @@
-import Board from "../_components/workspace/Board";
+import { WorkspaceShell } from "../_components/workspace/WorkspaceShell";
 
 export const metadata = {
   title: "Today | Taskboard",
@@ -7,5 +7,5 @@ export const metadata = {
 };
 
 export default function TodayPage() {
-  return <Board />;
+  return <WorkspaceShell />;
 }

@@ -5,6 +5,8 @@
 - CI: chạy unit tests trước production build/deploy để không bỏ sót regression domain.
 - Rà soát full tính năng: typecheck, 74 unit tests, format check và production build pass; E2E báo 36 pass/6 skip nhưng runner bị treo sau test cuối, Supabase integration thiếu credentials. Chi tiết ở `docs/RELEASE_READINESS.md`.
 - Deploy: chuyển Chatwork và Web Push cron sang lịch một lần mỗi ngày, phù hợp giới hạn Vercel Hobby; xem `docs/DEPLOYMENT.md` và `docs/NOTIFICATIONS.md`.
+- Hiệu năng: tách `WorkspaceShell` khỏi `WorkspaceCoordinator`, defer coordinator khỏi bundle khởi tạo; First Load JS workspace giảm từ 203 kB còn 105 kB.
+- UI: chuẩn hóa màu, độ tương phản, typography, khoảng cách, surface và control; giữ sidebar desktop đến viewport 960px và dùng drawer dưới ngưỡng này.
 
 ## Unreleased — 2026-11-25
 

@@ -1,4 +1,4 @@
-import Board from "@/app/_components/workspace/Board";
+import { WorkspaceShell } from "@/app/_components/workspace/WorkspaceShell";
 
 export const metadata = {
   title: "Task list | Taskboard",
@@ -7,5 +7,5 @@ export const metadata = {
 };
 
 export default function TasksPage() {
-  return <Board />;
+  return <WorkspaceShell />;
 }

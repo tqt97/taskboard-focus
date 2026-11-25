@@ -23,6 +23,7 @@ test("task workspace stays usable at tablet width", async ({ page }) => {
 test("mobile uses a right-side menu instead of a clipped sidebar control", async ({
   page,
 }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/tasks");
   const menuButton = page.getByRole("button", { name: "Mở menu" });
   await expect(menuButton).toBeVisible();

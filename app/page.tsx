@@ -1,4 +1,4 @@
-import Board from "@/app/_components/workspace/Board";
+import { WorkspaceShell } from "@/app/_components/workspace/WorkspaceShell";
 export default function Home() {
-  return <Board />;
+  return <WorkspaceShell />;
 }
