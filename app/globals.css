@@ -1496,6 +1496,37 @@ textarea:focus-visible {
   color: #758092;
   font-size: 9px;
 }
+.settings-modal .setting-member select,
+.settings-modal .remote-member-row select,
+.settings-modal .remote-member-invite select,
+.settings-modal .setting-row select,
+.settings-modal .quiet-hours-inputs input[type="time"] {
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  padding: 8px 10px;
+  font-size: 14px;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+.settings-modal .setting-member select,
+.settings-modal .remote-member-row select,
+.settings-modal .remote-member-invite select {
+  flex: 0 0 122px;
+  min-width: 0;
+}
+.settings-modal .quiet-hours-inputs input[type="time"] {
+  width: 112px;
+}
+.settings-modal .setting-member select:focus-visible,
+.settings-modal .remote-member-row select:focus-visible,
+.settings-modal .remote-member-invite select:focus-visible,
+.settings-modal .setting-row select:focus-visible,
+.settings-modal .quiet-hours-inputs input[type="time"]:focus-visible {
+  border-color: var(--accent);
+}
 .quiet-hours-row {
   align-items: center;
 }
