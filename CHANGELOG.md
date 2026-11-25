@@ -13,6 +13,10 @@
 - Hiệu năng dữ liệu: ghi IndexedDB bất đồng bộ trước, chỉ stringify/ghi localStorage fallback khi IndexedDB không ghi được.
 - Nhắc việc: cô lập trạng thái đã gửi và đã đọc theo workspace để tránh task ID trùng làm bỏ nhắc chéo.
 - Kiểm thử: thêm regression tests cho trạng thái reminder/notification xuyên workspace.
+- Template: thêm giao diện đổi tên và xóa template theo workspace.
+- Notifications: thêm Web Push nền cho owner cloud, Service Worker, đăng ký/thu hồi subscription và cron digest có dedupe/retry.
+- Bảo mật: Chatwork test yêu cầu owner Auth và cooldown atomic 60 giây; pin PostCSS bản vá để `npm audit` không còn advisory.
+- Backup: nhắc người dùng tải JSON ngoài trình duyệt mỗi 7 ngày.
 - Kết quả build lần rà soát 2026-11-25: First Load JS workspace 203 kB (mốc trước tối ưu 208 kB); phần Board dùng chung vẫn chiếm phần lớn bundle.
 
 ## 0.1.2 - 2026-11-20

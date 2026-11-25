@@ -51,9 +51,10 @@ Lệnh sẽ fail rõ ràng nếu thiếu các biến `TASKBOARD_TEST_*`; không 
 
 ```text
 npm run typecheck             pass
-npm run test                  65 passed, 1 skipped (Supabase credentials absent)
-npm run format:check          fail: 62 existing files need Prettier; touched files formatted
+npm run test                  66 passed, 1 skipped (Supabase credentials absent)
+npm run format:check          pass (repo formatting synchronized)
 npm run build                 pass; First Load JS workspace 203 kB
 npm run test:e2e              blocked: Chromium executable missing from Playwright cache
+`npm audit --omit=dev`        pass; 0 vulnerabilities after PostCSS override
 Supabase integration/runtime  not run: test credentials absent
 ```

@@ -14,3 +14,7 @@
 ## Trước khi dùng cho dữ liệu nhóm hoặc production
 
 Bắt buộc cấu hình Auth/RLS thật, server-side validation, secret management, rate limiting, backup/restore, monitoring và kiểm thử quyền truy cập. Email invite phải đi qua server route với `SUPABASE_SERVICE_ROLE_KEY`; tuyệt đối không đưa key này vào client.
+
+- Chatwork test yêu cầu bearer session của `TASKBOARD_OWNER_ID`, room phải khớp cấu hình server và cooldown 60 giây được claim atomic trong Supabase. Cần áp dụng schema mới nhất để bật route.
+- Web Push subscription chỉ cho owner cấu hình; endpoint, `p256dh` và `auth` được lưu trong bảng có RLS. Payload push hiển thị tiêu đề task trong notification hệ điều hành; chỉ bật trên thiết bị cá nhân đáng tin cậy.
+- VAPID private key là server secret; chỉ public key có tiền tố `NEXT_PUBLIC_`. Tắt push sẽ xóa subscription server và local; endpoint bị thu hồi được dọn khi Push service trả 404/410.

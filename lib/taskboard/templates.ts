@@ -11,6 +11,22 @@ export const createTemplateFromTask = (task: Task, name: string): TaskTemplate =
   created_at: new Date().toISOString(),
 });
 
+export function renameTaskTemplate(
+  templates: TaskTemplate[],
+  templateId: string,
+  name: string,
+) {
+  const nextName = name.trim().slice(0, 120);
+  if (!nextName) return templates;
+  return templates.map((template) =>
+    template.id === templateId ? { ...template, name: nextName } : template,
+  );
+}
+
+export function deleteTaskTemplate(templates: TaskTemplate[], templateId: string) {
+  return templates.filter((template) => template.id !== templateId);
+}
+
 export const createTaskFromTemplate = (
   template: TaskTemplate,
   code: string,

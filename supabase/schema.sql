@@ -416,3 +416,53 @@ create policy notification_runs_owner_policy on public.notification_runs
   for all to authenticated
   using (owner_id = (select auth.uid()))
   with check (owner_id = (select auth.uid()));
+
+create table if not exists public.notification_test_limits(
+ owner_id uuid primary key references auth.users(id) on delete cascade,
+ last_sent_at timestamptz not null
+);
+alter table public.notification_test_limits enable row level security;
+revoke all on public.notification_test_limits from anon, authenticated;
+grant all on public.notification_test_limits to service_role;
+create or replace function public.claim_notification_test(
+ p_owner_id uuid,
+ p_cooldown_seconds integer default 60
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  changed_rows integer;
+begin
+  if p_owner_id is null or p_cooldown_seconds < 1 then
+    return false;
+  end if;
+  insert into public.notification_test_limits(owner_id, last_sent_at)
+  values (p_owner_id, now())
+  on conflict (owner_id) do update
+    set last_sent_at = excluded.last_sent_at
+    where public.notification_test_limits.last_sent_at <=
+      now() - make_interval(secs => p_cooldown_seconds);
+  get diagnostics changed_rows = row_count;
+  return changed_rows = 1;
+end;
+$$;
+revoke all on function public.claim_notification_test(uuid, integer) from public, anon, authenticated;
+grant execute on function public.claim_notification_test(uuid, integer) to service_role;
+
+create table if not exists public.push_subscriptions(
+ owner_id uuid not null references auth.users(id) on delete cascade,
+ endpoint text not null,
+ p256dh text not null,
+ auth text not null,
+ created_at timestamptz not null default now(),
+ primary key (owner_id, endpoint)
+);
+alter table public.push_subscriptions enable row level security;
+drop policy if exists push_subscriptions_owner_policy on public.push_subscriptions;
+create policy push_subscriptions_owner_policy on public.push_subscriptions
+  for all to authenticated
+  using (owner_id = (select auth.uid()))
+  with check (owner_id = (select auth.uid()));

@@ -38,6 +38,8 @@
 - IndexedDB là lưu trữ local chính; LocalStorage hỗ trợ migration và fallback khi IndexedDB lỗi. Giữ tối đa 7 bản sao theo ngày/workspace.
 - Các view nặng được tải theo nhu cầu; font Geist self-host có content hash và cache dài hạn.
 - Browser reminders theo thiết bị; daily Chatwork digest hỗ trợ quiet hours, timezone, retry và chống gửi trùng khi cấu hình cron/server secrets.
+- Web Push nền hỗ trợ owner cloud đã cài PWA; subscription theo thiết bị và delivery theo cron.
+- Nhắc xuất JSON backup ngoài trình duyệt mỗi tuần; vẫn giữ 7 snapshot cục bộ để khôi phục nhanh.
 - Supabase Postgres schema chuẩn bị cho bước đồng bộ
 
 ## Bắt đầu
@@ -85,7 +87,7 @@ Dữ liệu local gắn với trình duyệt và profile máy tính. App tự gi
 3. Kiểm tra workspace catalog, role (`owner/admin/member/viewer`), RLS và xử lý lỗi đồng bộ; UI có nút push/pull cloud và queue retry cho task mutation.
 4. Chỉ dùng anon key ở client khi policies đã được kiểm chứng; không đưa service role key vào frontend.
 
-Scheduled notifications cần `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET` và `TASKBOARD_OWNER_ID`; Vercel cron gọi `/api/notifications` mỗi giờ. Endpoint tạo candidates từ Supabase và có thể gửi Chatwork khi `CHATWORK_API_TOKEN` cùng `CHATWORK_ROOM_ID` được cấu hình; Gmail chưa được hỗ trợ.
+Scheduled notifications cần `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET` và `TASKBOARD_OWNER_ID`; Vercel cron gọi `/api/notifications` và `/api/notifications/push` mỗi giờ. Push cần tạo VAPID keys (`npx web-push generate-vapid-keys`) và cấu hình `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`. Chỉ tài khoản owner có thể đăng ký thiết bị. Chatwork test cũng yêu cầu owner Auth và có cooldown 60 giây; Gmail chưa được hỗ trợ.
 
 Integration smoke test Supabase và cách cấu hình test project xem tại [docs/SUPABASE_SMOKE_TEST.md](docs/SUPABASE_SMOKE_TEST.md). Ma trận release và bằng chứng hiện tại xem tại [docs/RELEASE_READINESS.md](docs/RELEASE_READINESS.md).
 

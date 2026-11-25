@@ -90,4 +90,4 @@ Ngày do người dùng nhập là ngày lịch; hiện MVP chuyển thành UTC 
 
 ## Notification
 
-Browser notification là per-device, yêu cầu quyền trên từng browser. Daily Chatwork digest chạy qua `/api/notifications` với cron secret, idempotency run theo owner + ngày + channel và backoff khi thất bại. Cấu hình timezone/quiet hours và token chỉ ở server; Gmail chưa được tích hợp.
+Browser notification cục bộ là per-device, yêu cầu tab mở. Web Push nền dùng Service Worker và Supabase `push_subscriptions`, chỉ gửi cho owner cloud qua `/api/notifications/push`. Daily Chatwork digest chạy qua `/api/notifications`; hai route dùng cron secret và run idempotency theo owner + ngày + channel. VAPID private key và Chatwork token chỉ ở server; Gmail chưa được tích hợp.

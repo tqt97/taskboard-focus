@@ -33,6 +33,7 @@ Một workspace cá nhân giúp ghi task nhanh, nhìn tình hình chung và khô
 - Supabase Auth, CRUD đồng bộ từng task, conflict handling, realtime và RLS theo workspace.
 - Upload file vào Supabase Storage với giới hạn MIME/size khi cloud mode đã cấu hình; local MVP chỉ lưu URL metadata.
 - Gửi Chatwork digest qua server-side route và lịch cron; Gmail chưa tích hợp.
+- Web Push background cho thiết bị owner đã đăng ký; local browser reminder vẫn là per-device khi tab mở.
 - Email invite, quyền thành viên, nhiều workspace, signed URL và offline retry queue.
 
 ## Tiêu chí chấp nhận

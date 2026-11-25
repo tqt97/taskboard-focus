@@ -13,7 +13,11 @@ import {
   getReadNotificationStorageKey,
   isWithinQuietHours,
 } from "../lib/taskboard/notifications.ts";
-import { createTaskFromTemplate } from "../lib/taskboard/templates.ts";
+import {
+  createTaskFromTemplate,
+  deleteTaskTemplate,
+  renameTaskTemplate,
+} from "../lib/taskboard/templates.ts";
 import { createTaskComment } from "../lib/taskboard/comments.ts";
 import { formatActivityDate, formatActivityValue } from "../lib/taskboard/activity.ts";
 import {
@@ -417,6 +421,36 @@ test("template creates a new todo task with provenance", () => {
   assert.equal(task.status, "todo");
   assert.equal(task.code, "WEB-NEW");
   assert.equal(task.template_id, "template-1");
+});
+
+test("template manager trims rename and deletes only the selected template", () => {
+  const templates = [
+    {
+      id: "template-a",
+      name: "Alpha",
+      title: "Task A",
+      description: "",
+      priority: "medium" as const,
+      severity: "medium" as const,
+      created_at: "2026-11-25T00:00:00.000Z",
+    },
+    {
+      id: "template-b",
+      name: "Beta",
+      title: "Task B",
+      description: "",
+      priority: "low" as const,
+      severity: "low" as const,
+      created_at: "2026-11-25T00:00:00.000Z",
+    },
+  ];
+  const renamed = renameTaskTemplate(templates, "template-a", "  Alpha v2  ");
+  assert.equal(renamed[0].name, "Alpha v2");
+  assert.equal(renameTaskTemplate(templates, "template-a", "   "), templates);
+  assert.deepEqual(
+    deleteTaskTemplate(renamed, "template-a").map((template) => template.id),
+    ["template-b"],
+  );
 });
 
 test("accepts review status, checklist items and activity diffs", () => {

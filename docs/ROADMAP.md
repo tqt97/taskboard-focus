@@ -58,8 +58,9 @@ P0 và phần lớn P1 đã có code/test local/E2E. P2 đã có contract chạy
 2. **P1 — giảm bundle theo route:** `Board` vẫn được import trên mọi route workspace nên shared First Load JS là khoảng 203 kB. Tách state/data orchestration khỏi view-specific UI, sau đó cho `/timeline`, `/inbox`, `/today` và `/tasks` tải đúng feature của route; đo lại build trước/sau mỗi nhánh.
 3. **P1 — giảm rủi ro bảo trì:** tiếp tục tách `Board` theo seams rõ ràng (toolbar/navigation, dashboard analytics, task list, workspace settings) và thêm test cho storage fallback. Giữ các domain rules trong `lib/taskboard/`, tránh chuyển logic nghiệp vụ vào component.
 4. **P1 — hoàn tất cloud gate:** chạy `npm run test:supabase:required` với project test, owner/member/viewer và multi-client race; chỉ sau đó nâng trạng thái cloud collaboration từ contract sang runtime-verified.
-5. **P1 — bảo vệ notification test:** endpoint Chatwork test chỉ gửi tới room cấu hình nhưng cần đánh giá xác thực người gọi và rate limiting trước khi bật public production.
-6. **P2 — nhắc khi đóng app:** browser reminder hiện chỉ chạy khi trang đang mở; nếu cần notification nền, bổ sung Service Worker push subscription, thu hồi subscription và delivery audit.
-7. **P2 — quản lý template:** hiện tạo và dùng template được, nhưng thiếu UI rename/delete để dọn thư viện theo workspace.
+5. **P1 — bảo vệ notification test:** Chatwork test giờ yêu cầu owner Auth, room cố định và atomic cooldown 60 giây; cần chạy integration test với project Supabase.
+6. **P1 — kiểm chứng Web Push:** subscription, Service Worker, VAPID delivery và cron route đã có; cần bật env/schema và xác minh nhận banner trên thiết bị đã cài PWA.
+7. **P2 — quản lý template:** UI đổi tên/xóa template đã được thêm; tiếp theo có thể thêm tag/danh mục nếu thư viện lớn.
+8. **P2 — backup ngoài thiết bị:** app nhắc tải JSON mỗi tuần nhưng backup vẫn do người dùng chủ động lưu; có thể thêm provider cloud backup có mã hóa đầu cuối.
 
 Không đưa server cache vào dữ liệu task/workspace cá nhân vì dữ liệu phụ thuộc account và thay đổi thường xuyên. Cache dài hạn phù hợp với font/static assets; cache dữ liệu cloud cần account-scoped invalidation trước khi thêm.

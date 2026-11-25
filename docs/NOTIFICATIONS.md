@@ -12,7 +12,11 @@ Có thể bật trong **Cài đặt → Thông báo**. Browser sẽ hỏi quyề
 
 Chọn một notification trong Notification Center sẽ mở task tương ứng. Khi quyền đang bị chặn, trang cài đặt hướng dẫn mở quyền thông báo ở quyền website của trình duyệt hoặc trong cài đặt hệ điều hành nếu dùng app đã cài. Ứng dụng kiểm tra lại quyền khi cửa sổ được focus hoặc tab hiện lại.
 
-Giới hạn quan trọng: browser reminder chưa có Service Worker nên chỉ chạy khi workspace đang mở trong một tab và JavaScript đang hoạt động. Đóng toàn bộ tab hoặc máy ngủ thì không thể đánh thức app để gửi nhắc. Persistence IndexedDB không thay đổi giới hạn scheduling này.
+Browser reminder cục bộ chỉ chạy khi workspace đang mở trong một tab và JavaScript đang hoạt động. Đóng toàn bộ tab hoặc máy ngủ thì không thể đánh thức app.
+
+### Web Push nền
+
+Owner có thể bật **Nhắc nền khi đóng app** trên thiết bị đã cấp quyền notification. App đăng ký Service Worker `/sw.js`, gửi subscription có xác thực lên Supabase và nhận digest từ `/api/notifications/push`; task phải được đồng bộ cloud. Cron chạy mỗi giờ, quiet hours và lead time dùng cấu hình server. Push hiện chỉ chạy cho `TASKBOARD_OWNER_ID`; member/viewer chưa có notification digest riêng.
 
 ### Chatwork test
 
@@ -27,12 +31,17 @@ Trong local `.env.local` hoặc Vercel Environment Variables:
 ```env
 CHATWORK_API_TOKEN=your_server_only_token
 CHATWORK_ROOM_ID=123456789
+NEXT_PUBLIC_VAPID_PUBLIC_KEY=your_vapid_public_key
+VAPID_PRIVATE_KEY=your_vapid_private_key
+VAPID_SUBJECT=mailto:admin@example.com
 TASKBOARD_TIMEZONE=Asia/Ho_Chi_Minh
 NOTIFICATION_QUIET_START=22:00
 NOTIFICATION_QUIET_END=07:00
 ```
 
-Room ID hiện được nhập từ UI để hỗ trợ test nhưng phải khớp `CHATWORK_ROOM_ID` đã cấu hình trên server; route không cho gửi tới room tùy ý từ client. Không đặt hai biến này với tiền tố `NEXT_PUBLIC_`.
+Room ID nhập từ UI phải khớp `CHATWORK_ROOM_ID` trên server. Gửi test yêu cầu Supabase Auth đúng `TASKBOARD_OWNER_ID` và bị giới hạn một lần mỗi 60 giây qua atomic database claim. Không đặt Chatwork token hoặc VAPID private key với tiền tố `NEXT_PUBLIC_`.
+
+Tạo cặp VAPID bằng `npx web-push generate-vapid-keys`. Cấu hình public key ở `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, private key ở `VAPID_PRIVATE_KEY`, và subject hợp lệ (thường là `mailto:`) ở `VAPID_SUBJECT`. Chạy schema mới nhất để tạo `push_subscriptions` và `claim_notification_test` trước khi bật các nút này.
 
 ## Gửi reminder Chatwork định kỳ
 

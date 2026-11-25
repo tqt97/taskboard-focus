@@ -33,6 +33,6 @@ Mở http://localhost:3000. Không cần điền biến môi trường để dù
 
 ## Chatwork/Gmail
 
-Chatwork đã có server route gửi thông báo test tại `/api/notifications/chatwork-test` và scheduled endpoint `/api/notifications`; cần cấu hình `CRON_SECRET`, service role, owner ID, scheduler và delivery credentials. Token đặt ở server environment variables, không dùng `NEXT_PUBLIC_*`. Xem [NOTIFICATIONS.md](NOTIFICATIONS.md).
+Chatwork test và scheduled digest cần Auth owner, `TASKBOARD_OWNER_ID`, `CRON_SECRET`, service role và Chatwork credentials. Push nền cần thêm cặp VAPID và schema push subscription; hai cron route chạy mỗi giờ. Token và VAPID private key chỉ đặt ở server environment, không dùng `NEXT_PUBLIC_*`. Xem [NOTIFICATIONS.md](NOTIFICATIONS.md).
 
 Gmail chưa triển khai. Cron định kỳ có thể dùng Vercel Cron hoặc Supabase Scheduled Functions; route đã có retry, delivery log và lease idempotency, nhưng vẫn cần cấu hình scheduler/credentials và chạy integration smoke test trước production.

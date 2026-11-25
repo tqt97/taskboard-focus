@@ -20,6 +20,8 @@
 - Dùng bộ lọc **Người phụ trách** hoặc **Mốc hiển thị** để thu hẹp thông tin. Kéo mốc **Deadline** sang ngày khác để cập nhật deadline; thay đổi vẫn được lưu vào activity và đồng bộ cloud khi workspace đã đăng nhập.
 - Action chính của task đi theo flow: **Bắt đầu** → **Gửi review** → **Hoàn tất**. Task bị chặn sẽ quay lại trạng thái trước đó sau khi **Gỡ chặn**; nếu muốn hoàn tất, cần đi qua bước review.
 - Bấm **Chọn nhiều** rồi tick các task để dùng bulk action chuyển sang **Đang làm** hoặc đặt **Ưu tiên cao**; tắt chế độ này để giao diện gọn hơn.
+- Chọn **Quản lý template** để đổi tên hoặc xóa template trong workspace hiện tại. Template được lưu trên trình duyệt này và có thể tạo lại từ task chi tiết.
+- Trong **Cài đặt → Thông báo**, bật **Nhắc nền khi đóng app** trên thiết bị đã cấp quyền. Cần đăng nhập owner cloud, cài PWA/cho phép push và đồng bộ task; lịch gửi dùng timezone/quiet hours cấu hình server.
 - Trên màn hình hẹp, assignee/deadline nằm trong **Bộ lọc nâng cao**. Mã task dùng monospace và có nút copy để dán vào ô tìm kiếm.
 
 ## Thành viên
@@ -30,11 +32,11 @@ Với cloud workspace, phần **Quyền thành viên cloud** cho phép owner/adm
 
 ## Sao lưu và chuyển máy
 
-Trong Cài đặt → Dữ liệu, app giữ 7 bản sao tự động theo ngày trên từng workspace. Chọn **Xem và khôi phục** để đưa bản sao qua màn hình preview trước khi áp dụng. Để chuyển máy hoặc giữ bản độc lập với browser profile, xuất JSON rồi nhập trên máy khác. Import thay toàn bộ task và thành viên ở trình duyệt hiện tại; luôn kiểm tra preview trước khi xác nhận.
+Trong Cài đặt → Dữ liệu, app giữ 7 bản sao tự động theo ngày trên từng workspace. Chọn **Xem và khôi phục** để đưa bản sao qua màn hình preview trước khi áp dụng. App nhắc tải JSON mỗi tuần; lưu file tải xuống sang vị trí an toàn nếu cần bảo vệ khi mất browser profile. Import thay toàn bộ task và thành viên ở trình duyệt hiện tại; luôn kiểm tra preview trước khi xác nhận.
 
 ## Dữ liệu và khóa màn hình
 
-Local workspace ưu tiên lưu bất đồng bộ trong IndexedDB; nếu không ghi được, app dùng localStorage dự phòng và hiển thị thông báo. localStorage cũ cũng được đọc để migration. Bản sao tự động nằm trên cùng thiết bị; xóa site data/browser profile có thể làm mất cả workspace lẫn bản sao, nên hãy xuất JSON định kỳ. Cloud workspace cần Supabase Auth và RLS. Lock screen chỉ là lớp giao diện, không bảo vệ endpoint hay dữ liệu trong DevTools.
+Local workspace ưu tiên lưu bất đồng bộ trong IndexedDB; nếu không ghi được, app dùng localStorage dự phòng và hiển thị thông báo. localStorage cũ cũng được đọc để migration. Bản sao tự động nằm trên cùng thiết bị; xóa site data/browser profile có thể làm mất cả workspace lẫn bản sao. Cloud workspace cần Supabase Auth và RLS. Lock screen chỉ là lớp giao diện, không bảo vệ endpoint hay dữ liệu trong DevTools.
 
 ## Ngôn ngữ và thiết bị
 

@@ -81,6 +81,8 @@ import { useBoardSync } from "@/lib/taskboard/use-board-sync";
 import {
   createTaskFromTemplate,
   createTemplateFromTask,
+  deleteTaskTemplate,
+  renameTaskTemplate,
 } from "@/lib/taskboard/templates";
 import { getAccessToken, getCurrentUser } from "@/lib/auth";
 import {
@@ -159,6 +161,11 @@ const ConflictDialog = dynamic(
   () => import("./ConflictDialog").then((module) => module.ConflictDialog),
   { ssr: false },
 );
+const TemplateManagerDialog = dynamic(
+  () =>
+    import("./TemplateManagerDialog").then((module) => module.TemplateManagerDialog),
+  { ssr: false },
+);
 
 const priorityRank: Record<Priority, number> = {
   urgent: 0,
@@ -184,6 +191,7 @@ const taskMilestones = (task: Task) =>
   milestoneDefinitions.map(([label, key]) => ({ task, label, date: task[key] }));
 const defaultReminderSettings: ReminderSettings = {
   browserEnabled: false,
+  pushEnabled: false,
   leadDays: { Deadline: 3, "Dev up": 1, "Staging up": 1, Release: 1 },
   quietHours: { start: "22:00", end: "07:00" },
 };
@@ -192,6 +200,8 @@ const reminderSettingsStorageKey = (workspaceId: string) =>
   `${reminderSettingsKey}:${workspaceId}`;
 const savedViewsKey = "taskboard-saved-views-v1";
 const savedViewsStorageKey = (workspaceId: string) => `${savedViewsKey}:${workspaceId}`;
+const backupExportKey = "taskboard-last-json-export-v1";
+const backupNudgeKey = "taskboard-json-export-nudge-v1";
 const wideWorkspaceBreakpoint = 1440;
 const allowedLeadDays = [0, 1, 3, 7];
 const safeSetLocalStorage = (key: string, value: string) => {
@@ -221,6 +231,7 @@ const readReminderSettings = (workspaceId = "default"): ReminderSettings => {
     return {
       ...defaultReminderSettings,
       browserEnabled: value?.browserEnabled === true,
+      pushEnabled: value?.pushEnabled === true,
       leadDays,
       quietHours: {
         start: /^\d{2}:\d{2}$/.test(value?.quietHours?.start)
@@ -344,9 +355,9 @@ export default function Board() {
     [assigneeFilter, setAssigneeFilter] = useState("all"),
     [dueFilter, setDueFilter] = useState("all"),
     [archiveFilter, setArchiveFilter] = useState<"active" | "archived">("active"),
-    [modal, setModal] = useState<"task" | "settings" | "lock" | "quick-capture" | null>(
-      null,
-    ),
+    [modal, setModal] = useState<
+      "task" | "settings" | "lock" | "quick-capture" | "templates" | null
+    >(null),
     [edit, setEdit] = useState<Task | null>(null),
     [confirm, setConfirm] = useState<string | null>(null),
     [importPreview, setImportPreview] = useState<BoardData | null>(null),
@@ -513,6 +524,22 @@ export default function Board() {
   }, [ready, workspaceId]);
   useEffect(() => {
     if (ready) setReminderSettings(readReminderSettings(workspaceId));
+  }, [ready, workspaceId]);
+  useEffect(() => {
+    if (!ready) return;
+    const nowMs = Date.now();
+    try {
+      const lastExport = Number(
+        localStorage.getItem(`${backupExportKey}:${workspaceId}`) || 0,
+      );
+      const lastNudge = Number(
+        localStorage.getItem(`${backupNudgeKey}:${workspaceId}`) || 0,
+      );
+      const sevenDays = 7 * 24 * 60 * 60 * 1000;
+      if (nowMs - lastExport < sevenDays || nowMs - lastNudge < sevenDays) return;
+      setToast("Hãy tải backup JSON để có một bản sao ngoài trình duyệt.");
+      safeSetLocalStorage(`${backupNudgeKey}:${workspaceId}`, String(nowMs));
+    } catch {}
   }, [ready, workspaceId]);
   useEffect(() => {
     if (!ready) return;
@@ -1158,6 +1185,78 @@ export default function Board() {
     setToast("Đã bật thông báo trình duyệt.");
     return true;
   };
+  const togglePushNotifications = async (enabled: boolean) => {
+    const accessToken = await getAccessToken();
+    const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+    if (!accessToken || !vapidPublicKey) {
+      setToast("Push cần phiên owner cloud và VAPID public key đã cấu hình.");
+      return false;
+    }
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+      setToast("Trình duyệt này không hỗ trợ push notification.");
+      return false;
+    }
+    try {
+      if (enabled && browserPermission !== "granted") {
+        if (!("Notification" in window)) {
+          setToast("Trình duyệt này không hỗ trợ thông báo.");
+          return false;
+        }
+        const permission = await Notification.requestPermission();
+        setBrowserPermission(permission);
+        if (permission !== "granted") {
+          setToast("Bạn chưa cấp quyền thông báo cho trình duyệt.");
+          return false;
+        }
+      }
+      const registration = await navigator.serviceWorker.register("/sw.js");
+      const existing = await registration.pushManager.getSubscription();
+      if (enabled) {
+        const applicationServerKey = Uint8Array.from(
+          atob(vapidPublicKey.replace(/-/g, "+").replace(/_/g, "/")),
+          (character) => character.charCodeAt(0),
+        );
+        const subscription =
+          existing ||
+          (await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey,
+          }));
+        const response = await fetch("/api/notifications/push-subscriptions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify(subscription.toJSON()),
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.error || "Không thể bật push.");
+      } else if (existing) {
+        const response = await fetch("/api/notifications/push-subscriptions", {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({ endpoint: existing.endpoint }),
+        });
+        if (!response.ok) {
+          throw new Error("Không thể xóa push subscription trên server.");
+        }
+        await existing.unsubscribe();
+      }
+      updateReminderSettings({
+        ...reminderSettings,
+        pushEnabled: enabled,
+      });
+      setToast(enabled ? "Đã bật nhắc nền trên thiết bị này." : "Đã tắt nhắc nền.");
+      return true;
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "Không thể cập nhật push.");
+      return false;
+    }
+  };
   const statusSummary = useMemo(
     () =>
       Object.entries(labels).map(([status, label]) => ({
@@ -1509,6 +1608,22 @@ export default function Board() {
     setTemplates(next);
     setToast("Đã lưu template");
   };
+  const updateTemplates = (next: TaskTemplate[], successMessage: string) => {
+    if (!localTemplateStorage.save(next, workspaceId)) {
+      setToast("Không thể lưu template vào trình duyệt.");
+      return false;
+    }
+    setTemplates(next);
+    setToast(successMessage);
+    return true;
+  };
+  const renameTemplate = (id: string, name: string) => {
+    const next = renameTaskTemplate(templates, id, name);
+    if (next === templates) return false;
+    return updateTemplates(next, "Đã đổi tên template");
+  };
+  const deleteTemplate = (id: string) =>
+    updateTemplates(deleteTaskTemplate(templates, id), "Đã xóa template");
   const uploadAttachment = async (file: File) => {
     if (!canEditWorkspace) {
       setToast("Bạn chỉ có quyền xem workspace này.");
@@ -1673,7 +1788,10 @@ export default function Board() {
     a.href = URL.createObjectURL(blob);
     a.download = `taskboard-backup-${toDateInputValue(new Date().toISOString())}.json`;
     a.click();
-    URL.revokeObjectURL(a.href);
+    window.setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    const exportedAt = String(Date.now());
+    safeSetLocalStorage(`${backupExportKey}:${workspaceId}`, exportedAt);
+    safeRemoveLocalStorage(`${backupNudgeKey}:${workspaceId}`);
     setToast("Đã xuất bản sao dữ liệu");
   };
   const importData = (file?: File) => {
@@ -2119,6 +2237,13 @@ export default function Board() {
                       ))}
                     </select>
                   )}
+                  <button
+                    className="text-button template-manage-trigger"
+                    disabled={!canEditWorkspace}
+                    onClick={() => setModal("templates")}
+                  >
+                    Quản lý template
+                  </button>
                   <button
                     className="primary-button"
                     disabled={!canEditWorkspace}
@@ -2813,6 +2938,14 @@ export default function Board() {
       {modal === "quick-capture" && (
         <QuickCapture onClose={() => setModal(null)} onSave={saveQuickCapture} />
       )}
+      {modal === "templates" && (
+        <TemplateManagerDialog
+          templates={templates}
+          onRename={renameTemplate}
+          onDelete={deleteTemplate}
+          onClose={() => setModal(null)}
+        />
+      )}
       {modal === "settings" && (
         <SettingsModal
           data={data}
@@ -2855,6 +2988,7 @@ export default function Board() {
           browserPermission={browserPermission}
           onReminderSettings={updateReminderSettings}
           onRequestBrowserNotifications={requestBrowserNotifications}
+          onTogglePushNotifications={togglePushNotifications}
           onToast={setToast}
           locale={locale}
           onLocaleChange={setLocale}

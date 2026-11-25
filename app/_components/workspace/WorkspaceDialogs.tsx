@@ -24,9 +24,11 @@ import {
 } from "@/lib/storage/indexed-db-board-storage";
 import type { RemoteWorkspaceMember } from "@/lib/repositories/task-repository";
 import { localeLabels, supportedLocales, type AppLocale } from "@/lib/i18n";
+import { getAccessToken } from "@/lib/auth";
 
 export type ReminderSettings = {
   browserEnabled: boolean;
+  pushEnabled: boolean;
   leadDays: Record<"Deadline" | "Dev up" | "Staging up" | "Release", number>;
   quietHours: { start: string; end: string };
 };
@@ -58,6 +60,7 @@ export function SettingsModal({
   browserPermission,
   onReminderSettings,
   onRequestBrowserNotifications,
+  onTogglePushNotifications,
   onToast,
   locale,
   onLocaleChange,
@@ -83,6 +86,7 @@ export function SettingsModal({
   browserPermission: NotificationPermission | "unsupported";
   onReminderSettings: (settings: ReminderSettings) => void;
   onRequestBrowserNotifications: () => Promise<boolean>;
+  onTogglePushNotifications: (enabled: boolean) => Promise<boolean>;
   onToast: (message: string) => void;
   locale: AppLocale;
   onLocaleChange: (locale: AppLocale) => void;
@@ -449,6 +453,29 @@ export function SettingsModal({
                     }}
                   />
                 </div>
+                <div className="setting-row notification-setting-row">
+                  <span>
+                    <b>Nhắc nền khi đóng app</b>
+                    <small>
+                      {reminderSettings.pushEnabled
+                        ? "Đã đăng ký push cho tài khoản owner"
+                        : "Cần đăng nhập và cấu hình VAPID trên server"}
+                    </small>
+                  </span>
+                  <button
+                    className={
+                      reminderSettings.pushEnabled
+                        ? "toggle-switch on"
+                        : "toggle-switch"
+                    }
+                    aria-label="Bật hoặc tắt nhắc nền"
+                    aria-pressed={reminderSettings.pushEnabled}
+                    disabled={browserPermission === "unsupported"}
+                    onClick={async () => {
+                      await onTogglePushNotifications(!reminderSettings.pushEnabled);
+                    }}
+                  />
+                </div>
                 {browserPermission === "denied" && (
                   <p className="muted-note notification-permission-help">
                     Để bật lại: mở quyền trang web từ biểu tượng cạnh thanh địa chỉ, cho
@@ -538,9 +565,16 @@ export function SettingsModal({
                   onClick={async () => {
                     setChatworkTestState("sending");
                     try {
+                      const accessToken = await getAccessToken();
+                      if (!accessToken) {
+                        throw new Error("Đăng nhập bằng tài khoản owner để gửi test.");
+                      }
                       const response = await fetch("/api/notifications/chatwork-test", {
                         method: "POST",
-                        headers: { "Content-Type": "application/json" },
+                        headers: {
+                          "Content-Type": "application/json",
+                          Authorization: `Bearer ${accessToken}`,
+                        },
                         body: JSON.stringify({ roomId: room.trim() }),
                       });
                       const result = await response.json().catch(() => ({}));
