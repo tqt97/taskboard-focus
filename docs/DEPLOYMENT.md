@@ -33,6 +33,6 @@ Mở http://localhost:3000. Không cần điền biến môi trường để dù
 
 ## Chatwork/Gmail
 
-Chatwork test và scheduled digest cần Auth owner, `TASKBOARD_OWNER_ID`, `CRON_SECRET`, service role và Chatwork credentials. Push nền cần thêm cặp VAPID và schema push subscription; hai cron route chạy mỗi giờ. Token và VAPID private key chỉ đặt ở server environment, không dùng `NEXT_PUBLIC_*`. Xem [NOTIFICATIONS.md](NOTIFICATIONS.md).
+Chatwork test và scheduled digest cần Auth owner, `TASKBOARD_OWNER_ID`, `CRON_SECRET`, service role và Chatwork credentials. Push nền cần thêm cặp VAPID và schema push subscription. Trên Vercel Hobby, hai cron route chạy một lần/ngày (01:00 và 02:00 UTC); lịch này đáp ứng giới hạn daily của gói. Token và VAPID private key chỉ đặt ở server environment, không dùng `NEXT_PUBLIC_*`. Xem [NOTIFICATIONS.md](NOTIFICATIONS.md).
 
 Gmail chưa triển khai. Cron định kỳ có thể dùng Vercel Cron hoặc Supabase Scheduled Functions; route đã có retry, delivery log và lease idempotency, nhưng vẫn cần cấu hình scheduler/credentials và chạy integration smoke test trước production.

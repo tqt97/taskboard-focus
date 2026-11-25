@@ -12,6 +12,8 @@ npm run check
 
 `npm run test` dùng Node.js test runner native, không thêm dependency runtime. Bộ test hiện khóa các edge case của backup/domain parser:
 
+CI chạy `npm run test` cùng format check, typecheck và production build trước khi deploy. `npm run check` chạy lần lượt typecheck, unit tests, format check và build.
+
 - backup hợp lệ và normalize dữ liệu legacy;
 - nhập backup legacy không có `schema_version`, lỗi JSON/schema và undo sau khi thay workspace nhầm;
 - JSON root sai, duplicate member/task ID;

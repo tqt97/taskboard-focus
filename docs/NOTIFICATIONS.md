@@ -16,7 +16,7 @@ Browser reminder cục bộ chỉ chạy khi workspace đang mở trong một ta
 
 ### Web Push nền
 
-Owner có thể bật **Nhắc nền khi đóng app** trên thiết bị đã cấp quyền notification. App đăng ký Service Worker `/sw.js`, gửi subscription có xác thực lên Supabase và nhận digest từ `/api/notifications/push`; task phải được đồng bộ cloud. Cron chạy mỗi giờ, quiet hours và lead time dùng cấu hình server. Push hiện chỉ chạy cho `TASKBOARD_OWNER_ID`; member/viewer chưa có notification digest riêng.
+Owner có thể bật **Nhắc nền khi đóng app** trên thiết bị đã cấp quyền notification. App đăng ký Service Worker `/sw.js`, gửi subscription có xác thực lên Supabase và nhận digest từ `/api/notifications/push`; task phải được đồng bộ cloud. Vercel Cron gọi Chatwork lúc 01:00 UTC và Web Push lúc 02:00 UTC mỗi ngày để tương thích Hobby; quiet hours và lead time dùng cấu hình server. Push hiện chỉ chạy cho `TASKBOARD_OWNER_ID`; member/viewer chưa có notification digest riêng.
 
 ### Chatwork test
 

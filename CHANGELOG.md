@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — 2026-11-26
+
+- CI: chạy unit tests trước production build/deploy để không bỏ sót regression domain.
+- Rà soát full tính năng: typecheck, 74 unit tests, format check và production build pass; E2E báo 36 pass/6 skip nhưng runner bị treo sau test cuối, Supabase integration thiếu credentials. Chi tiết ở `docs/RELEASE_READINESS.md`.
+- Deploy: chuyển Chatwork và Web Push cron sang lịch một lần mỗi ngày, phù hợp giới hạn Vercel Hobby; xem `docs/DEPLOYMENT.md` và `docs/NOTIFICATIONS.md`.
+
 ## Unreleased — 2026-11-25
 
 - UI: self-host Geist Sans với hỗ trợ dấu tiếng Việt, đồng bộ font page heading và bỏ eyebrow workspace khỏi các trang.

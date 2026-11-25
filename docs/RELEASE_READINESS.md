@@ -1,6 +1,6 @@
 # Taskboard release readiness
 
-Ngày rà soát: 2026-11-25
+Ngày rà soát: 2026-11-26
 
 Tài liệu này tách rõ phần đã có bằng chứng local/browser khỏi phần cần runtime Supabase thật. Không coi test bị `skip` là bằng chứng cloud đã hoàn tất.
 
@@ -35,7 +35,7 @@ Tài liệu này tách rõ phần đã có bằng chứng local/browser khỏi p
 | Multi-workspace            | Đã kiểm chứng local/browser             | workspace/task/template/view isolation E2E                                                         |
 | Realtime collaboration     | Contract đã triển khai, runtime pending | task + assignee subscriptions; cần Supabase multi-client smoke test                                |
 
-Trong rà soát 2026-11-25, quick capture, snapshot backup, daily reminder digest, lazy route chunks và IndexedDB-first async persistence đã được triển khai. Build hiện báo First Load JS workspace 203 kB, so với mốc 208 kB trước đợt tối ưu. Browser E2E chưa được thực thi vì máy thiếu Playwright Chromium; Supabase/Chatwork runtime vẫn cần credentials và dịch vụ thật.
+Trong rà soát 2026-11-25, quick capture, snapshot backup, daily reminder digest, lazy route chunks và IndexedDB-first async persistence đã được triển khai. Build hiện báo First Load JS workspace 203 kB, so với mốc 208 kB trước đợt tối ưu. Supabase/Chatwork runtime vẫn cần credentials và dịch vụ thật.
 
 ## Required cloud gate
 
@@ -51,10 +51,12 @@ Lệnh sẽ fail rõ ràng nếu thiếu các biến `TASKBOARD_TEST_*`; không 
 
 ```text
 npm run typecheck             pass
-npm run test                  66 passed, 1 skipped (Supabase credentials absent)
-npm run format:check          pass (repo formatting synchronized)
+npm run test                  74 passed, 1 skipped (Supabase credentials absent)
+npm run format:check          pass
 npm run build                 pass; First Load JS workspace 203 kB
-npm run test:e2e              blocked: Chromium executable missing from Playwright cache
-`npm audit --omit=dev`        pass; 0 vulnerabilities after PostCSS override
-Supabase integration/runtime  not run: test credentials absent
+npm run test:e2e              36 passed, 6 skipped across desktop/tablet/mobile; runner did not return after final browser case
+npm run test:supabase         not run: test credentials absent
+CI                            now runs unit tests before production build/deploy
 ```
+
+E2E cases reported as passed covered desktop/tablet/mobile responsive layouts, task flows, backup/restore, inbox, discussions, timeline and local persistence. The six skipped cases are performance or viewport-specific skips declared by the Playwright suite. The runner stalled during teardown after reporting its final case, so its process exit code is unavailable; rerun in CI to confirm clean teardown. Supabase authorization, Realtime and push delivery still need a configured test project and dedicated accounts.
