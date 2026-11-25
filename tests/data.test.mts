@@ -29,6 +29,39 @@ test("rejects a backup missing tasks or members", () => {
   assert.match(missingMembers.error || "", /tasks và members/);
 });
 
+test("rejects an unsupported backup schema version", () => {
+  const payload = { ...fixture(), schema_version: 999 };
+
+  const result = parseBoardDataWithError(payload);
+
+  assert.equal(result.data, null);
+  assert.match(result.error || "", /schema version 999/);
+});
+
+test("accepts an explicitly versioned v1 backup", () => {
+  const payload = { ...fixture(), schema_version: 1 };
+
+  const result = parseBoardDataWithError(payload);
+
+  assert.ok(result.data);
+  assert.deepEqual(result.data.tasks[0].assignee_ids, ["m1"]);
+});
+
+test("rejects duplicate assignees and dependencies", () => {
+  const duplicateAssignees = fixture();
+  duplicateAssignees.tasks[0].assignee_ids = ["m1", "m1"];
+  const assigneeResult = parseBoardDataWithError(duplicateAssignees);
+
+  const duplicateDependencies = fixture();
+  duplicateDependencies.tasks[1].blocked_by = ["t1", "t1"];
+  const dependencyResult = parseBoardDataWithError(duplicateDependencies);
+
+  assert.equal(assigneeResult.data, null);
+  assert.match(assigneeResult.error || "", /người phụ trách bị trùng/);
+  assert.equal(dependencyResult.data, null);
+  assert.match(dependencyResult.error || "", /dependency bị trùng/);
+});
+
 test("rejects duplicate member IDs", () => {
   const payload = fixture();
   payload.members[1].id = payload.members[0].id;

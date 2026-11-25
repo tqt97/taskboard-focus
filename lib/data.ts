@@ -1,4 +1,5 @@
-import type { BoardData, Member, Task } from "./types";
+import type { BoardData, Member, RecurrenceRule, Task, TaskAttachment } from "./types";
+import { validateBoardRelations } from "./taskboard/constraints.ts";
 export const demoData: BoardData = {
   code_prefix: "MENSQZIN-",
   members: [
@@ -95,6 +96,7 @@ function iso(offset: number) {
   return d.toISOString();
 }
 const key = "taskboard-focus-v1";
+export const boardSchemaVersion = 2;
 const maxBackupBytes = 5 * 1024 * 1024;
 const colors = ["blue", "violet", "orange", "green"];
 const maxLengths = {
@@ -137,6 +139,24 @@ const isActivity = (value: unknown) =>
   isRequiredDateValue(value.at) &&
   isBoundedString(value.summary, 500) &&
   Boolean(value.summary.trim());
+const isRecurrence = (value: unknown): value is RecurrenceRule =>
+  isRecord(value) &&
+  ["daily", "weekly", "monthly"].includes(String(value.frequency)) &&
+  Number.isInteger(value.interval) &&
+  Number(value.interval) >= 1 &&
+  Number(value.interval) <= 365 &&
+  (value.until === undefined || isDateValue(value.until));
+const isAttachment = (value: unknown): value is TaskAttachment =>
+  isRecord(value) &&
+  isBoundedString(value.id, maxLengths.id) &&
+  Boolean(value.id.trim()) &&
+  isBoundedString(value.name, 255) &&
+  Boolean(value.name.trim()) &&
+  isBoundedString(value.url, maxLengths.url) &&
+  /^https?:\/\//i.test(value.url.trim()) &&
+  (value.size === undefined ||
+    (Number.isSafeInteger(value.size) && Number(value.size) >= 0)) &&
+  (value.mime_type === undefined || isBoundedString(value.mime_type, 120));
 
 const isMember = (value: unknown): value is Member =>
   isRecord(value) &&
@@ -205,11 +225,54 @@ const isTask = (value: unknown): value is Task =>
   (value.activity === undefined ||
     (Array.isArray(value.activity) &&
       value.activity.length <= 200 &&
-      value.activity.every(isActivity)));
+      value.activity.every(isActivity))) &&
+  (value.archived_at === undefined || isRequiredDateValue(value.archived_at)) &&
+  (value.recurrence === undefined || isRecurrence(value.recurrence)) &&
+  (value.template_id === undefined ||
+    (isBoundedString(value.template_id, maxLengths.id) &&
+      Boolean(value.template_id.trim()))) &&
+  (value.attachments === undefined ||
+    (Array.isArray(value.attachments) &&
+      value.attachments.length <= 50 &&
+      value.attachments.every(isAttachment)));
 
 type ParseBoardResult = { data: BoardData | null; error?: string };
 
+export function migrateBoardData(value: unknown): unknown {
+  if (!isRecord(value)) return value;
+  const tasks = Array.isArray(value.tasks)
+    ? value.tasks.map((task) =>
+        isRecord(task)
+          ? {
+              ...task,
+              blocked_by: task.blocked_by ?? [],
+              attachments: task.attachments ?? [],
+            }
+          : task,
+      )
+    : value.tasks;
+  return {
+    ...value,
+    schema_version: value.schema_version ?? boardSchemaVersion,
+    tasks,
+  };
+}
+
 export function parseBoardDataWithError(value: unknown): ParseBoardResult {
+  if (isRecord(value)) {
+    const schemaVersion = value.schema_version;
+    if (
+      schemaVersion !== undefined &&
+      schemaVersion !== 1 &&
+      schemaVersion !== boardSchemaVersion
+    ) {
+      return {
+        data: null,
+        error: `Backup không hỗ trợ schema version ${String(schemaVersion)}.`,
+      };
+    }
+  }
+  value = migrateBoardData(value);
   if (!isRecord(value)) {
     return { data: null, error: "Backup phải là một object JSON hợp lệ." };
   }
@@ -237,44 +300,8 @@ export function parseBoardDataWithError(value: unknown): ParseBoardResult {
   if (new Set(tasks.map((task) => task.id)).size !== tasks.length) {
     return { data: null, error: "Backup có ID task bị trùng." };
   }
-  if (
-    tasks.some(
-      (task) =>
-        (task.assignee_ids || []).some((memberId) => !memberIds.has(memberId)) ||
-        (task.assignee_id && !memberIds.has(task.assignee_id)),
-    )
-  ) {
-    return { data: null, error: "Backup có task gán cho thành viên không tồn tại." };
-  }
-  const taskIds = new Set(tasks.map((task) => task.id));
-  if (
-    tasks.some((task) =>
-      (task.blocked_by || []).some(
-        (dependencyId) => dependencyId === task.id || !taskIds.has(dependencyId),
-      ),
-    )
-  ) {
-    return {
-      data: null,
-      error: "Backup có dependency trỏ tới task không tồn tại hoặc tự phụ thuộc.",
-    };
-  }
-  const visiting = new Set<string>();
-  const visited = new Set<string>();
-  const taskById = new Map(tasks.map((task) => [task.id, task]));
-  const hasDependencyCycle = (taskId: string): boolean => {
-    if (visiting.has(taskId)) return true;
-    if (visited.has(taskId)) return false;
-    visiting.add(taskId);
-    const task = taskById.get(taskId);
-    if (task && (task.blocked_by || []).some(hasDependencyCycle)) return true;
-    visiting.delete(taskId);
-    visited.add(taskId);
-    return false;
-  };
-  if (tasks.some((task) => hasDependencyCycle(task.id))) {
-    return { data: null, error: "Backup có vòng lặp giữa các task phụ thuộc nhau." };
-  }
+  const relationError = validateBoardRelations(tasks, members);
+  if (relationError) return { data: null, error: relationError };
   const normalizedTasks = tasks.map((task) => {
     const assigneeIds = task.assignee_ids?.length
       ? task.assignee_ids

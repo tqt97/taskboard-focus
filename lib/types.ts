@@ -25,6 +25,30 @@ export type SavedView = {
   assignee: string;
   due: string;
   focus: boolean;
+  archive?: "active" | "archived";
+};
+export type DependencyState = "ready" | "waiting" | "blocked";
+export type RecurrenceRule = {
+  frequency: "daily" | "weekly" | "monthly";
+  interval: number;
+  until?: string;
+};
+export type TaskAttachment = {
+  id: string;
+  name: string;
+  url: string;
+  size?: number;
+  mime_type?: string;
+};
+export type TaskTemplate = {
+  id: string;
+  name: string;
+  title: string;
+  description: string;
+  priority: Priority;
+  severity: Severity;
+  recurrence?: RecurrenceRule;
+  created_at: string;
 };
 export type Task = {
   id: string;
@@ -50,6 +74,10 @@ export type Task = {
   review_note?: string;
   blocked_by?: string[];
   activity?: TaskActivity[];
+  archived_at?: string;
+  recurrence?: RecurrenceRule;
+  template_id?: string;
+  attachments?: TaskAttachment[];
   custom_code?: boolean;
   created_at: string;
   updated_at: string;
