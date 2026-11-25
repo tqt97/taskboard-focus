@@ -7,7 +7,7 @@ Một workspace cá nhân giúp ghi task nhanh, nhìn tình hình chung và khô
 ## Người dùng và phạm vi
 
 - Một workspace có owner, admin, member và viewer; thành viên cloud là tài khoản Supabase có thể được mời qua email hoặc gán bằng user ID. Danh mục member local vẫn được giữ để backward compatibility và để gán người phụ trách.
-- MVP chạy local-first bằng localStorage, không cần cấu hình dịch vụ ngoài.
+- MVP chạy local-first bằng IndexedDB; localStorage là migration/fallback khi IndexedDB không dùng được. Không cần cấu hình dịch vụ ngoài.
 - Supabase là đích lưu dữ liệu lâu dài khi được cấu hình; workspace cloud có snapshot, remote CRUD từng task, realtime subscription, optimistic revision và RLS theo role.
 - Không cung cấp xác thực thật bằng passcode client; lock-screen UI chỉ mang tính tiện lợi.
 
@@ -27,12 +27,12 @@ Một workspace cá nhân giúp ghi task nhanh, nhìn tình hình chung và khô
 12. Comment theo task có mention, reply, pin; activity chỉ ghi nhận sự kiện thay đổi, không thay thế nội dung thảo luận.
 13. Conflict Center hiển thị local/remote diff, merge từng field và lưu lựa chọn resolution trong luồng activity.
 
-## Nâng cấp sau MVP
+## Nâng cấp đã có trong MVP hiện tại
 
 - IndexedDB workspace, Inbox/Today action center, triage, checklist, Review/Blocked và quick actions.
 - Supabase Auth, CRUD đồng bộ từng task, conflict handling, realtime và RLS theo workspace.
 - Upload file vào Supabase Storage với giới hạn MIME/size khi cloud mode đã cấu hình; local MVP chỉ lưu URL metadata.
-- Gửi Chatwork qua server-side function và lịch cron; Gmail sau khi có yêu cầu cụ thể.
+- Gửi Chatwork digest qua server-side route và lịch cron; Gmail chưa tích hợp.
 - Email invite, quyền thành viên, nhiều workspace, signed URL và offline retry queue.
 
 ## Tiêu chí chấp nhận

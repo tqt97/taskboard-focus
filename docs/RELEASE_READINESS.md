@@ -35,7 +35,7 @@ Tài liệu này tách rõ phần đã có bằng chứng local/browser khỏi p
 | Multi-workspace            | Đã kiểm chứng local/browser             | workspace/task/template/view isolation E2E                                                         |
 | Realtime collaboration     | Contract đã triển khai, runtime pending | task + assignee subscriptions; cần Supabase multi-client smoke test                                |
 
-Trong cập nhật 2026-11-25, quick capture, snapshot backup, daily reminder digest và lazy route chunks đã được triển khai; typecheck/build pass, browser E2E và Chatwork/Supabase runtime chưa chạy. Build report First Load JS workspace giảm từ 208 kB xuống 202 kB.
+Trong rà soát 2026-11-25, quick capture, snapshot backup, daily reminder digest, lazy route chunks và IndexedDB-first async persistence đã được triển khai. Build hiện báo First Load JS workspace 203 kB, so với mốc 208 kB trước đợt tối ưu. Browser E2E chưa được thực thi vì máy thiếu Playwright Chromium; Supabase/Chatwork runtime vẫn cần credentials và dịch vụ thật.
 
 ## Required cloud gate
 
@@ -47,13 +47,13 @@ npm run test:supabase:required
 
 Lệnh sẽ fail rõ ràng nếu thiếu các biến `TASKBOARD_TEST_*`; không dùng tài khoản production. Chỉ sau khi lệnh này pass mới được kết luận RLS, remote CRUD, signed Storage và collaboration runtime đã đạt.
 
-## Local gates đã chạy
+## Kết quả cục bộ của lần rà soát này
 
 ```text
-npm run check                 pass
-npm run test                  53 passed, 1 skipped (Supabase integration credentials absent)
-npm run test:e2e              19 passed, 2 skipped (mobile workspace tests)
-npm run test:supabase         1 skipped khi thiếu credentials
-npm run test:supabase:required fail-fast khi thiếu credentials
-schema validation             pass trên DB tạm mới + DB legacy UUID
+npm run typecheck             pass
+npm run test                  63 passed, 1 skipped (Supabase credentials absent)
+npm run format:check          fail: 62 existing files need Prettier; touched files formatted
+npm run build                 pass; First Load JS workspace 203 kB
+npm run test:e2e              blocked: Chromium executable missing from Playwright cache
+Supabase integration/runtime  not run: test credentials absent
 ```

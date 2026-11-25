@@ -27,11 +27,11 @@ export function useWorkspacePersistence({
   onError: (message: string) => void;
 }) {
   const backupFailureNotified = useRef(false);
+  const fallbackNotified = useRef(false);
   useEffect(() => {
     if (!ready || !persistenceReady) return;
     setSaveStatus("saving");
     const timer = window.setTimeout(() => {
-      const localResult = localBoardStorage.save(data, workspaceId);
       void indexedDbBoardStorage
         .saveDailyBackup(data, workspaceId)
         .then((backupSaved) => {
@@ -50,8 +50,20 @@ export function useWorkspacePersistence({
       void indexedDbBoardStorage
         .save(data, workspaceId, workspaceName)
         .then((indexedSaved) => {
-          if (localResult.ok || indexedSaved) {
+          if (indexedSaved) {
+            fallbackNotified.current = false;
             setSaveStatus("saved");
+            return;
+          }
+          const fallbackResult = localBoardStorage.save(data, workspaceId);
+          if (fallbackResult.ok) {
+            setSaveStatus("saved");
+            if (!fallbackNotified.current) {
+              fallbackNotified.current = true;
+              onError(
+                "IndexedDB không khả dụng; dữ liệu đang được lưu qua localStorage dự phòng.",
+              );
+            }
             return;
           }
           setSaveStatus("error");

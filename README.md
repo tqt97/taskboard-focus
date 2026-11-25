@@ -35,7 +35,9 @@
 - Next.js 15 App Router, React 19, TypeScript
 - CSS riêng, Lucide icons
 - Geist Sans được self-host, giao diện không phụ thuộc font cài sẵn trên thiết bị.
-- IndexedDB là lưu trữ local chính, LocalStorage là fallback; giữ 7 bản sao an toàn theo ngày trên từng workspace.
+- IndexedDB là lưu trữ local chính; LocalStorage hỗ trợ migration và fallback khi IndexedDB lỗi. Giữ tối đa 7 bản sao theo ngày/workspace.
+- Các view nặng được tải theo nhu cầu; font Geist self-host có content hash và cache dài hạn.
+- Browser reminders theo thiết bị; daily Chatwork digest hỗ trợ quiet hours, timezone, retry và chống gửi trùng khi cấu hình cron/server secrets.
 - Supabase Postgres schema chuẩn bị cho bước đồng bộ
 
 ## Bắt đầu

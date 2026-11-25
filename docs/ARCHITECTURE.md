@@ -41,10 +41,12 @@ Validation shape nằm ở `lib/data.ts`; validation relation nằm ở `lib/tas
 
 ## Performance budget hiện tại
 
-- Route dashboard/tasks/today được prerender; initial JS sau build khoảng 188 kB First Load JS.
+- Build production lần rà soát 2026-11-25 tạo First Load JS khoảng 203 kB cho các route workspace (`/`, `/tasks`, `/today`, `/inbox`, `/timeline`). Mốc trước đợt tối ưu gần nhất là 208 kB; con số phụ thuộc phiên bản dependency và cần cập nhật sau build có thay đổi bundle.
 - Task modal được tải theo nhu cầu bằng dynamic import để initial render không phải tải form CRUD và attachment controls.
 - Settings/confirm/lock dialog cũng được tải theo nhu cầu; route metadata có title, description và canonical riêng cho `/tasks`, `/today`, `/login`.
-- Font ngoài không còn được tải bằng CSS `@import`; UI dùng system font stack để tránh request render-blocking và vẫn giữ fallback tốt trên desktop/mobile.
+- Geist Sans được self-host với Latin/Latin Extended; file font có content hash và cache `public, max-age=31536000, immutable`. CSS vẫn có system fallback để xử lý khi font tải lỗi.
+- View Kanban, timeline, TaskCard và một số popover/dialog được tách dynamic chunk. Dữ liệu workspace cá nhân không dùng cache HTTP dùng chung.
+- Ghi workspace ưu tiên IndexedDB bất đồng bộ; chỉ ghi localStorage khi IndexedDB thất bại. localStorage vẫn được đọc để migrate/khôi phục fallback. Daily backup lưu tối đa 7 bản/workspace.
 - Locale hiện có `vi`, `en`, `ja`; language setting đã lưu lựa chọn, đổi `html lang` và định dạng ngày/giờ. Copy toàn bộ màn hình sẽ được migrate qua catalog theo từng feature, không dịch trực tiếp trong domain logic.
 - Search dùng `useDeferredValue`; query conditions được parse trong `lib/taskboard/search.ts`, derived task lists dùng `useMemo`. Mỗi Kanban column dùng lazy/windowed card rendering với overscan 720px, placeholder intrinsic size và `content-visibility: auto`; card height biến thiên vẫn cần benchmark trên dataset cực lớn.
 
@@ -53,14 +55,14 @@ Validation shape nằm ở `lib/data.ts`; validation relation nằm ở `lib/tas
 ```mermaid
 flowchart LR
  UI[Dashboard UI] --> State[React state]
- State --> Local[IndexedDB]
- Local --> Fallback[localStorage fallback]
+ State --> Local[IndexedDB async primary]
+ Local -. khi lỗi .-> Fallback[localStorage fallback]
  State --> Export[Versioned JSON backup]
  Import[JSON file] --> Validate[Schema validation]
  Validate --> State
 ```
 
-MVP hiện tại là local-first. Mỗi trình duyệt/máy có vùng lưu riêng. Export/import là cách di chuyển dữ liệu. Supabase schema có legacy snapshot `owner_id` và contract multi-workspace mới qua `workspaces`, `workspace_members`, `workspace_snapshots`, `workspace_id` và RLS role-aware. Cloud mode hỗ trợ catalog workspace, load snapshot theo workspace, remote CRUD từng task, optimistic revision check và queue retry; legacy snapshot vẫn là fallback. Local mode không cần credentials.
+MVP hiện tại là local-first. Mỗi trình duyệt/máy có vùng lưu riêng. Export/import là cách di chuyển dữ liệu. Supabase schema có legacy snapshot `owner_id` và contract multi-workspace mới qua `workspaces`, `workspace_members`, `workspace_snapshots`, `workspace_id` và RLS role-aware. Cloud mode hỗ trợ catalog workspace, load snapshot theo workspace, remote CRUD từng task, optimistic revision check, realtime subscription, offline queue và Conflict Center; legacy snapshot vẫn là fallback. Local mode không cần credentials.
 
 ## Mô hình dữ liệu
 
@@ -80,13 +82,12 @@ Ngày do người dùng nhập là ngày lịch; hiện MVP chuyển thành UTC 
 
 ## Mở rộng Supabase
 
-1. Bật Supabase Auth cho account deploy duy nhất và session server-side.
-2. Chạy schema, kiểm tra RLS bằng request authenticated và anonymous.
-3. Dùng `createSupabaseWorkspaceRepository` và `createSupabaseRemoteTaskRepository` sau khi chạy schema; legacy snapshot fallback vẫn giữ cho dữ liệu cũ.
-4. Thêm migration cho owner_id, domain fields mới, file metadata, notification settings.
-5. Xử lý optimistic update và lỗi đồng bộ; remote task update/delete dùng conditional write theo `updated_at`, mutation lỗi được giữ trong offline queue, không báo “đã lưu” nếu remote write thất bại.
-6. Với uploads, Storage policy phải cùng quyền truy cập bảng task.
+1. Bật Supabase Auth và cấu hình redirect URL cho môi trường deploy.
+2. Chạy schema, kiểm tra RLS bằng owner/member/viewer và request anonymous.
+3. Dùng repository cloud qua Auth; mutation task dùng conditional write theo `updated_at`, offline queue và Conflict Center.
+4. Chạy `npm run test:supabase:required` trên project test trước khi bật cloud cho dữ liệu thật.
+5. Với uploads, Storage bucket phải private, giới hạn MIME/size và policy phải khớp quyền workspace.
 
 ## Notification
 
-Dashboard hiện tính mốc gần trực tiếp từ task. Push/message định kỳ phải chạy server-side qua scheduled function, dùng idempotency key theo task + loại mốc + ngày, ghi lịch sử gửi để tránh trùng. Chatwork API token chỉ nằm ở server secrets.
+Browser notification là per-device, yêu cầu quyền trên từng browser. Daily Chatwork digest chạy qua `/api/notifications` với cron secret, idempotency run theo owner + ngày + channel và backoff khi thất bại. Cấu hình timezone/quiet hours và token chỉ ở server; Gmail chưa được tích hợp.

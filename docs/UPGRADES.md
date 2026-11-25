@@ -6,7 +6,7 @@
 - Quick capture qua phím `N` hoặc nút **Ghi nhanh** chỉ yêu cầu tiêu đề và tạo task vào Inbox.
 - Local IndexedDB giữ 7 bản sao theo ngày/workspace, xem danh sách và khôi phục qua import preview; JSON export vẫn là bản sao độc lập để chuyển máy.
 - Browser reminder recheck permission khi tab quay lại, Notification Center mở task đích; Chatwork digest gồm đủ bốn mốc và chạy tối đa một lần/ngày theo timezone cấu hình.
-- Lazy-load Kanban, timeline, notification popover, import/conflict dialog theo nhu cầu; font có content hash và immutable cache một năm. Đồng hồ chỉ cập nhật mỗi phút, chart nhịp tạo task chỉ tính lại khi ngày hoặc task đổi. Build report cho thấy First Load JS giảm 208 → 202 kB; phần Board dùng chung vẫn là bundle lớn nhất cần tách tiếp nếu muốn giảm thêm đáng kể.
+- Lazy-load Kanban, timeline, notification popover, import/conflict dialog theo nhu cầu; font có content hash và immutable cache một năm. Đồng hồ chỉ cập nhật mỗi phút, chart nhịp tạo task chỉ tính lại khi ngày hoặc task đổi. Build lần rà soát báo First Load JS 203 kB (mốc trước tối ưu 208 kB); phần Board dùng chung vẫn là bundle lớn nhất cần tách tiếp nếu muốn giảm thêm đáng kể.
 - Tách UI page heading, quick capture, browser reminder và task card thành component/hook riêng để giảm trách nhiệm của Board.
 - Tách lịch sử và thảo luận task khỏi `TaskModal`; state của composer comment được đóng gói trong panel.
 - `/today` là workspace riêng cho task quá hạn, đến hạn hôm nay và task khẩn; task đã archive không xuất hiện.
@@ -37,6 +37,6 @@ npm run test:e2e
 npm run build
 ```
 
-Domain tests hiện có 54 case, trong đó 53 pass và 1 skip khi thiếu credentials; Supabase integration smoke test được tách riêng. Playwright responsive hiện có 21 matrix case trên Chromium desktop/tablet/mobile, trong đó 19 pass và 2 skip có chủ đích ở mobile workspace.
+Domain tests bao phủ data validation/migration, selectors, recurrence, permissions, search, comments/activity, import/conflict merge, local storage và remote queue. Supabase integration smoke test được tách riêng và yêu cầu project/tài khoản test. Playwright responsive chạy trên Chromium desktop/tablet/mobile; xem kết quả lần chạy hiện tại trong release readiness thay vì dựa vào số case cố định.
 
-Trong lượt cập nhật ngày 2026-11-25, `tsc --noEmit` và Prettier check đã pass. Test runner, browser E2E, build production và Chatwork/Supabase runtime chưa chạy lại cho các thay đổi mới.
+Ghi workspace hiện ghi IndexedDB bất đồng bộ trước, chỉ ghi localStorage fallback nếu IndexedDB thất bại để tránh stringify đồng bộ payload lớn mỗi lần sửa task. Đọc localStorage legacy, chuyển workspace và daily snapshot vẫn được giữ.

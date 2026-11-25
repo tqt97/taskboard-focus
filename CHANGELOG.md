@@ -10,7 +10,8 @@
 - Bảo trì: tách lịch sử và thảo luận task khỏi TaskModal, chuyển trạng thái composer comment vào panel riêng.
 - Hiệu năng: lazy-load Kanban, timeline, notification popover, import/conflict dialogs; giảm cập nhật đồng hồ xuống mỗi phút và cache chart theo ngày.
 - Cache: self-hosted font assets có tên theo content hash và `Cache-Control: immutable` một năm.
-- Kết quả build: First Load JS trên các route workspace giảm từ 208 kB xuống 202 kB; các phần nặng còn lại vẫn nằm trong bundle Board dùng chung.
+- Hiệu năng dữ liệu: ghi IndexedDB bất đồng bộ trước, chỉ stringify/ghi localStorage fallback khi IndexedDB không ghi được.
+- Kết quả build lần rà soát 2026-11-25: First Load JS workspace 203 kB (mốc trước tối ưu 208 kB); phần Board dùng chung vẫn chiếm phần lớn bundle.
 
 ## 0.1.2 - 2026-11-20
 

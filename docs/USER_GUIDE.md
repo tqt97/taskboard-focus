@@ -34,7 +34,7 @@ Trong Cài đặt → Dữ liệu, app giữ 7 bản sao tự động theo ngày
 
 ## Dữ liệu và khóa màn hình
 
-Local workspace ưu tiên lưu trong IndexedDB và giữ localStorage làm fallback/migration. Bản sao tự động cũng nằm trên thiết bị này; xóa site data/browser profile có thể làm mất cả workspace lẫn bản sao, nên hãy xuất JSON định kỳ. Cloud workspace cần Supabase Auth và RLS. Lock screen chỉ là lớp giao diện, không bảo vệ endpoint hay dữ liệu trong DevTools.
+Local workspace ưu tiên lưu bất đồng bộ trong IndexedDB; nếu không ghi được, app dùng localStorage dự phòng và hiển thị thông báo. localStorage cũ cũng được đọc để migration. Bản sao tự động nằm trên cùng thiết bị; xóa site data/browser profile có thể làm mất cả workspace lẫn bản sao, nên hãy xuất JSON định kỳ. Cloud workspace cần Supabase Auth và RLS. Lock screen chỉ là lớp giao diện, không bảo vệ endpoint hay dữ liệu trong DevTools.
 
 ## Ngôn ngữ và thiết bị
 

@@ -51,3 +51,13 @@
 ## Trạng thái triển khai
 
 P0 và phần lớn P1 đã có code/test local/E2E. P2 đã có contract chạy được cho local/cloud workspace, role-aware schema, remote CRUD queue, conditional conflict guard và lazy/windowed card rendering. Chưa tuyên bố hoàn tất remote collaboration vì chưa có Supabase integration test và kiểm chứng race condition đa client trên backend thật.
+
+## Ưu tiên sau rà soát 2026-11-25
+
+1. **P0 — xác minh luồng lưu:** bổ sung kiểm tra browser cho IndexedDB primary, localStorage fallback, workspace switch và daily backup. Unit tests hiện kiểm tra localStorage scope; Playwright chưa chạy được trên máy rà soát vì thiếu Chromium.
+2. **P1 — giảm bundle theo route:** `Board` vẫn được import trên mọi route workspace nên shared First Load JS là khoảng 203 kB. Tách state/data orchestration khỏi view-specific UI, sau đó cho `/timeline`, `/inbox`, `/today` và `/tasks` tải đúng feature của route; đo lại build trước/sau mỗi nhánh.
+3. **P1 — giảm rủi ro bảo trì:** tiếp tục tách `Board` theo seams rõ ràng (toolbar/navigation, dashboard analytics, task list, workspace settings) và thêm test cho storage fallback. Giữ các domain rules trong `lib/taskboard/`, tránh chuyển logic nghiệp vụ vào component.
+4. **P1 — hoàn tất cloud gate:** chạy `npm run test:supabase:required` với project test, owner/member/viewer và multi-client race; chỉ sau đó nâng trạng thái cloud collaboration từ contract sang runtime-verified.
+5. **P2 — bảo vệ notification test:** endpoint Chatwork test chỉ gửi tới room cấu hình nhưng cần đánh giá xác thực người gọi và rate limiting trước khi bật public production.
+
+Không đưa server cache vào dữ liệu task/workspace cá nhân vì dữ liệu phụ thuộc account và thay đổi thường xuyên. Cache dài hạn phù hợp với font/static assets; cache dữ liệu cloud cần account-scoped invalidation trước khi thêm.

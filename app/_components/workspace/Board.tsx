@@ -39,7 +39,6 @@ import {
   Sun,
   Users,
   X,
-  Link2,
   ListFilter,
 } from "lucide-react";
 import {
@@ -774,10 +773,20 @@ export default function Board() {
     const currentName =
       localWorkspaces.find((workspace) => workspace.id === workspaceId)?.name ||
       "Workspace cá nhân";
-    const localSaved = localBoardStorage.save(data, workspaceId);
-    await indexedDbBoardStorage.save(data, workspaceId, currentName);
-    if (!localSaved.ok) {
-      setToast("Không thể lưu fallback workspace; IndexedDB vẫn sẽ được dùng.");
+    const indexedSaved = await indexedDbBoardStorage.save(
+      data,
+      workspaceId,
+      currentName,
+    );
+    if (!indexedSaved) {
+      const fallbackSaved = localBoardStorage.save(data, workspaceId);
+      if (!fallbackSaved.ok) {
+        setToast(
+          "Không thể lưu workspace trước khi chuyển; hãy kiểm tra dung lượng trình duyệt.",
+        );
+        return;
+      }
+      setToast("IndexedDB không khả dụng; workspace đã lưu qua localStorage dự phòng.");
     }
     let nextData: BoardData | null = null;
     if (remoteWorkspaceIds.includes(nextId) && cloudUserEmail) {
