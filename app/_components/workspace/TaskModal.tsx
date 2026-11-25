@@ -9,7 +9,10 @@ import {
   FileText,
   Link2,
   ListChecks,
+  MessageCircle,
+  Pin,
   Plus,
+  Reply,
   RotateCcw,
   Trash2,
   Upload,
@@ -21,6 +24,7 @@ import type {
   TaskAttachment,
   TaskLink,
   TaskChecklistItem,
+  TaskComment,
   Status,
   Priority,
   Severity,
@@ -31,7 +35,9 @@ import {
   toDateInputValue,
   toDateTimeLocalValue,
 } from "@/lib/taskboard/dates";
-import { intlLocale, type AppLocale } from "@/lib/i18n";
+import type { AppLocale } from "@/lib/i18n";
+import { createTaskComment } from "@/lib/taskboard/comments";
+import { formatActivityDate, formatActivityValue } from "@/lib/taskboard/activity";
 
 const labels: Record<Status, string> = {
   todo: "Chưa làm",
@@ -80,6 +86,9 @@ export function TaskModal({
   onDiscardAttachments,
   onPrefixChange,
   locale,
+  commentAuthorId,
+  onAddComment,
+  onToggleCommentPin,
   readOnly = false,
 }: {
   task: Task;
@@ -97,6 +106,9 @@ export function TaskModal({
   onDiscardAttachments?: (storagePaths: string[]) => void;
   onPrefixChange: (prefix: string) => void;
   locale: AppLocale;
+  commentAuthorId?: string;
+  onAddComment?: (taskId: string, comment: TaskComment) => void;
+  onToggleCommentPin?: (taskId: string, commentId: string) => void;
   readOnly?: boolean;
 }) {
   const [form, setForm] = useState<Task>(task),
@@ -106,7 +118,7 @@ export function TaskModal({
     [attachments, setAttachments] = useState<TaskAttachment[]>(task.attachments || []),
     [checklist, setChecklist] = useState<TaskChecklistItem[]>(task.checklist || []),
     [uploadingAttachment, setUploadingAttachment] = useState(false),
-    [activeTab, setActiveTab] = useState<"details" | "history">("details"),
+    [activeTab, setActiveTab] = useState<"details" | "history" | "comments">("details"),
     [resourcesOpen, setResourcesOpen] = useState(
       Boolean((task.attachments || []).length || legacyLinks(task).length),
     ),
@@ -117,7 +129,9 @@ export function TaskModal({
           ? [task.assignee_id]
           : [],
     ),
-    [error, setError] = useState("");
+    [error, setError] = useState(""),
+    [commentBody, setCommentBody] = useState(""),
+    [replyTo, setReplyTo] = useState<string | undefined>();
   const uploadedPathsRef = useRef(new Set<string>());
   const closeModal = () => {
     const unsavedPaths = [...uploadedPathsRef.current];
@@ -170,6 +184,26 @@ export function TaskModal({
     );
   const setSnooze = (days: number) =>
     field("snoozed_until", new Date(Date.now() + days * 86400000).toISOString());
+  const submitComment = () => {
+    if (isNew || readOnly) return;
+    const comment = createTaskComment({
+      body: commentBody,
+      authorId: commentAuthorId,
+      parentId: replyTo,
+      members,
+    });
+    if (!comment) {
+      setError("Comment không được để trống và không quá 5.000 ký tự.");
+      return;
+    }
+    onAddComment?.(form.id, comment);
+    setForm((current) => ({
+      ...current,
+      comments: [...(current.comments || []), comment],
+    }));
+    setCommentBody("");
+    setReplyTo(undefined);
+  };
   const save = () => {
     const filledLinks = links.filter((link) => link.url.trim());
     const title = form.title.trim();
@@ -348,6 +382,19 @@ export function TaskModal({
               Lịch sử thay đổi
               {form.activity?.length ? <span>{form.activity.length}</span> : null}
             </button>
+            {!isNew && (
+              <button
+                className={`modal-tab${activeTab === "comments" ? " active" : ""}`}
+                type="button"
+                role="tab"
+                aria-selected={activeTab === "comments"}
+                aria-controls="task-comments-panel"
+                onClick={() => setActiveTab("comments")}
+              >
+                <MessageCircle size={14} /> Thảo luận
+                {form.comments?.length ? <span>{form.comments.length}</span> : null}
+              </button>
+            )}
           </div>
           {activeTab === "details" ? (
             <fieldset className="task-form-fieldset" disabled={readOnly}>
@@ -1081,7 +1128,7 @@ export function TaskModal({
                 </section>
               </div>
             </fieldset>
-          ) : (
+          ) : activeTab === "history" ? (
             <section
               className="task-history-panel"
               id="task-history-panel"
@@ -1108,21 +1155,13 @@ export function TaskModal({
                                 .slice(0, 3)
                                 .map(
                                   (change) =>
-                                    `${change.field}: ${change.from} → ${change.to}`,
+                                    `${change.field}: ${formatActivityValue(change.field, change.from, locale)} → ${formatActivityValue(change.field, change.to, locale)}`,
                                 )
                                 .join(" · ")}
                             </small>
                           ) : null}
                         </span>
-                        <small>
-                          {new Intl.DateTimeFormat(intlLocale[locale], {
-                            day: "2-digit",
-                            month: "2-digit",
-                            year: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          }).format(new Date(item.at))}
-                        </small>
+                        <small>{formatActivityDate(item.at, locale)}</small>
                       </div>
                     ))}
                 </div>
@@ -1130,6 +1169,142 @@ export function TaskModal({
                 <div className="history-empty">
                   <b>Chưa có lịch sử thay đổi</b>
                   <small>Các cập nhật sẽ xuất hiện ở đây sau khi task được lưu.</small>
+                </div>
+              )}
+            </section>
+          ) : (
+            <section
+              className="task-comments-panel"
+              id="task-comments-panel"
+              role="tabpanel"
+            >
+              <div className="form-block-heading">
+                <div>
+                  <h3>Thảo luận</h3>
+                  <p>Trao đổi theo task; mention thành viên để gửi thông báo.</p>
+                </div>
+              </div>
+              <div className="task-comment-list">
+                {(form.comments || []).length ? (
+                  (form.comments || []).map((comment) => {
+                    const author = members.find(
+                      (member) => member.id === comment.author_id,
+                    );
+                    return (
+                      <article
+                        className={[
+                          "task-comment",
+                          comment.pinned ? "pinned" : "",
+                          comment.parent_id ? "reply" : "",
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
+                        key={comment.id}
+                      >
+                        <div className="task-comment-heading">
+                          <b>{author?.name || "Thành viên"}</b>
+                          <small>
+                            {formatActivityDate(comment.created_at, locale)}
+                          </small>
+                        </div>
+                        {comment.parent_id && (
+                          <small className="task-comment-reply-label">
+                            ↳ Trả lời comment trước đó
+                          </small>
+                        )}
+                        <p>{comment.body}</p>
+                        <div className="task-comment-actions">
+                          <button
+                            type="button"
+                            className="text-button"
+                            onClick={() => setReplyTo(comment.id)}
+                          >
+                            <Reply size={13} /> Trả lời
+                          </button>
+                          <button
+                            type="button"
+                            className="text-button"
+                            disabled={readOnly}
+                            onClick={() => {
+                              onToggleCommentPin?.(form.id, comment.id);
+                              setForm((current) => ({
+                                ...current,
+                                comments: (current.comments || []).map((item) =>
+                                  item.id === comment.id
+                                    ? { ...item, pinned: !item.pinned }
+                                    : item,
+                                ),
+                              }));
+                            }}
+                          >
+                            <Pin size={13} /> {comment.pinned ? "Bỏ ghim" : "Ghim"}
+                          </button>
+                        </div>
+                      </article>
+                    );
+                  })
+                ) : (
+                  <div className="history-empty">
+                    <b>Chưa có thảo luận</b>
+                    <small>Hãy để lại comment đầu tiên cho task này.</small>
+                  </div>
+                )}
+              </div>
+              {!readOnly && (
+                <div className="task-comment-composer">
+                  {replyTo && (
+                    <small>
+                      Đang trả lời một comment{" "}
+                      <button
+                        type="button"
+                        className="text-button"
+                        onClick={() => setReplyTo(undefined)}
+                      >
+                        Hủy
+                      </button>
+                    </small>
+                  )}
+                  <textarea
+                    aria-label="Nội dung comment"
+                    value={commentBody}
+                    onChange={(event) => setCommentBody(event.target.value)}
+                    placeholder="Viết comment hoặc dùng @ để mention thành viên..."
+                    rows={3}
+                  />
+                  <div className="task-comment-composer-footer">
+                    <select
+                      aria-label="Mention thành viên"
+                      defaultValue=""
+                      onChange={(event) => {
+                        const member = members.find(
+                          (item) => item.id === event.target.value,
+                        );
+                        if (member)
+                          setCommentBody(
+                            (body) =>
+                              `${body}${body && !body.endsWith(" ") ? " " : ""}@${member.name} `,
+                          );
+                        event.currentTarget.value = "";
+                      }}
+                    >
+                      <option value="">Mention thành viên</option>
+                      {members
+                        .filter((member) => member.active)
+                        .map((member) => (
+                          <option value={member.id} key={member.id}>
+                            @{member.name}
+                          </option>
+                        ))}
+                    </select>
+                    <button
+                      type="button"
+                      className="primary-button"
+                      disabled={!commentBody.trim()}
+                      onClick={submitComment}
+                    >
+                      Gửi comment
+                    </button>
+                  </div>
                 </div>
               )}
             </section>

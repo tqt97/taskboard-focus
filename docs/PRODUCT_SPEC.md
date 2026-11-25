@@ -24,6 +24,8 @@ Một workspace cá nhân giúp ghi task nhanh, nhìn tình hình chung và khô
 9. Focus view, quick capture bằng phím tắt, bulk update và task có bước tiếp theo.
 10. Lưu activity history tối giản cho các thay đổi quan trọng của task.
 11. Calendar/Timeline theo dõi Dev up, Staging up, Release và Deadline; hỗ trợ lọc theo người phụ trách/mốc và kéo Deadline để đổi ngày.
+12. Comment theo task có mention, reply, pin; activity chỉ ghi nhận sự kiện thay đổi, không thay thế nội dung thảo luận.
+13. Conflict Center hiển thị local/remote diff, merge từng field và lưu lựa chọn resolution trong luồng activity.
 
 ## Nâng cấp sau MVP
 
@@ -49,3 +51,5 @@ Một workspace cá nhân giúp ghi task nhanh, nhìn tình hình chung và khô
 - Bulk action phải hiển thị số task được chọn và reset selection sau khi hoàn tất.
 - Status flow chuẩn là `Chưa làm → Đang làm → Chờ review → Hoàn tất`; `Bị chặn` là nhánh ngoại lệ và lưu trạng thái trước đó để gỡ chặn quay lại đúng bước. Không cho hoàn tất trực tiếp từ `Đang làm` hoặc `Bị chặn`.
 - Activity history chỉ giữ các thay đổi gần nhất để không làm phình localStorage.
+- Activity date/time phải dùng `Intl.DateTimeFormat` theo locale đang chọn; không hiển thị ISO raw cho người dùng.
+- Import merge không thay thế workspace ngay: preview conflict trước, chỉ áp dụng task được chọn và luôn giữ khả năng rollback local.

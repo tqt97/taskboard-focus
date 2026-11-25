@@ -5,6 +5,7 @@ import type {
   Task,
   TaskAttachment,
   TaskChecklistItem,
+  TaskComment,
 } from "./types";
 import { validateBoardRelations } from "./taskboard/constraints.ts";
 export const demoData: BoardData = {
@@ -169,6 +170,27 @@ const isChecklistItem = (value: unknown): value is TaskChecklistItem =>
   isBoundedString(value.title, 500) &&
   Boolean(value.title.trim()) &&
   typeof value.done === "boolean";
+const isComment = (value: unknown): value is TaskComment =>
+  isRecord(value) &&
+  isBoundedString(value.id, maxLengths.id) &&
+  Boolean(value.id.trim()) &&
+  isBoundedString(value.body, 5000) &&
+  Boolean(value.body.trim()) &&
+  (value.author_id === undefined ||
+    (isBoundedString(value.author_id, maxLengths.id) &&
+      Boolean(value.author_id.trim()))) &&
+  (value.parent_id === undefined ||
+    (isBoundedString(value.parent_id, maxLengths.id) &&
+      Boolean(value.parent_id.trim()))) &&
+  (value.mention_ids === undefined ||
+    (Array.isArray(value.mention_ids) &&
+      value.mention_ids.length <= 100 &&
+      value.mention_ids.every(
+        (id) => isBoundedString(id, maxLengths.id) && Boolean(id.trim()),
+      ))) &&
+  (value.pinned === undefined || typeof value.pinned === "boolean") &&
+  isRequiredDateValue(value.created_at) &&
+  (value.updated_at === undefined || isRequiredDateValue(value.updated_at));
 const isRecurrence = (value: unknown): value is RecurrenceRule =>
   isRecord(value) &&
   ["daily", "weekly", "monthly"].includes(String(value.frequency)) &&
@@ -195,6 +217,8 @@ const isMember = (value: unknown): value is Member =>
   isRecord(value) &&
   isBoundedString(value.id, maxLengths.id) &&
   Boolean(value.id.trim()) &&
+  (value.user_id === undefined ||
+    (isBoundedString(value.user_id, maxLengths.id) && Boolean(value.user_id.trim()))) &&
   isBoundedString(value.name, maxLengths.name) &&
   Boolean(value.name.trim()) &&
   isBoundedString(value.role, maxLengths.role) &&
@@ -264,6 +288,10 @@ const isTask = (value: unknown): value is Task =>
     (Array.isArray(value.activity) &&
       value.activity.length <= 200 &&
       value.activity.every(isActivity))) &&
+  (value.comments === undefined ||
+    (Array.isArray(value.comments) &&
+      value.comments.length <= 500 &&
+      value.comments.every(isComment))) &&
   (value.archived_at === undefined || isRequiredDateValue(value.archived_at)) &&
   (value.recurrence === undefined || isRecurrence(value.recurrence)) &&
   (value.template_id === undefined ||

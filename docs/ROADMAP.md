@@ -38,6 +38,11 @@
 - Cloud settings đã có list/update/remove member theo user ID, email invite qua server-side Supabase Auth/Admin và bảo vệ owner membership.
 - Browser rendering đã có lazy/windowed card rendering với overscan và `content-visibility`; cần benchmark thêm cho card height biến thiên ở dataset cực lớn.
 - Realtime conflict resolution có conditional `updated_at` write, `REPLICA IDENTITY FULL` cho stale-delete, shared workspace CRUD không còn giới hạn theo người tạo task, và không nhận event cũ hơn local; atomic server/runtime integration test vẫn cần môi trường Supabase thật.
+- Comment theo task đã tách khỏi activity history: mention, reply, pin và notification mention; deadline/mốc trong activity được format theo locale thay vì hiển thị ISO thô.
+- Conflict Center đã có compare local/remote, merge từng field, chọn giữ local/lấy remote và blocked queue riêng; thao tác ghi đè remote chỉ chạy sau xác nhận rõ ràng.
+- Có `npm run benchmark` đo workload 100/1.000/10.000 task gồm tạo dữ liệu, search khi gõ, realtime update và serialize backup; `npm run benchmark:e2e` đo trực tiếp qua IndexedDB trong browser cả load/search/mở modal/chuyển tab. Baseline lần chạy hiện tại ở 10.000 task là khoảng 1.24s/498ms/739ms/182ms; cần theo dõi thêm card height biến thiên trước khi chốt ngưỡng production.
+- Import backup đã có preview conflict, merge từng task và lựa chọn thay thế toàn bộ; các thao tác import đều đi qua undo window.
+- Next Action, activity diff và import merge/preview được tách thành domain modules để tiếp tục refactor `Board.tsx` theo seam, không rewrite một lần.
 
 ## Ngoài phạm vi hiện tại
 

@@ -154,8 +154,9 @@ create policy taskboard_attachment_delete on storage.objects
     )
   );
 create table if not exists public.members(
- id text primary key default gen_random_uuid()::text, owner_id uuid not null references auth.users(id) default auth.uid(), name text not null check (char_length(name) <= 120), role text not null default '' check (char_length(role) <= 120), color text not null default 'blue' check (color in ('blue', 'violet', 'orange', 'green')), active boolean not null default true, created_at timestamptz not null default now()
+ id text primary key default gen_random_uuid()::text, user_id uuid references auth.users(id) on delete set null, owner_id uuid not null references auth.users(id) default auth.uid(), name text not null check (char_length(name) <= 120), role text not null default '' check (char_length(role) <= 120), color text not null default 'blue' check (color in ('blue', 'violet', 'orange', 'green')), active boolean not null default true, created_at timestamptz not null default now()
 );
+alter table public.members add column if not exists user_id uuid references auth.users(id) on delete set null;
 alter table public.members add column if not exists workspace_id uuid references public.workspaces(id) on delete cascade;
 create table if not exists public.tasks(
  id text primary key default gen_random_uuid()::text, owner_id uuid not null references auth.users(id) default auth.uid(), code text not null default '' check (char_length(code) <= 100), custom_code boolean not null default false, title text not null check (char_length(title) <= 500), description text not null default '' check (char_length(description) <= 10000),
@@ -167,6 +168,7 @@ create table if not exists public.tasks(
  blocked_by jsonb not null default '[]'::jsonb check (jsonb_typeof(blocked_by) = 'array'),
  blocked_from text check (blocked_from in ('todo','in_progress','review')),
  activity jsonb not null default '[]'::jsonb check (jsonb_typeof(activity) = 'array'),
+ comments jsonb not null default '[]'::jsonb check (jsonb_typeof(comments) = 'array'),
  primary_links jsonb not null default '[]'::jsonb check (jsonb_typeof(primary_links) = 'array'),
  secondary_links jsonb not null default '[]'::jsonb check (jsonb_typeof(secondary_links) = 'array'),
  -- Deprecated compatibility column. New writes should use task_assignees.
@@ -187,6 +189,7 @@ alter table public.tasks add column if not exists checklist jsonb not null defau
 alter table public.tasks add column if not exists inbox boolean not null default false;
 alter table public.tasks add column if not exists snoozed_until timestamptz;
 alter table public.tasks add column if not exists blocked_from text;
+alter table public.tasks add column if not exists comments jsonb not null default '[]'::jsonb check (jsonb_typeof(comments) = 'array');
 -- Realtime DELETE payloads need the previous updated_at for stale-delete protection.
 alter table public.tasks replica identity full;
 create index if not exists tasks_archived_at_idx on public.tasks(archived_at);
@@ -206,6 +209,7 @@ before update on public.tasks
 for each row execute function public.set_task_updated_at();
 create index if not exists members_owner_id_idx on public.members(owner_id);
 create index if not exists members_workspace_id_idx on public.members(workspace_id);
+create index if not exists members_user_id_idx on public.members(user_id);
 
 -- Local/legacy exports use stable IDs such as `t1` and `m1`; task and member
 -- identities must not be forced through UUID before they can be synced.

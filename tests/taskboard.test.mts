@@ -10,6 +10,16 @@ import {
 import { getNextOccurrence } from "../lib/taskboard/recurrence.ts";
 import { isWithinQuietHours } from "../lib/taskboard/notifications.ts";
 import { createTaskFromTemplate } from "../lib/taskboard/templates.ts";
+import { createTaskComment } from "../lib/taskboard/comments.ts";
+import { formatActivityDate, formatActivityValue } from "../lib/taskboard/activity.ts";
+import {
+  formatConflictValue,
+  getConflictFields,
+  mergeConflictFields,
+} from "../lib/taskboard/conflicts.ts";
+import { getNextAction } from "../lib/taskboard/next-action.ts";
+import { diffTaskFields } from "../lib/taskboard/activity-diff.ts";
+import { mergeBoardImport, previewBoardImport } from "../lib/taskboard/import-merge.ts";
 import { matchesTaskSearch, parseTaskSearch } from "../lib/taskboard/search.ts";
 import {
   remoteTaskScope,
@@ -32,6 +42,169 @@ import {
 } from "../lib/taskboard/status-transitions.ts";
 
 const fixture = () => JSON.parse(JSON.stringify(demoData)) as typeof demoData;
+
+test("comments preserve replies and mention member IDs", () => {
+  const comment = createTaskComment({
+    body: "@Linh kiểm tra giúp mình nhé",
+    authorId: "m1",
+    parentId: "comment-1",
+    members: fixture().members,
+    now: new Date("2026-11-25T08:34:00.000Z"),
+  });
+
+  assert.ok(comment);
+  assert.equal(comment.author_id, "m1");
+  assert.equal(comment.parent_id, "comment-1");
+  assert.deepEqual(comment.mention_ids, ["m2"]);
+  assert.equal(comment.created_at, "2026-11-25T08:34:00.000Z");
+
+  const ambiguous = createTaskComment({
+    body: "@An không phải @Anh",
+    members: [
+      { id: "an", name: "An", role: "Dev", color: "blue", active: true },
+      { id: "anh", name: "Anh", role: "Dev", color: "green", active: true },
+    ],
+  });
+  assert.ok(ambiguous);
+  assert.deepEqual(ambiguous.mention_ids, ["an", "anh"]);
+});
+
+test("activity dates and milestone values use readable localized format", () => {
+  assert.match(
+    formatActivityDate("2026-11-25T08:34:00.000Z", "vi"),
+    /^\d{2}:\d{2} 25\/11\/2026$/,
+  );
+  assert.match(
+    formatActivityValue("Deadline", "2026-11-26T10:00:00.000Z", "vi"),
+    /^\d{2}:\d{2} 26\/11\/2026$/,
+  );
+});
+
+test("conflict center exposes changed fields and merges only selected remote fields", () => {
+  const base = {
+    id: "task-1",
+    code: "WEB-1",
+    title: "Local title",
+    description: "Same",
+    status: "in_progress" as const,
+    priority: "high" as const,
+    severity: "medium" as const,
+    dev_up: "",
+    staging_up: "",
+    release_at: "",
+    deadline: "2026-11-26T10:00:00.000Z",
+    order_index: 0,
+    links: [],
+    created_at: "2026-11-25T00:00:00.000Z",
+    updated_at: "2026-11-25T01:00:00.000Z",
+  };
+  const remote = {
+    ...base,
+    title: "Remote title",
+    deadline: "2026-11-27T10:00:00.000Z",
+    updated_at: "2026-11-25T02:00:00.000Z",
+  };
+  const fields = getConflictFields(base, remote);
+  assert.deepEqual(
+    fields.map((field) => field.key),
+    ["title", "deadline"],
+  );
+  const merged = mergeConflictFields(base, remote, new Set(["deadline"]));
+  assert.equal(merged.title, "Local title");
+  assert.equal(merged.deadline, remote.deadline);
+  assert.notEqual(merged.updated_at, base.updated_at);
+});
+
+test("conflict values stay readable for nested fields", () => {
+  assert.equal(formatConflictValue([]), "Trống");
+  assert.equal(
+    formatConflictValue([{ id: "check-1", title: "Kiểm tra", done: false }]),
+    '[{"id":"check-1","title":"Kiểm tra","done":false}]',
+  );
+  assert.equal(formatConflictValue(undefined), "Chưa đặt");
+});
+
+test("backup parser preserves explicit member cloud identity", () => {
+  const result = parseBoardDataWithError({
+    schema_version: 2,
+    members: [
+      {
+        ...fixture().members[0],
+        user_id: "auth-user-1",
+      },
+    ],
+    tasks: [],
+  });
+  assert.equal(result.data?.members[0].user_id, "auth-user-1");
+});
+
+test("next action engine prioritizes dependency and review decisions", () => {
+  const task = {
+    id: "a",
+    code: "A",
+    title: "A",
+    description: "",
+    status: "review" as const,
+    priority: "medium" as const,
+    severity: "low" as const,
+    dev_up: "",
+    staging_up: "",
+    release_at: "",
+    deadline: "",
+    order_index: 0,
+    links: [],
+    blocked_by: ["b"],
+    created_at: "2026-11-25T00:00:00.000Z",
+    updated_at: "2026-11-25T00:00:00.000Z",
+  };
+  const dependency = {
+    ...task,
+    id: "b",
+    code: "B",
+    title: "B",
+    status: "in_progress" as const,
+    blocked_by: [],
+  };
+  assert.equal(getNextAction(task, [task, dependency]).label, "Theo dõi dependency");
+  assert.equal(getNextAction({ ...task, blocked_by: [] }, [task]).label, "Review task");
+});
+
+test("activity diff and import merge preserve local choices", () => {
+  const localTasks = [{ id: "1", title: "Local", updated_at: "1" }];
+  const incomingTasks = [
+    { id: "1", title: "Remote", updated_at: "2" },
+    { id: "2", title: "New", updated_at: "2" },
+  ];
+  const local = { tasks: localTasks, members: [] } as never;
+  const incoming = { tasks: incomingTasks, members: [] } as never;
+  assert.deepEqual(
+    previewBoardImport(local, incoming).conflicts.map((item) => item.id),
+    ["1"],
+  );
+  const merged = mergeBoardImport(local, incoming, new Set(["1"]));
+  assert.deepEqual(
+    merged.tasks.map((task) => task.title),
+    ["Remote", "New"],
+  );
+  assert.deepEqual(
+    diffTaskFields(
+      { ...localTasks[0], description: "" } as never,
+      { ...localTasks[0], description: "changed" } as never,
+    ).map((change) => change.field),
+    ["description"],
+  );
+  const mergedWithMember = mergeBoardImport(
+    local,
+    {
+      tasks: incomingTasks,
+      members: [
+        { id: "new-member", name: "New", role: "Dev", color: "blue", active: true },
+      ],
+    } as never,
+    new Set(),
+  );
+  assert.equal(mergedWithMember.members[0]?.id, "new-member");
+});
 
 test("archive selector excludes archived work from Today", () => {
   const data = fixture();
@@ -488,6 +661,7 @@ test("remote queue pauses conflicts but reopens on a new task version", () => {
     const [queued] = remoteSyncQueue.listDue();
     remoteSyncQueue.block(queued, "Task đã thay đổi trên cloud");
     assert.equal(remoteSyncQueue.listDue().length, 0);
+    assert.equal(remoteSyncQueue.listBlocked().length, 1);
     remoteSyncQueue.enqueue(
       { ...task, title: "Local revision" },
       "upsert",

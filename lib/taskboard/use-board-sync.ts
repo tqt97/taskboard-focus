@@ -9,7 +9,8 @@ import {
   type SyncState,
 } from "../repositories/task-repository";
 import { supabase } from "../supabase";
-import type { BoardData, Task } from "../types";
+import type { BoardData, Member, Task } from "../types";
+import { mergeConflictFields } from "./conflicts";
 import {
   isRemoteConflict,
   isRemotePermanentError,
@@ -22,6 +23,12 @@ export function useBoardSync(
   workspaceId = "default",
 ) {
   const [syncState, setSyncState] = useState<SyncState>({ status: "local" });
+  const [conflict, setConflict] = useState<{
+    local: Task;
+    remote: Task;
+    message: string;
+  } | null>(null);
+  const [conflictCount, setConflictCount] = useState(0);
   const revisionRef = useRef<string | undefined>(undefined);
   const flushQueuedTasks = useCallback(async () => {
     const user = await getCurrentUser();
@@ -56,6 +63,41 @@ export function useBoardSync(
       window.clearInterval(timer);
     };
   }, [flushQueuedTasks]);
+  useEffect(() => {
+    if (!supabase) return;
+    let cancelled = false;
+    void (async () => {
+      const user = await getCurrentUser();
+      if (!user || cancelled) return;
+      const blockedItems = remoteSyncQueue
+        .listBlocked(user.id)
+        .filter((item) => item.workspaceId === workspaceId);
+      setConflictCount(blockedItems.length);
+      const blocked = blockedItems[0];
+      if (!blocked) return;
+      const local = data.tasks.find((task) => task.id === blocked.task.id);
+      if (!local) return;
+      try {
+        const repository = createSupabaseRemoteTaskRepository(
+          user.id,
+          workspaceId === "default" ? undefined : workspaceId,
+        );
+        const remote = await repository.get(local.id);
+        if (!cancelled && remote) {
+          setConflict({
+            local,
+            remote,
+            message: blocked.lastError || "Task đang conflict trên cloud.",
+          });
+        }
+      } catch {
+        // Keep the blocked queue item; the next online/sync attempt can retry the read.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [data.tasks, workspaceId]);
   useEffect(() => {
     const client = supabase;
     if (!client) return;
@@ -155,7 +197,11 @@ export function useBoardSync(
     };
   }, [setData, workspaceId]);
   const syncTask = useCallback(
-    async (task: Task, operation: "upsert" | "remove" = "upsert") => {
+    async (
+      task: Task,
+      operation: "upsert" | "remove" = "upsert",
+      members: Member[] = data.members,
+    ) => {
       setSyncState({ status: "syncing" });
       let ownerId = "anonymous";
       try {
@@ -167,7 +213,7 @@ export function useBoardSync(
           workspaceId === "default" ? undefined : workspaceId,
         );
         if (operation === "remove") await repository.remove(task.id, task.updated_at);
-        else await repository.upsert(task, data.members);
+        else await repository.upsert(task, members);
         remoteSyncQueue.acknowledge(`${workspaceId}:${task.id}`, ownerId);
         setSyncState({ status: "synced", at: new Date().toISOString() });
       } catch (error) {
@@ -183,7 +229,7 @@ export function useBoardSync(
           workspaceId,
           new Date(),
           message,
-          data.members,
+          members,
           ownerId,
         );
         if (isRemoteConflict(message) || isRemotePermanentError(message)) {
@@ -191,6 +237,23 @@ export function useBoardSync(
             .listDue(new Date(), ownerId)
             .find((item) => item.key === `${workspaceId}:${task.id}`);
           if (queued) remoteSyncQueue.block(queued, message, ownerId);
+          setConflictCount(
+            remoteSyncQueue
+              .listBlocked(ownerId)
+              .filter((item) => item.workspaceId === workspaceId).length,
+          );
+          if (isRemoteConflict(message)) {
+            try {
+              const remoteRepository = createSupabaseRemoteTaskRepository(
+                ownerId,
+                workspaceId === "default" ? undefined : workspaceId,
+              );
+              const remote = await remoteRepository.get(task.id);
+              if (remote) setConflict({ local: task, remote, message });
+            } catch {
+              // The sync error remains visible even when the comparison read fails.
+            }
+          }
         }
         setSyncState({
           status: "error",
@@ -231,5 +294,59 @@ export function useBoardSync(
     },
     [data, setData, workspaceId],
   );
-  return { syncState, sync, syncTask };
+  const resolveConflict = useCallback(
+    async (
+      resolution: "local" | "remote" | "merge",
+      remoteFields: ReadonlySet<keyof Task> = new Set(),
+    ) => {
+      if (!conflict) return;
+      const user = await getCurrentUser();
+      if (!user) throw new Error("Hãy đăng nhập Supabase trước khi xử lý conflict.");
+      const repository = createSupabaseRemoteTaskRepository(
+        user.id,
+        workspaceId === "default" ? undefined : workspaceId,
+      );
+      const nextBase =
+        resolution === "remote"
+          ? conflict.remote
+          : resolution === "merge"
+            ? mergeConflictFields(conflict.local, conflict.remote, remoteFields)
+            : { ...conflict.local, updated_at: new Date().toISOString() };
+      const resolvedAt = new Date().toISOString();
+      const next = {
+        ...nextBase,
+        updated_at: resolvedAt,
+        activity: [
+          ...(nextBase.activity || []),
+          {
+            id: crypto.randomUUID(),
+            type: "updated" as const,
+            at: resolvedAt,
+            summary: `Đã xử lý conflict: ${resolution} bởi ${user.email || user.id}`,
+          },
+        ].slice(-200),
+      };
+      await repository.resolveConflict(next, data.members);
+      remoteSyncQueue.acknowledge(`${workspaceId}:${next.id}`, user.id);
+      setConflictCount((count) => Math.max(0, count - 1));
+      setData((current) => ({
+        ...current,
+        tasks: current.tasks.some((task) => task.id === next.id)
+          ? current.tasks.map((task) => (task.id === next.id ? next : task))
+          : [...current.tasks, next],
+      }));
+      setConflict(null);
+      setSyncState({ status: "synced", at: new Date().toISOString() });
+    },
+    [conflict, data.members, setData, workspaceId],
+  );
+  return {
+    syncState,
+    sync,
+    syncTask,
+    conflict,
+    conflictCount,
+    resolveConflict,
+    dismissConflict: () => setConflict(null),
+  };
 }

@@ -47,6 +47,20 @@ export function validateBoardRelations(
     if (new Set(activityIds).size !== activityIds.length) {
       return `Task ${task.code || task.id} có activity history bị trùng.`;
     }
+    const comments = task.comments || [];
+    const commentIds = new Set(comments.map((comment) => comment.id));
+    if (commentIds.size !== comments.length) {
+      return `Task ${task.code || task.id} có comment bị trùng.`;
+    }
+    if (
+      comments.some(
+        (comment) =>
+          comment.parent_id === comment.id ||
+          (comment.parent_id && !commentIds.has(comment.parent_id)),
+      )
+    ) {
+      return `Task ${task.code || task.id} có reply trỏ tới comment không tồn tại.`;
+    }
   }
 
   const visiting = new Set<string>();

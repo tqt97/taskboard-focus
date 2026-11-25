@@ -72,6 +72,9 @@ export const remoteSyncQueue = {
       (item) => !item.blocked && new Date(item.nextAttemptAt).getTime() <= timestamp,
     );
   },
+  listBlocked(ownerId = "anonymous"): QueuedTaskOperation[] {
+    return readQueue(ownerId).filter((item) => item.blocked === true);
+  },
   enqueue(
     task: Task,
     operation: "upsert" | "remove",

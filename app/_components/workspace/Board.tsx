@@ -58,7 +58,7 @@ import type {
   TaskActivity,
   TaskTemplate,
 } from "@/lib/types";
-import { NotificationPopover, type BoardNotification } from "./NotificationPopover";
+import { NotificationPopover } from "./NotificationPopover";
 import type { ReminderSettings } from "./WorkspaceDialogs";
 import {
   getTodayTasks,
@@ -106,6 +106,13 @@ import {
   getPrimaryStatusAction,
   resolveStatusTransition,
 } from "@/lib/taskboard/status-transitions";
+import { ConflictDialog } from "./ConflictDialog";
+import { useTaskMutations } from "./hooks/useTaskMutations";
+import { ImportDialog } from "./ImportDialog";
+import { mergeBoardImport } from "@/lib/taskboard/import-merge";
+import { diffTaskFields } from "@/lib/taskboard/activity-diff";
+import { useWorkspacePersistence } from "./hooks/useWorkspacePersistence";
+import { useWorkspaceNotifications } from "./hooks/useWorkspaceNotifications";
 
 const StructuredTaskModal = dynamic(
   () => import("./TaskModal").then((module) => module.TaskModal),
@@ -155,6 +162,8 @@ const defaultReminderSettings: ReminderSettings = {
   quietHours: { start: "22:00", end: "07:00" },
 };
 const reminderSettingsKey = "taskboard-reminder-settings-v1";
+const reminderSettingsStorageKey = (workspaceId: string) =>
+  `${reminderSettingsKey}:${workspaceId}`;
 const browserReminderKey = "taskboard-browser-reminders-v1";
 const savedViewsKey = "taskboard-saved-views-v1";
 const savedViewsStorageKey = (workspaceId: string) => `${savedViewsKey}:${workspaceId}`;
@@ -168,10 +177,16 @@ const safeSetLocalStorage = (key: string, value: string) => {
     return false;
   }
 };
-const readReminderSettings = (): ReminderSettings => {
+const readReminderSettings = (workspaceId = "default"): ReminderSettings => {
   if (typeof window === "undefined") return defaultReminderSettings;
   try {
-    const value = JSON.parse(localStorage.getItem(reminderSettingsKey) || "null");
+    const value = JSON.parse(
+      localStorage.getItem(reminderSettingsStorageKey(workspaceId)) ||
+        (workspaceId === "default"
+          ? localStorage.getItem(reminderSettingsKey)
+          : "null") ||
+        "null",
+    );
     const leadDays = { ...defaultReminderSettings.leadDays };
     reminderLabels.forEach((label) => {
       if (allowedLeadDays.includes(value?.leadDays?.[label])) {
@@ -195,8 +210,11 @@ const readReminderSettings = (): ReminderSettings => {
     return defaultReminderSettings;
   }
 };
-const saveReminderSettings = (settings: ReminderSettings) =>
-  safeSetLocalStorage(reminderSettingsKey, JSON.stringify(settings));
+const saveReminderSettings = (settings: ReminderSettings, workspaceId = "default") =>
+  safeSetLocalStorage(
+    reminderSettingsStorageKey(workspaceId),
+    JSON.stringify(settings),
+  );
 const safeRemoveLocalStorage = (key: string) => {
   try {
     localStorage.removeItem(key);
@@ -335,15 +353,33 @@ export default function Board() {
     [sidebarCollapsed, setSidebarCollapsed] = useState(false),
     [displayName, setDisplayName] = useState("Tuấn"),
     [locale, setLocale] = useState<AppLocale>("vi"),
+    [cloudUserId, setCloudUserId] = useState(""),
     [cloudUserEmail, setCloudUserEmail] = useState(""),
     [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "error">("saved");
-  const { syncState, sync, syncTask } = useBoardSync(data, setData, workspaceId);
+  const {
+    syncState,
+    sync,
+    syncTask,
+    conflict,
+    conflictCount,
+    resolveConflict,
+    dismissConflict,
+  } = useBoardSync(data, setData, workspaceId);
   const cloudConfigured = Boolean(supabase);
   const copy = getUiCopy(locale);
   const currentWorkspaceRole = remoteWorkspaceRoles[workspaceId] || "owner";
   const canEditWorkspace =
     !remoteWorkspaceIds.includes(workspaceId) ||
     can(currentWorkspaceRole, "edit_tasks");
+  useWorkspacePersistence({
+    data,
+    workspaceId,
+    localWorkspaces,
+    ready,
+    persistenceReady,
+    setSaveStatus,
+    onError: setToast,
+  });
   const canManageMembers =
     !remoteWorkspaceIds.includes(workspaceId) ||
     can(currentWorkspaceRole, "manage_members");
@@ -384,9 +420,9 @@ export default function Board() {
     setDark(storedDark);
     setDisplayName(readDisplayName());
     setLocale(readStoredLocale());
-    setReminderSettings(readReminderSettings());
     if (cloudConfigured) {
       void getCurrentUser().then((user) => {
+        setCloudUserId(user?.id || "");
         setCloudUserEmail(user?.email || "");
         if (!user) return;
         void createSupabaseWorkspaceRepository(user.id)
@@ -430,6 +466,9 @@ export default function Board() {
       window.removeEventListener("focus", syncDisplayName);
     };
   }, [cloudConfigured]);
+  useEffect(() => {
+    if (ready) setReminderSettings(readReminderSettings(workspaceId));
+  }, [ready, workspaceId]);
   useEffect(() => {
     if (!ready) return;
     try {
@@ -484,29 +523,6 @@ export default function Board() {
     const timer = setInterval(tick, 15000);
     return () => clearInterval(timer);
   }, [locale]);
-  useEffect(() => {
-    if (!ready || !persistenceReady) return;
-    setSaveStatus("saving");
-    const timer = window.setTimeout(() => {
-      const localResult = localBoardStorage.save(data, workspaceId);
-      const workspaceName =
-        localWorkspaces.find((workspace) => workspace.id === workspaceId)?.name ||
-        "Workspace cá nhân";
-      void indexedDbBoardStorage
-        .save(data, workspaceId, workspaceName)
-        .then((indexedSaved) => {
-          if (localResult.ok || indexedSaved) {
-            setSaveStatus("saved");
-            return;
-          }
-          setSaveStatus("error");
-          setToast(
-            "Không thể lưu local; hãy export backup và kiểm tra dung lượng trình duyệt.",
-          );
-        });
-    }, 180);
-    return () => window.clearTimeout(timer);
-  }, [data, localWorkspaces, persistenceReady, ready, workspaceId]);
   useEffect(() => {
     document.documentElement.dataset.theme = dark ? "dark" : "light";
     safeSetLocalStorage("taskboard-dark", dark ? "1" : "0");
@@ -674,20 +690,17 @@ export default function Board() {
       })),
     [reminderItems],
   );
-  const notifications = useMemo<BoardNotification[]>(
-    () =>
-      reminderItems.slice(0, 8).map((item) => {
-        const overdue = new Date(item.date).getTime() < nowMs;
-        return {
-          id: `${item.task.id}-${item.label}`,
-          title: `${item.label}: ${item.task.title}`,
-          detail: `${item.task.code || "TASK"} · ${dueText(item.date, copy)}`,
-          overdue,
-          read: readNotificationIds.includes(`${item.task.id}-${item.label}`),
-        };
-      }),
-    [copy, nowMs, readNotificationIds, reminderItems],
-  );
+  const notifications = useWorkspaceNotifications({
+    tasks: data.tasks,
+    members: data.members,
+    reminders: reminderItems,
+    cloudUserId,
+    locale,
+    copy,
+    nowMs,
+    readIds: readNotificationIds,
+    dueText,
+  });
   useEffect(() => {
     if (
       !ready ||
@@ -740,7 +753,7 @@ export default function Board() {
   };
   const updateReminderSettings = (next: ReminderSettings) => {
     setReminderSettings(next);
-    if (!saveReminderSettings(next)) {
+    if (!saveReminderSettings(next, workspaceId)) {
       setToast("Không thể lưu cài đặt; hãy kiểm tra quyền lưu của trình duyệt.");
     }
   };
@@ -1050,9 +1063,9 @@ export default function Board() {
     setUndoState(null);
     setToast(`Đã hoàn tác: ${undoState.message}`);
   };
-  const syncRemoteTasks = (tasks: Task[]) => {
+  const syncRemoteTasks = (tasks: Task[], members = data.members) => {
     if (!cloudConfigured || !cloudUserEmail) return;
-    tasks.forEach((task) => void syncTask(task));
+    tasks.forEach((task) => void syncTask(task, "upsert", members));
   };
   const bulkUpdateTasks = (patch: Partial<Task>, message: string) => {
     if (!canEditWorkspace) {
@@ -1231,37 +1244,40 @@ export default function Board() {
           : previous.assignee_ids?.join(",") !== task.assignee_ids?.join(",")
             ? "assigned"
             : "updated";
+    const changedFields = new Set(
+      diffTaskFields(previous, task).map((change) => change.field),
+    );
     const changes = previous
       ? [
-          previous.status !== task.status
+          changedFields.has("status")
             ? {
                 field: "Trạng thái",
                 from: labels[previous.status],
                 to: labels[task.status],
               }
             : null,
-          previous.priority !== task.priority
+          changedFields.has("priority")
             ? {
                 field: "Ưu tiên",
                 from: priorityLabels[previous.priority],
                 to: priorityLabels[task.priority],
               }
             : null,
-          previous.deadline !== task.deadline
+          changedFields.has("deadline")
             ? {
                 field: "Deadline",
                 from: previous.deadline || "Chưa đặt",
                 to: task.deadline || "Chưa đặt",
               }
             : null,
-          previous.assignee_ids?.join(",") !== task.assignee_ids?.join(",")
+          changedFields.has("assignee_ids")
             ? {
                 field: "Người phụ trách",
                 from: String(previous.assignee_ids?.length || 0),
                 to: String(task.assignee_ids?.length || 0),
               }
             : null,
-          (previous.checklist?.length || 0) !== (task.checklist?.length || 0)
+          changedFields.has("checklist")
             ? {
                 field: "Checklist",
                 from: String(previous.checklist?.length || 0),
@@ -1343,6 +1359,14 @@ export default function Board() {
     syncRemoteTasks([nextTask]);
     setToast(`Đã đổi deadline ${task.code || "task"}`);
   };
+  const { addComment: addTaskComment, toggleCommentPin: toggleTaskCommentPin } =
+    useTaskMutations({
+      data,
+      setData,
+      canEdit: canEditWorkspace,
+      syncTasks: syncRemoteTasks,
+      onError: setToast,
+    });
   const quickUpdateStatus = (task: Task) => {
     if (!canEditWorkspace) {
       setToast("Bạn chỉ có quyền xem workspace này.");
@@ -2892,6 +2916,11 @@ export default function Board() {
             );
           }}
           locale={locale}
+          commentAuthorId={
+            data.members.find((member) => member.name === displayName)?.id
+          }
+          onAddComment={addTaskComment}
+          onToggleCommentPin={toggleTaskCommentPin}
           readOnly={!canEditWorkspace}
         />
       )}
@@ -2967,16 +2996,56 @@ export default function Board() {
         />
       )}
       {importPreview && (
-        <ConfirmDialog
-          title="Xác nhận nhập backup?"
-          body={`Backup hợp lệ gồm ${importPreview.tasks.length} task và ${importPreview.members.length} thành viên. Xác nhận sẽ thay thế dữ liệu workspace hiện tại; hãy export bản sao trước nếu cần giữ dữ liệu đang có.`}
+        <ImportDialog
+          current={data}
+          incoming={importPreview}
           onCancel={() => setImportPreview(null)}
-          onConfirm={() => {
+          onReplace={() => {
+            rememberUndo("nhập backup thay thế workspace");
+            const removedTasks = data.tasks.filter(
+              (task) =>
+                !importPreview.tasks.some((incoming) => incoming.id === task.id),
+            );
             setData(importPreview);
             setSortMode(importPreview.sort_mode || "smart");
+            syncRemoteTasks(importPreview.tasks, importPreview.members);
+            removedTasks.forEach((task) => void syncTask(task, "remove"));
             setImportPreview(null);
-            setToast("Đã nhập dữ liệu từ backup");
+            setToast("Đã nhập backup; bạn có thể Hoàn tác trong 10 giây.");
           }}
+          onMerge={(keepIncoming) => {
+            rememberUndo("merge backup vào workspace");
+            const local = data;
+            const incoming = importPreview;
+            const merged = mergeBoardImport(local, incoming, keepIncoming);
+            const changedIds = new Set(
+              incoming.tasks
+                .filter(
+                  (task) =>
+                    !local.tasks.some((current) => current.id === task.id) ||
+                    keepIncoming.has(task.id),
+                )
+                .map((task) => task.id),
+            );
+            setData(merged);
+            setSortMode(merged.sort_mode || "smart");
+            syncRemoteTasks(
+              merged.tasks.filter((task) => changedIds.has(task.id)),
+              merged.members,
+            );
+            setImportPreview(null);
+            setToast("Đã merge backup; các task conflict được xử lý theo lựa chọn.");
+          }}
+        />
+      )}
+      {conflict && (
+        <ConflictDialog
+          local={conflict.local}
+          remote={conflict.remote}
+          message={conflict.message}
+          remainingConflicts={conflictCount}
+          onResolve={resolveConflict}
+          onClose={dismissConflict}
         />
       )}
       {toast && (

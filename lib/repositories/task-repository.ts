@@ -18,6 +18,7 @@ export interface RemoteTaskRepository {
   list(): Promise<Task[]>;
   get(taskId: string): Promise<Task | null>;
   upsert(task: Task, members?: Member[]): Promise<void>;
+  resolveConflict(task: Task, members?: Member[]): Promise<void>;
   remove(taskId: string, expectedUpdatedAt?: string): Promise<void>;
 }
 export type RemoteWorkspace = {
@@ -99,6 +100,7 @@ export const taskToRemoteRow = (task: Task, ownerId: string, workspaceId?: strin
   blocked_by: task.blocked_by || [],
   blocked_from: task.blocked_from || null,
   activity: task.activity || [],
+  comments: task.comments || [],
   primary_links: task.primary_links || [],
   secondary_links: task.secondary_links || [],
   assignee_id:
@@ -159,6 +161,7 @@ export const remoteRowToTask = (
         ? row.blocked_from
         : undefined,
     activity: Array.isArray(row.activity) ? row.activity : [],
+    comments: Array.isArray(row.comments) ? row.comments : [],
     primary_links: Array.isArray(row.primary_links) ? row.primary_links : [],
     secondary_links: Array.isArray(row.secondary_links) ? row.secondary_links : [],
     attachments: Array.isArray(row.attachments) ? row.attachments : [],
@@ -317,7 +320,7 @@ export function createSupabaseWorkspaceRepository(
     async listTaskMembers(workspaceId) {
       const { data, error } = await client
         .from("members")
-        .select("id, owner_id, workspace_id, name, role, color, active")
+        .select("id, user_id, owner_id, workspace_id, name, role, color, active")
         .eq("workspace_id", workspaceId)
         .order("name");
       if (error)
@@ -359,7 +362,9 @@ export function createSupabaseRemoteTaskRepository(
   }
   const client = supabase;
   const scope = remoteTaskScope(ownerId, workspaceId);
-  return {
+  const repository: RemoteTaskRepository & {
+    upsert(task: Task, members?: Member[], force?: boolean): Promise<void>;
+  } = {
     async list() {
       const query = client.from("tasks").select("*").eq(scope.field, scope.value);
       const { data, error } = await query.order("order_index");
@@ -413,7 +418,7 @@ export function createSupabaseRemoteTaskRepository(
         workspaceId,
       );
     },
-    async upsert(task, members) {
+    async upsert(task, members, force = false) {
       const assigneeIds = task.assignee_ids?.length
         ? task.assignee_ids
         : task.assignee_id
@@ -452,6 +457,7 @@ export function createSupabaseRemoteTaskRepository(
           const { error: memberError } = await client.from("members").upsert(
             missingMembers.map((member) => ({
               id: toRemoteEntityId(member.id, ownerId, workspaceId),
+              user_id: member.user_id || null,
               owner_id: ownerId,
               workspace_id: workspaceId || null,
               name: member.name,
@@ -477,6 +483,7 @@ export function createSupabaseRemoteTaskRepository(
       if (currentError)
         throw new Error(`Không thể kiểm tra revision task: ${currentError.message}`);
       if (
+        !force &&
         current?.updated_at &&
         new Date(String(current.updated_at)).getTime() >
           new Date(task.updated_at).getTime()
@@ -495,9 +502,9 @@ export function createSupabaseRemoteTaskRepository(
           .from("tasks")
           .update(row)
           .eq("id", remoteTaskId)
-          .eq("updated_at", current.updated_at)
           .eq(scope.field, scope.value)
           .select("id");
+        if (!force) updateQuery = updateQuery.eq("updated_at", current.updated_at);
         const { data: updated, error } = await updateQuery.maybeSingle();
         if (error) throw new Error(`Không thể lưu task remote: ${error.message}`);
         if (!updated)
@@ -524,6 +531,9 @@ export function createSupabaseRemoteTaskRepository(
         if (assignmentError)
           throw new Error(`Không thể lưu người phụ trách: ${assignmentError.message}`);
       }
+    },
+    async resolveConflict(task, members) {
+      return this.upsert(task, members, true);
     },
     async remove(taskId, expectedUpdatedAt) {
       const remoteTaskId = toRemoteEntityId(taskId, ownerId, workspaceId);
@@ -556,4 +566,5 @@ export function createSupabaseRemoteTaskRepository(
         );
     },
   };
+  return repository;
 }

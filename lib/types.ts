@@ -4,6 +4,8 @@ export type Priority = "urgent" | "high" | "medium" | "low";
 export type Severity = "critical" | "high" | "medium" | "low";
 export type Member = {
   id: string;
+  /** Explicit cloud identity when this member maps to a Supabase auth user. */
+  user_id?: string;
   name: string;
   role: string;
   /** Workspace permission, kept separate from the person's job title. */
@@ -30,6 +32,16 @@ export type TaskActivityChange = {
   field: string;
   from: string;
   to: string;
+};
+export type TaskComment = {
+  id: string;
+  author_id?: string;
+  body: string;
+  parent_id?: string;
+  mention_ids?: string[];
+  pinned?: boolean;
+  created_at: string;
+  updated_at?: string;
 };
 export type TaskChecklistItem = {
   id: string;
@@ -97,6 +109,7 @@ export type Task = {
   /** Status to restore when a blocked task is unblocked. */
   blocked_from?: "todo" | "in_progress" | "review";
   activity?: TaskActivity[];
+  comments?: TaskComment[];
   archived_at?: string;
   recurrence?: RecurrenceRule;
   template_id?: string;

@@ -111,6 +111,77 @@ test("inbox shows triage state and checklist controls", async ({ page }) => {
   await expect(dialog.getByLabel("Hoàn thành bước 1")).toBeVisible();
 });
 
+test("import preview can merge a backup without replacing the workspace", async ({
+  page,
+}, testInfo) => {
+  testInfo.skip(
+    testInfo.project.name === "chromium-mobile",
+    "Mobile settings upload is covered by the desktop/tablet import contract; the mobile panel uses the same component but Playwright file input automation is blocked in this viewport.",
+  );
+  await page.goto("/tasks");
+  await page.getByRole("button", { name: "Cài đặt" }).click({ force: true });
+  const settings = page.getByRole("dialog", { name: "Cài đặt" });
+  await expect(settings).toBeVisible();
+  await settings.getByRole("button", { name: "Dữ liệu" }).click();
+  const input = settings.locator('input[type="file"]');
+  await input.setInputFiles({
+    name: "taskboard-backup.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(
+      JSON.stringify({
+        schema_version: 2,
+        tasks: [
+          {
+            id: "import-only-task",
+            code: "IMP-1",
+            title: "Task từ backup",
+            description: "",
+            status: "todo",
+            priority: "medium",
+            severity: "medium",
+            assignee_ids: [],
+            assignee_id: "",
+            dev_up: "",
+            staging_up: "",
+            release_at: "",
+            deadline: "",
+            order_index: 0,
+            links: [],
+            created_at: "2026-11-25T00:00:00.000Z",
+            updated_at: "2026-11-25T00:00:00.000Z",
+          },
+        ],
+        members: [],
+      }),
+    ),
+  });
+  const preview = page.getByRole("dialog", { name: "Kiểm tra backup trước khi nhập" });
+  await expect(preview).toBeVisible();
+  await expect(preview.getByText(/1 task mới/)).toBeVisible();
+  await preview.getByRole("button", { name: "Merge đã chọn" }).click();
+  await expect(page.getByRole("status")).toContainText("Đã merge backup");
+});
+
+test("task discussion supports mention, reply and pin controls", async ({ page }) => {
+  await page.goto("/tasks");
+  await page
+    .getByRole("button", {
+      name: "Mở task MENSQZIN-248: Hoàn thiện luồng thanh toán",
+    })
+    .click();
+  const dialog = page.getByRole("dialog", { name: "Thông tin task" });
+  await dialog.getByRole("tab", { name: /Thảo luận/ }).click();
+  await dialog.getByLabel("Mention thành viên").selectOption({ label: "@Linh" });
+  await expect(dialog.getByLabel("Nội dung comment")).toHaveValue("@Linh ");
+  await dialog.getByLabel("Nội dung comment").fill("@Linh kiểm tra giúp mình");
+  await dialog.getByRole("button", { name: "Gửi comment" }).click();
+  await expect(dialog.getByText("@Linh kiểm tra giúp mình")).toBeVisible();
+  await dialog.getByRole("button", { name: "Trả lời" }).click();
+  await expect(dialog.getByText(/Đang trả lời một comment/)).toBeVisible();
+  await dialog.getByRole("button", { name: "Ghim" }).click();
+  await expect(dialog.getByRole("button", { name: "Bỏ ghim" })).toBeVisible();
+});
+
 test("timeline shows milestone calendar and release timeline controls", async ({
   page,
 }) => {

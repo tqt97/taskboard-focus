@@ -12,6 +12,27 @@ test("accepts a valid legacy backup and normalizes assignee_id", () => {
   assert.equal(result.data.tasks[0].assignee_id, "m1");
 });
 
+test("accepts task comments with mentions and reply relationship", () => {
+  const payload = fixture();
+  payload.tasks[0].comments = [
+    {
+      id: "comment-1",
+      author_id: "m1",
+      body: "@Linh kiểm tra giúp mình",
+      mention_ids: ["m2"],
+      parent_id: undefined,
+      pinned: true,
+      created_at: "2026-11-25T08:34:00.000Z",
+    },
+  ];
+
+  const result = parseBoardDataWithError(payload);
+
+  assert.ok(result.data);
+  assert.equal(result.data.tasks[0].comments?.[0].mention_ids?.[0], "m2");
+  assert.equal(result.data.tasks[0].comments?.[0].pinned, true);
+});
+
 test("rejects a non-object backup with a useful error", () => {
   const result = parseBoardDataWithError(null);
 
