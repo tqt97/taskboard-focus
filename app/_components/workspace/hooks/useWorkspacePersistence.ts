@@ -39,7 +39,9 @@ export function useWorkspacePersistence({
             backupFailureNotified.current = false;
           } else if (!backupFailureNotified.current) {
             backupFailureNotified.current = true;
-            onError("Workspace đã lưu, nhưng chưa tạo được bản sao tự động. Hãy xuất JSON.");
+            onError(
+              "Workspace đã lưu, nhưng chưa tạo được bản sao tự động. Hãy xuất JSON.",
+            );
           }
         });
       const workspaceName =
