@@ -1,6 +1,7 @@
 "use client";
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import {
   Activity,
   AlertTriangle,
@@ -9,13 +10,14 @@ import {
   CalendarDays,
   Check,
   CheckCheck,
+  CloudDownload,
+  CloudUpload,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   Clock3,
   Copy,
   Download,
-  FileUp,
   Filter,
   LayoutDashboard,
   ListTodo,
@@ -25,22 +27,14 @@ import {
   Menu,
   Plus,
   Search,
-  Send,
   Settings2,
   Sun,
-  Trash2,
   Users,
   X,
   Link2,
   ListFilter,
 } from "lucide-react";
-import {
-  demoData,
-  maxBackupBytes,
-  parseBoardDataWithError,
-  readLocal,
-  writeLocal,
-} from "@/lib/data";
+import { demoData, maxBackupBytes, parseBoardDataWithError } from "@/lib/data";
 import type {
   BoardData,
   Member,
@@ -51,22 +45,50 @@ import type {
   Status,
   Task,
   TaskActivity,
+  TaskTemplate,
 } from "@/lib/types";
-import { TaskModal as StructuredTaskModal } from "./TaskModal";
 import { NotificationPopover, type BoardNotification } from "./NotificationPopover";
+import type { ReminderSettings } from "./WorkspaceDialogs";
+import { getTodayTasks, isArchived, isDueToday } from "@/lib/taskboard/selectors";
+import { toDateInputValue } from "@/lib/taskboard/dates";
+import {
+  getUiCopy,
+  intlLocale,
+  readStoredLocale,
+  writeStoredLocale,
+  type AppLocale,
+} from "@/lib/i18n";
+import { localBoardStorage } from "@/lib/storage/board-storage";
+import { localTemplateStorage } from "@/lib/storage/template-storage";
+import { useBoardSync } from "@/lib/taskboard/use-board-sync";
+import {
+  createTaskFromTemplate,
+  createTemplateFromTask,
+} from "@/lib/taskboard/templates";
+import { TaskBoardColumns } from "./TaskBoardColumns";
+import { getCurrentUser } from "@/lib/auth";
+import { uploadTaskAttachment } from "@/lib/storage/attachment-storage";
 
-const labels: Record<Status, string> = {
-  todo: "Chưa làm",
-  in_progress: "Đang làm",
-  blocked: "Đang review",
-  done: "Hoàn tất",
-};
-const priorityLabels: Record<Priority, string> = {
-  urgent: "Khẩn cấp",
-  high: "Cao",
-  medium: "Vừa",
-  low: "Thấp",
-};
+const StructuredTaskModal = dynamic(
+  () => import("./TaskModal").then((module) => module.TaskModal),
+  {
+    ssr: false,
+    loading: () => <div className="overlay" aria-label="Đang mở biểu mẫu" />,
+  },
+);
+const SettingsModal = dynamic(
+  () => import("./WorkspaceDialogs").then((module) => module.SettingsModal),
+  { ssr: false },
+);
+const ConfirmDialog = dynamic(
+  () => import("./WorkspaceDialogs").then((module) => module.ConfirmDialog),
+  { ssr: false },
+);
+const LockModal = dynamic(
+  () => import("./WorkspaceDialogs").then((module) => module.LockModal),
+  { ssr: false },
+);
+
 const priorityRank: Record<Priority, number> = {
   urgent: 0,
   high: 1,
@@ -89,10 +111,6 @@ const milestoneDefinitions = [
 ] as const satisfies ReadonlyArray<readonly [ReminderLabel, keyof Task]>;
 const taskMilestones = (task: Task) =>
   milestoneDefinitions.map(([label, key]) => ({ task, label, date: task[key] }));
-type ReminderSettings = {
-  browserEnabled: boolean;
-  leadDays: Record<ReminderLabel, number>;
-};
 const defaultReminderSettings: ReminderSettings = {
   browserEnabled: false,
   leadDays: { Deadline: 3, "Dev up": 1, "Staging up": 1, Release: 1 },
@@ -161,8 +179,6 @@ const emptyTask = (prefix = "MENSQZIN-"): Task => ({
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
 });
-const dateOnly = (s: string) => (s ? new Date(s).toISOString().slice(0, 10) : "");
-const stamp = (s: string) => (s ? new Date(s).toISOString() : "");
 const taskAssigneeIds = (task: Task) =>
   task.assignee_ids?.length
     ? task.assignee_ids
@@ -181,16 +197,16 @@ const readDisplayName = () => {
     return "Tuấn";
   }
 };
-function dueText(s: string) {
-  if (!s) return "Chưa đặt";
+function dueText(s: string, copy: ReturnType<typeof getUiCopy>) {
+  if (!s) return copy.due.unset;
   const days = Math.ceil(
     (new Date(s).setHours(0, 0, 0, 0) - new Date().setHours(0, 0, 0, 0)) / 86400000,
   );
   return days < 0
-    ? `Quá hạn ${Math.abs(days)} ngày`
+    ? copy.due.overdue(Math.abs(days))
     : days === 0
-      ? "Hôm nay"
-      : `Còn ${days} ngày`;
+      ? copy.due.today
+      : copy.due.remaining(days);
 }
 function dueState(s: string) {
   if (!s) return "";
@@ -199,26 +215,22 @@ function dueState(s: string) {
   );
   return days < 0 ? "overdue" : days <= 3 ? "soon" : "";
 }
-function formatDate(s: string) {
+function formatDate(s: string, locale: AppLocale) {
   return s
-    ? new Intl.DateTimeFormat("vi-VN", {
+    ? new Intl.DateTimeFormat(intlLocale[locale], {
         day: "2-digit",
         month: "short",
       }).format(new Date(s))
     : "—";
 }
-function initial(): BoardData {
-  return readLocal();
-}
-function greetingForHour(hour: number) {
-  if (hour < 12) return "Chào buổi sáng";
-  if (hour < 18) return "Chào buổi chiều";
-  return "Chào buổi tối";
-}
 export default function Board() {
   const router = useRouter(),
     pathname = usePathname(),
-    view = pathname.startsWith("/tasks") ? "tasks" : "overview";
+    view = pathname.startsWith("/tasks")
+      ? "tasks"
+      : pathname.startsWith("/today")
+        ? "today"
+        : "overview";
   const [data, setData] = useState<BoardData>(demoData),
     [now, setNow] = useState(new Date()),
     [ready, setReady] = useState(false),
@@ -227,6 +239,7 @@ export default function Board() {
     [priorityFilter, setPriorityFilter] = useState("all"),
     [assigneeFilter, setAssigneeFilter] = useState("all"),
     [dueFilter, setDueFilter] = useState("all"),
+    [archiveFilter, setArchiveFilter] = useState<"active" | "archived">("active"),
     [modal, setModal] = useState<"task" | "settings" | "lock" | null>(null),
     [edit, setEdit] = useState<Task | null>(null),
     [confirm, setConfirm] = useState<string | null>(null),
@@ -242,6 +255,8 @@ export default function Board() {
     [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false),
     [mobileMenuOpen, setMobileMenuOpen] = useState(false),
     [savedViews, setSavedViews] = useState<SavedView[]>([]),
+    [templates, setTemplates] = useState<TaskTemplate[]>([]),
+    [templateCreateMode, setTemplateCreateMode] = useState(false),
     [undoState, setUndoState] = useState<{ data: BoardData; message: string } | null>(
       null,
     ),
@@ -256,12 +271,29 @@ export default function Board() {
       NotificationPermission | "unsupported"
     >("default"),
     [sidebarCollapsed, setSidebarCollapsed] = useState(false),
-    [displayName, setDisplayName] = useState("Tuấn");
-  const greeting = greetingForHour(now.getHours());
+    [displayName, setDisplayName] = useState("Tuấn"),
+    [locale, setLocale] = useState<AppLocale>("vi"),
+    [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "error">("saved");
+  const { syncState, sync } = useBoardSync(data, setData);
+  const copy = getUiCopy(locale);
+  const labels = copy.status;
+  const priorityLabels = copy.priority;
+  const greeting =
+    now.getHours() < 12
+      ? copy.greeting.morning
+      : now.getHours() < 18
+        ? copy.greeting.afternoon
+        : copy.greeting.evening;
   useEffect(() => {
-    const saved = initial();
+    const loaded = localBoardStorage.loadWithError();
+    const saved = loaded.data;
     setData(saved);
     setSortMode(saved.sort_mode || "smart");
+    if (loaded.error) {
+      setToast(
+        `${loaded.error} Hãy export backup nếu bạn còn bản dữ liệu cũ trước khi tiếp tục.`,
+      );
+    }
     setAdvancedFiltersOpen(window.innerWidth > wideWorkspaceBreakpoint);
     setReady(true);
     let storedDark = false;
@@ -270,7 +302,9 @@ export default function Board() {
     } catch {}
     setDark(storedDark);
     setDisplayName(readDisplayName());
+    setLocale(readStoredLocale());
     setReminderSettings(readReminderSettings());
+    setTemplates(localTemplateStorage.load());
     try {
       const storedViews = JSON.parse(localStorage.getItem(savedViewsKey) || "[]");
       setSavedViews(
@@ -301,33 +335,47 @@ export default function Board() {
       );
       setReadNotificationIds(Array.isArray(storedRead) ? storedRead : []);
     } catch {}
+    return () => {
+      window.removeEventListener("storage", syncDisplayName);
+      window.removeEventListener("focus", syncDisplayName);
+    };
+  }, []);
+  useEffect(() => {
+    document.documentElement.lang = locale;
+    writeStoredLocale(locale);
+  }, [locale]);
+  useEffect(() => {
     const tick = () => {
-      setNow(new Date());
+      const current = new Date();
+      setNow(current);
       setClock(
-        new Intl.DateTimeFormat("vi-VN", {
+        new Intl.DateTimeFormat(intlLocale[locale], {
           weekday: "long",
           day: "numeric",
           month: "long",
           year: "numeric",
           hour: "2-digit",
           minute: "2-digit",
-        }).format(new Date()),
+        }).format(current),
       );
     };
     tick();
     const timer = setInterval(tick, 15000);
-    return () => {
-      clearInterval(timer);
-      window.removeEventListener("storage", syncDisplayName);
-      window.removeEventListener("focus", syncDisplayName);
-    };
-  }, []);
+    return () => clearInterval(timer);
+  }, [locale]);
   useEffect(() => {
-    if (ready && !writeLocal(data)) {
-      setToast(
-        "Không thể lưu local; hãy export backup và kiểm tra dung lượng trình duyệt.",
-      );
-    }
+    if (!ready) return;
+    setSaveStatus("saving");
+    const timer = window.setTimeout(() => {
+      if (localBoardStorage.save(data).ok) setSaveStatus("saved");
+      else {
+        setSaveStatus("error");
+        setToast(
+          "Không thể lưu local; hãy export backup và kiểm tra dung lượng trình duyệt.",
+        );
+      }
+    }, 180);
+    return () => window.clearTimeout(timer);
   }, [data, ready]);
   useEffect(() => {
     document.documentElement.dataset.theme = dark ? "dark" : "light";
@@ -416,6 +464,7 @@ export default function Board() {
     () =>
       sorted.filter(
         (t) =>
+          (archiveFilter === "active" ? !isArchived(t) : isArchived(t)) &&
           (statusFilter === "all" || t.status === statusFilter) &&
           (priorityFilter === "all" || t.priority === priorityFilter) &&
           (assigneeFilter === "all" ||
@@ -424,7 +473,7 @@ export default function Board() {
               : taskAssigneeIds(t).includes(assigneeFilter))) &&
           (dueFilter === "all" ||
             (dueFilter === "overdue" && dueState(t.deadline) === "overdue") ||
-            (dueFilter === "today" && dueText(t.deadline) === "Hôm nay") ||
+            (dueFilter === "today" && isDueToday(t, now)) ||
             (dueFilter === "week" &&
               Boolean(t.deadline) &&
               new Date(t.deadline).getTime() - nowMs >= 0 &&
@@ -439,6 +488,7 @@ export default function Board() {
       priorityFilter,
       assigneeFilter,
       dueFilter,
+      archiveFilter,
       deferredSearch,
       nowMs,
     ],
@@ -459,9 +509,10 @@ export default function Board() {
     [filtered, focusMode],
   );
   const active = useMemo(
-    () => data.tasks.filter((t) => t.status !== "done"),
+    () => data.tasks.filter((t) => t.status !== "done" && !isArchived(t)),
     [data.tasks],
   );
+  const todayTasks = useMemo(() => getTodayTasks(data.tasks, now), [data.tasks, now]);
   const isInReminderWindow = (date: string, label: ReminderLabel) => {
     const diff = new Date(date).getTime() - nowMs;
     return diff >= -86400000 && diff <= reminderSettings.leadDays[label] * 86400000;
@@ -489,12 +540,12 @@ export default function Board() {
         return {
           id: `${item.task.id}-${item.label}`,
           title: `${item.label}: ${item.task.title}`,
-          detail: `${item.task.code || "TASK"} · ${dueText(item.date)}`,
+          detail: `${item.task.code || "TASK"} · ${dueText(item.date, copy)}`,
           overdue,
           read: readNotificationIds.includes(`${item.task.id}-${item.label}`),
         };
       }),
-    [nowMs, readNotificationIds, reminderItems],
+    [copy, nowMs, readNotificationIds, reminderItems],
   );
   useEffect(() => {
     if (!ready || !reminderSettings.browserEnabled || browserPermission !== "granted")
@@ -515,7 +566,7 @@ export default function Board() {
         if (nextSent.includes(id)) return;
         try {
           new Notification(`${label}: ${task.title}`, {
-            body: `${task.code || "TASK"} · ${dueText(date)}`,
+            body: `${task.code || "TASK"} · ${dueText(date, copy)}`,
             tag: id,
           });
           nextSent.push(id);
@@ -527,7 +578,7 @@ export default function Board() {
     if (nextSent.length !== sent.length) {
       safeSetLocalStorage(browserReminderKey, JSON.stringify(nextSent.slice(-200)));
     }
-  }, [active, browserPermission, nowMs, ready, reminderSettings]);
+  }, [active, browserPermission, copy, nowMs, ready, reminderSettings]);
   const unreadNotificationCount = notifications.filter((item) => !item.read).length;
   const markNotificationRead = (id: string) => {
     setReadNotificationIds((ids) => {
@@ -578,6 +629,7 @@ export default function Board() {
       assignee: assigneeFilter,
       due: dueFilter,
       focus: focusMode,
+      archive: archiveFilter,
     };
     const nextViews = [...savedViews, view].slice(-12);
     setSavedViews(nextViews);
@@ -595,6 +647,7 @@ export default function Board() {
     setPriorityFilter(view.priority);
     setAssigneeFilter(view.assignee);
     setDueFilter(view.due);
+    setArchiveFilter(view.archive || "active");
     setFocusMode(view.focus);
     setAdvancedFiltersOpen(view.assignee !== "all" || view.due !== "all");
   };
@@ -724,10 +777,13 @@ export default function Board() {
     [active, data.members, nowMs],
   );
   const saveTask = (task: Task) => {
-    rememberUndo(edit ? "cập nhật task" : "tạo task");
+    rememberUndo(edit && !templateCreateMode ? "cập nhật task" : "tạo task");
     const timestamp = new Date().toISOString();
     setData((d) => {
-      const previous = edit ? d.tasks.find((item) => item.id === task.id) : undefined;
+      const previous =
+        edit && !templateCreateMode
+          ? d.tasks.find((item) => item.id === task.id)
+          : undefined;
       const activityType: TaskActivity["type"] = !previous
         ? "created"
         : previous.status !== task.status
@@ -760,21 +816,92 @@ export default function Board() {
         ...d,
         code_prefix: d.code_prefix || "MENSQZIN-",
         sort_mode: d.sort_mode || sortMode,
-        tasks: edit
-          ? d.tasks.map((item) => (item.id === task.id ? nextTask : item))
-          : [{ ...nextTask, order_index: d.tasks.length }, ...d.tasks],
+        tasks:
+          edit && !templateCreateMode
+            ? d.tasks.map((item) => (item.id === task.id ? nextTask : item))
+            : [{ ...nextTask, order_index: d.tasks.length }, ...d.tasks],
       };
     });
     setModal(null);
     setEdit(null);
-    setToast(edit ? "Đã cập nhật task" : "Đã tạo task");
+    setTemplateCreateMode(false);
+    setToast(edit && !templateCreateMode ? "Đã cập nhật task" : "Đã tạo task");
   };
   const removeTask = (id: string) => {
-    rememberUndo("xóa task");
-    setData((d) => ({ ...d, tasks: d.tasks.filter((t) => t.id !== id) }));
+    rememberUndo("lưu trữ task");
+    const timestamp = new Date().toISOString();
+    setData((d) => ({
+      ...d,
+      tasks: d.tasks.map((task) =>
+        task.id === id
+          ? {
+              ...task,
+              archived_at: timestamp,
+              updated_at: timestamp,
+              activity: [
+                ...(task.activity || []),
+                {
+                  id: crypto.randomUUID(),
+                  type: "updated" as const,
+                  at: timestamp,
+                  summary: "Đã lưu trữ task",
+                },
+              ],
+            }
+          : task,
+      ),
+    }));
     setConfirm(null);
     setModal(null);
-    setToast("Đã xóa task");
+    setToast("Đã lưu trữ task");
+  };
+  const saveTemplateFromTask = (task: Task) => {
+    const name = window.prompt("Tên template", task.title.slice(0, 80));
+    if (!name?.trim()) return;
+    const next = [...templates, createTemplateFromTask(task, name)].slice(-50);
+    if (!localTemplateStorage.save(next)) {
+      setToast("Không thể lưu template vào trình duyệt.");
+      return;
+    }
+    setTemplates(next);
+    setToast("Đã lưu template");
+  };
+  const uploadAttachment = async (file: File) => {
+    try {
+      const user = await getCurrentUser();
+      if (!user) throw new Error("Hãy đăng nhập Supabase để upload file.");
+      return await uploadTaskAttachment(file, user.id);
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "Upload file thất bại.");
+      return null;
+    }
+  };
+  const restoreTask = (id: string) => {
+    rememberUndo("khôi phục task");
+    const timestamp = new Date().toISOString();
+    setData((d) => ({
+      ...d,
+      tasks: d.tasks.map((task) =>
+        task.id === id
+          ? {
+              ...task,
+              archived_at: undefined,
+              updated_at: timestamp,
+              activity: [
+                ...(task.activity || []),
+                {
+                  id: crypto.randomUUID(),
+                  type: "updated" as const,
+                  at: timestamp,
+                  summary: "Đã khôi phục task",
+                },
+              ],
+            }
+          : task,
+      ),
+    }));
+    setModal(null);
+    setToast("Đã khôi phục task");
   };
   const reorder = (target: string) => {
     if (!dragId || dragId === target) return;
@@ -860,7 +987,7 @@ export default function Board() {
     );
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `taskboard-backup-${dateOnly(new Date().toISOString())}.json`;
+    a.download = `taskboard-backup-${toDateInputValue(new Date().toISOString())}.json`;
     a.click();
     URL.revokeObjectURL(a.href);
     setToast("Đã xuất bản sao dữ liệu");
@@ -1023,7 +1150,7 @@ export default function Board() {
         </span>
         <span className={`due ${dueState(t.deadline)}`}>
           <CalendarDays size={13} />
-          {t.deadline ? dueText(t.deadline) : "Chưa hạn"}
+          {t.deadline ? dueText(t.deadline, copy) : copy.due.unset}
         </span>
       </div>
     </article>
@@ -1066,6 +1193,13 @@ export default function Board() {
             <ListTodo size={18} />
             Danh sách task<span className="nav-count">{active.length}</span>
           </button>
+          <button
+            className={view === "today" ? "nav-item active" : "nav-item"}
+            onClick={() => router.push("/today")}
+          >
+            <CalendarDays size={18} />
+            Hôm nay<span className="nav-count">{todayTasks.length}</span>
+          </button>
         </nav>
         <div className="sidebar-bottom">
           <div className="profile">
@@ -1102,7 +1236,11 @@ export default function Board() {
           </div>
           <div className="breadcrumbs">
             Workspace <span>/</span>{" "}
-            {view === "overview" ? "Tổng quan" : "Danh sách task"}
+            {view === "overview"
+              ? "Tổng quan"
+              : view === "today"
+                ? "Hôm nay"
+                : "Danh sách task"}
           </div>
           <div className="top-actions">
             <button
@@ -1150,6 +1288,16 @@ export default function Board() {
                     <ListTodo size={17} /> Danh sách task
                     <span>{active.length}</span>
                   </button>
+                  <button
+                    className={view === "today" ? "active" : ""}
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      router.push("/today");
+                    }}
+                  >
+                    <CalendarDays size={17} /> Hôm nay
+                    <span>{todayTasks.length}</span>
+                  </button>
                 </nav>
               </>
             )}
@@ -1157,6 +1305,44 @@ export default function Board() {
               <span className="live-dot" />
               {clock}
             </div>
+            <span className={`autosave-status ${saveStatus}`} aria-live="polite">
+              {saveStatus === "saving"
+                ? "Đang lưu"
+                : saveStatus === "error"
+                  ? "Lỗi lưu"
+                  : "Đã lưu"}
+            </span>
+            <span
+              className={`sync-status sync-${syncState.status}`}
+              title={syncState.status === "error" ? syncState.message : undefined}
+              aria-live="polite"
+            >
+              {syncState.status === "syncing"
+                ? "Đang sync"
+                : syncState.status === "synced"
+                  ? "Cloud đã sync"
+                  : syncState.status === "error"
+                    ? "Sync lỗi"
+                    : "Local"}
+            </span>
+            <button
+              className="icon-button"
+              aria-label="Đẩy workspace lên cloud"
+              title="Đẩy workspace lên cloud"
+              onClick={() => void sync("push")}
+              disabled={syncState.status === "syncing"}
+            >
+              <CloudUpload size={17} />
+            </button>
+            <button
+              className="icon-button"
+              aria-label="Tải workspace từ cloud"
+              title="Tải workspace từ cloud"
+              onClick={() => void sync("pull")}
+              disabled={syncState.status === "syncing"}
+            >
+              <CloudDownload size={17} />
+            </button>
             <button
               className="icon-button"
               aria-label="Tải dữ liệu"
@@ -1220,6 +1406,8 @@ export default function Board() {
                   <>
                     {greeting}, <span className="display-name">{displayName}</span>
                   </>
+                ) : view === "today" ? (
+                  "Hôm nay"
                 ) : (
                   "Danh sách task"
                 )}{" "}
@@ -1228,19 +1416,53 @@ export default function Board() {
               <p>
                 {view === "overview"
                   ? "Một cái nhìn nhanh về tiến độ, rủi ro và các mốc sắp tới."
-                  : "Tìm, lọc, tạo và cập nhật mọi task trong workspace."}
+                  : view === "today"
+                    ? "Các việc quá hạn, đến hạn hôm nay và ưu tiên khẩn cần được xử lý trước."
+                    : "Tìm, lọc, tạo và cập nhật mọi task trong workspace."}
               </p>
             </div>
-            {view === "tasks" && (
-              <button
-                className="primary-button"
-                onClick={() => {
-                  setEdit(null);
-                  setModal("task");
-                }}
-              >
-                <Plus size={17} /> Tạo task
-              </button>
+            {(view === "tasks" || view === "today") && (
+              <div className="page-actions">
+                {templates.length > 0 && (
+                  <select
+                    className="template-select"
+                    aria-label="Tạo task từ template"
+                    defaultValue=""
+                    onChange={(event) => {
+                      const template = templates.find(
+                        (item) => item.id === event.target.value,
+                      );
+                      event.currentTarget.value = "";
+                      if (!template) return;
+                      setTemplateCreateMode(true);
+                      setEdit(
+                        createTaskFromTemplate(
+                          template,
+                          `${data.code_prefix || "MENSQZIN-"}NEW`,
+                        ),
+                      );
+                      setModal("task");
+                    }}
+                  >
+                    <option value="">Template</option>
+                    {templates.map((template) => (
+                      <option key={template.id} value={template.id}>
+                        {template.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <button
+                  className="primary-button"
+                  onClick={() => {
+                    setTemplateCreateMode(false);
+                    setEdit(null);
+                    setModal("task");
+                  }}
+                >
+                  <Plus size={17} /> Tạo task
+                </button>
+              </div>
             )}
           </div>
           {view === "overview" && (
@@ -1424,7 +1646,7 @@ export default function Board() {
                             </b>
                             <small>
                               {labels[t.status]} ·{" "}
-                              {t.deadline ? dueText(t.deadline) : "Chưa đặt hạn"}
+                              {t.deadline ? dueText(t.deadline, copy) : copy.due.unset}
                             </small>
                           </span>
                           <ChevronDown size={15} />
@@ -1472,17 +1694,23 @@ export default function Board() {
               </div>
             </>
           )}
-          <div className={view === "tasks" ? "tasks-layout" : "overview-layout"}>
-            {view === "tasks" && (
+          <div
+            className={
+              view === "tasks" || view === "today" ? "tasks-layout" : "overview-layout"
+            }
+          >
+            {(view === "tasks" || view === "today") && (
               <section className="tasks-panel panel">
                 <div className="panel-heading">
                   <div>
                     <h2>Ưu tiên công việc</h2>
                     <p>
-                      {visibleTasks.length} task
-                      {focusMode
-                        ? " cần tập trung"
-                        : " · trạng thái đi từ trái sang phải"}
+                      {(view === "today" ? todayTasks : visibleTasks).length} task
+                      {view === "today"
+                        ? " cần xử lý hôm nay"
+                        : focusMode
+                          ? " cần tập trung"
+                          : " · trạng thái đi từ trái sang phải"}
                     </p>
                   </div>
                   <div className="task-panel-actions">
@@ -1590,6 +1818,18 @@ export default function Board() {
                   </button>
                   {advancedFiltersOpen && (
                     <>
+                      <label className="select-wrap advanced-filter">
+                        <select
+                          value={archiveFilter}
+                          onChange={(e) =>
+                            setArchiveFilter(e.target.value as "active" | "archived")
+                          }
+                        >
+                          <option value="active">Đang hoạt động</option>
+                          <option value="archived">Đã lưu trữ</option>
+                        </select>
+                        <ChevronDown size={13} />
+                      </label>
                       <label className="select-wrap advanced-filter">
                         <select
                           value={assigneeFilter}
@@ -1703,39 +1943,11 @@ export default function Board() {
                     </span>
                   </div>
                 </div>
-                <div className="kanban-board">
-                  {visibleTasks.length ? (
-                    Object.entries(labels).map(([status, label]) => (
-                      <section
-                        className="kanban-column"
-                        key={status}
-                        onDragOver={(e) => e.preventDefault()}
-                        onDrop={() => dropOnStatus(status as Status)}
-                      >
-                        <header>
-                          <span className={`status status-${status}`}>
-                            <i />
-                            {label}
-                          </span>
-                          <b>
-                            {visibleTasks.filter((t) => t.status === status).length}
-                          </b>
-                        </header>
-                        <div className="kanban-cards">
-                          {visibleTasks
-                            .filter((t) => t.status === status)
-                            .map(taskCard)}
-                        </div>
-                      </section>
-                    ))
-                  ) : (
-                    <div className="empty-state">
-                      <ListTodo size={28} />
-                      <b>Chưa tìm thấy task</b>
-                      <span>Thử đổi bộ lọc hoặc tạo công việc mới.</span>
-                    </div>
-                  )}
-                </div>
+                <TaskBoardColumns
+                  tasks={view === "today" ? todayTasks : visibleTasks}
+                  taskCard={taskCard}
+                  onDropStatus={dropOnStatus}
+                />
               </section>
             )}
             {view === "overview" && (
@@ -1780,11 +1992,11 @@ export default function Board() {
                                     <div className="timeline-title">
                                       <b>{item.task.code || "TASK"}</b>
                                       <span className={dueState(item.date)}>
-                                        {dueText(item.date)}
+                                        {dueText(item.date, copy)}
                                       </span>
                                     </div>
                                     <p>{item.task.title}</p>
-                                    <small>{formatDate(item.date)}</small>
+                                    <small>{formatDate(item.date, locale)}</small>
                                   </div>
                                 </div>
                               ))}
@@ -1875,14 +2087,19 @@ export default function Board() {
           tasks={data.tasks}
           prefix={data.code_prefix || "MENSQZIN-"}
           members={data.members}
-          isNew={!edit}
+          isNew={!edit || templateCreateMode}
           onClose={() => {
             setModal(null);
             setEdit(null);
+            setTemplateCreateMode(false);
           }}
           onSave={saveTask}
           onPrefixChange={(prefix) => setData((d) => ({ ...d, code_prefix: prefix }))}
           onDelete={() => setConfirm("delete")}
+          onRestore={() => restoreTask(edit?.id || "")}
+          onSaveTemplate={() => edit && saveTemplateFromTask(edit)}
+          onUploadAttachment={uploadAttachment}
+          locale={locale}
         />
       )}
       {modal === "settings" && (
@@ -1914,6 +2131,8 @@ export default function Board() {
           onReminderSettings={updateReminderSettings}
           onRequestBrowserNotifications={requestBrowserNotifications}
           onToast={setToast}
+          locale={locale}
+          onLocaleChange={setLocale}
         />
       )}
       {modal === "lock" && (
@@ -1921,10 +2140,12 @@ export default function Board() {
       )}
       {confirm && (
         <ConfirmDialog
-          title={confirm === "delete" ? "Xóa task này?" : "Xóa toàn bộ dữ liệu local?"}
+          title={
+            confirm === "delete" ? "Lưu trữ task này?" : "Xóa toàn bộ dữ liệu local?"
+          }
           body={
             confirm === "delete"
-              ? "Task sẽ bị xóa khỏi workspace hiện tại. Hành động này không thể hoàn tác."
+              ? "Task sẽ được đưa vào kho lưu trữ và có thể khôi phục lại sau."
               : "Dữ liệu lưu trên trình duyệt này sẽ bị xóa. Hãy xuất bản sao trước nếu cần."
           }
           onCancel={() => setConfirm(null)}
@@ -1949,521 +2170,5 @@ export default function Board() {
         </div>
       )}
     </main>
-  );
-}
-function SettingsModal({
-  data,
-  tab,
-  setTab,
-  onMember,
-  onClose,
-  onExport,
-  onImport,
-  onClear,
-  displayName,
-  onDisplayName,
-  reminderSettings,
-  browserPermission,
-  onReminderSettings,
-  onRequestBrowserNotifications,
-  onToast,
-}: {
-  data: BoardData;
-  tab: string;
-  setTab: (s: string) => void;
-  onMember: (m: Member) => void;
-  onClose: () => void;
-  onExport: () => void;
-  onImport: (f?: File) => void;
-  onClear: () => void;
-  displayName: string;
-  onDisplayName: (name: string) => void;
-  reminderSettings: ReminderSettings;
-  browserPermission: NotificationPermission | "unsupported";
-  onReminderSettings: (settings: ReminderSettings) => void;
-  onRequestBrowserNotifications: () => Promise<boolean>;
-  onToast: (message: string) => void;
-}) {
-  const [newName, setNewName] = useState(""),
-    [newRole, setNewRole] = useState("Developer"),
-    [room, setRoom] = useState(() =>
-      (() => {
-        try {
-          return typeof window === "undefined"
-            ? ""
-            : localStorage.getItem("taskboard-chatwork-room-id-v1") || "";
-        } catch {
-          return "";
-        }
-      })(),
-    ),
-    [chatworkTestState, setChatworkTestState] = useState<
-      "idle" | "sending" | "success" | "error"
-    >("idle"),
-    [passcode, setPasscode] = useState(() =>
-      (() => {
-        try {
-          return typeof window === "undefined"
-            ? ""
-            : localStorage.getItem("taskboard-lock-passcode-v1") || "";
-        } catch {
-          return "";
-        }
-      })(),
-    );
-  return (
-    <div
-      className="overlay"
-      onMouseDown={(e) => e.target === e.currentTarget && onClose()}
-    >
-      <section
-        className="modal settings-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="settings-modal-title"
-      >
-        <header className="modal-header">
-          <div>
-            <span className="eyebrow">WORKSPACE</span>
-            <h2 id="settings-modal-title">Cài đặt</h2>
-          </div>
-          <button className="icon-button" onClick={onClose}>
-            <X size={19} />
-          </button>
-        </header>
-        <div className="settings-tabs">
-          {[
-            ["members", "Đội ngũ"],
-            ["notifications", "Thông báo"],
-            ["integrations", "Tích hợp"],
-            ["data", "Dữ liệu"],
-            ["appearance", "Giao diện"],
-          ].map(([k, v]) => (
-            <button
-              className={tab === k ? "selected" : ""}
-              key={k}
-              onClick={() => setTab(k)}
-            >
-              {v}
-            </button>
-          ))}
-        </div>
-        <div className="settings-content">
-          {tab === "members" && (
-            <>
-              <div className="setting-intro">
-                <h3>Thành viên nhóm</h3>
-                <p>Danh sách này dùng để gán người phụ trách task.</p>
-              </div>
-              {data.members.map((m) => (
-                <div className="setting-member" key={m.id}>
-                  <span className={`avatar avatar-${m.color}`}>
-                    {m.name.slice(0, 1)}
-                  </span>
-                  <input
-                    value={m.name}
-                    onChange={(e) => onMember({ ...m, name: e.target.value })}
-                  />
-                  <input
-                    value={m.role}
-                    onChange={(e) => onMember({ ...m, role: e.target.value })}
-                  />
-                  <button
-                    className={m.active ? "tiny-toggle on" : "tiny-toggle"}
-                    onClick={() => onMember({ ...m, active: !m.active })}
-                  >
-                    {m.active ? "Đang hoạt động" : "Đã ẩn"}
-                  </button>
-                </div>
-              ))}
-              <div className="add-member">
-                <input
-                  placeholder="Tên thành viên"
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                />
-                <input
-                  placeholder="Vai trò"
-                  value={newRole}
-                  onChange={(e) => setNewRole(e.target.value)}
-                />
-                <button
-                  className="secondary-button"
-                  onClick={() => {
-                    if (newName.trim()) {
-                      onMember({
-                        id: crypto.randomUUID(),
-                        name: newName.trim(),
-                        role: newRole,
-                        color: ["blue", "violet", "orange", "green"][
-                          data.members.length % 4
-                        ],
-                        active: true,
-                      });
-                      setNewName("");
-                    }
-                  }}
-                >
-                  <Plus size={15} /> Thêm
-                </button>
-              </div>
-            </>
-          )}
-          {tab === "notifications" && (
-            <>
-              <div className="setting-intro">
-                <h3>Nhắc mốc công việc</h3>
-                <p>
-                  Notification center luôn hiển thị mốc sắp đến. Browser reminder chỉ
-                  chạy khi workspace đang mở và bạn đã cấp quyền trình duyệt.
-                </p>
-              </div>
-              {reminderLabels.map((x) => (
-                <div className="setting-row" key={x}>
-                  <span>
-                    <b>{x}</b>
-                    <small>Nhắc trước khi đến hạn</small>
-                  </span>
-                  <select
-                    value={reminderSettings.leadDays[x]}
-                    onChange={(e) =>
-                      onReminderSettings({
-                        ...reminderSettings,
-                        leadDays: {
-                          ...reminderSettings.leadDays,
-                          [x]: Number(e.target.value),
-                        },
-                      })
-                    }
-                  >
-                    <option value="0">Đúng ngày</option>
-                    <option value="1">1 ngày</option>
-                    <option value="3">3 ngày</option>
-                    <option value="7">7 ngày</option>
-                  </select>
-                </div>
-              ))}
-              <div className="setting-row notification-setting-row">
-                <span>
-                  <b>Thông báo trình duyệt</b>
-                  <small>
-                    {browserPermission === "unsupported"
-                      ? "Trình duyệt không hỗ trợ"
-                      : browserPermission === "denied"
-                        ? "Đang bị chặn trong cài đặt trình duyệt"
-                        : "Nhắc một lần cho mỗi mốc task"}
-                  </small>
-                </span>
-                <button
-                  className={
-                    reminderSettings.browserEnabled
-                      ? "toggle-switch on"
-                      : "toggle-switch"
-                  }
-                  aria-label="Bật hoặc tắt thông báo trình duyệt"
-                  aria-pressed={reminderSettings.browserEnabled}
-                  disabled={
-                    browserPermission === "denied" ||
-                    browserPermission === "unsupported"
-                  }
-                  onClick={async () => {
-                    if (reminderSettings.browserEnabled) {
-                      onReminderSettings({
-                        ...reminderSettings,
-                        browserEnabled: false,
-                      });
-                    } else {
-                      await onRequestBrowserNotifications();
-                    }
-                  }}
-                />
-              </div>
-              <p className="muted-note">
-                Chatwork test và gửi định kỳ cần token server-side. Cấu hình trong tab
-                Tích hợp; lịch định kỳ production cần Cron/worker và kho dữ liệu remote.
-              </p>
-            </>
-          )}
-          {tab === "integrations" && (
-            <>
-              <div className="setting-intro">
-                <h3>Kết nối dịch vụ</h3>
-                <p>
-                  Thông tin nhạy cảm phải đặt trong Environment Variables trên Vercel.
-                </p>
-              </div>
-              <div className="integration-card">
-                <div className="integration-logo chatwork">C</div>
-                <div>
-                  <b>Chatwork</b>
-                  <small>Gửi thông báo mốc task đến room</small>
-                </div>
-                <span className="connection-status">Chưa cấu hình</span>
-              </div>
-              <label className="field">
-                <span>
-                  Room ID <small>(chỉ lưu tạm trên giao diện này)</small>
-                </span>
-                <input
-                  value={room}
-                  onChange={(e) => {
-                    setRoom(e.target.value);
-                    safeSetLocalStorage(
-                      "taskboard-chatwork-room-id-v1",
-                      e.target.value.trim(),
-                    );
-                  }}
-                  placeholder="Ví dụ: 123456789"
-                />
-              </label>
-              <button
-                className="secondary-button integration-test-button"
-                disabled={chatworkTestState === "sending" || !room.trim()}
-                onClick={async () => {
-                  setChatworkTestState("sending");
-                  try {
-                    const response = await fetch("/api/notifications/chatwork-test", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ roomId: room.trim() }),
-                    });
-                    const result = await response.json().catch(() => ({}));
-                    if (!response.ok) throw new Error(result.error || "Gửi thất bại");
-                    setChatworkTestState("success");
-                    onToast("Đã gửi thông báo test đến Chatwork.");
-                  } catch (error) {
-                    setChatworkTestState("error");
-                    onToast(
-                      error instanceof Error ? error.message : "Gửi Chatwork thất bại.",
-                    );
-                  }
-                }}
-              >
-                <Send size={15} />
-                {chatworkTestState === "sending" ? "Đang gửi..." : "Gửi thông báo test"}
-              </button>
-              {chatworkTestState === "success" && (
-                <p className="integration-feedback success">Đã gửi thành công.</p>
-              )}
-              {chatworkTestState === "error" && (
-                <p className="integration-feedback error">
-                  Không gửi được. Kiểm tra token và Room ID.
-                </p>
-              )}
-              <div className="integration-card">
-                <div className="integration-logo gmail">G</div>
-                <div>
-                  <b>Gmail</b>
-                  <small>Thông báo email (để sau MVP)</small>
-                </div>
-                <span className="connection-status later">Chưa kết nối</span>
-              </div>
-              <p className="muted-note">
-                Không nhập API token vào đây. Thêm CHATWORK_API_TOKEN và
-                CHATWORK_ROOM_ID vào Vercel Environment Variables để tích hợp ở server.
-              </p>
-            </>
-          )}
-          {tab === "data" && (
-            <>
-              <div className="setting-intro">
-                <h3>Sao lưu và khôi phục</h3>
-                <p>Chuyển dữ liệu workspace giữa máy tính bằng JSON.</p>
-              </div>
-              <div className="data-actions">
-                <button className="secondary-button" onClick={onExport}>
-                  <Download size={16} /> Xuất bản sao JSON
-                </button>
-                <label className="secondary-button upload-button">
-                  <FileUp size={16} /> Nhập JSON
-                  <input
-                    type="file"
-                    accept="application/json,.json"
-                    onChange={(e) => onImport(e.target.files?.[0])}
-                  />
-                </label>
-              </div>
-              <div className="data-summary">
-                <span>
-                  Task<strong>{data.tasks.length}</strong>
-                </span>
-                <span>
-                  Thành viên<strong>{data.members.length}</strong>
-                </span>
-                <span>
-                  Lưu trữ<strong>Local browser</strong>
-                </span>
-              </div>
-              <button className="danger-button ghost" onClick={onClear}>
-                <Trash2 size={15} /> Xóa toàn bộ dữ liệu local
-              </button>
-              <p className="muted-note">
-                Nhập file thay thế toàn bộ dữ liệu đang có trên trình duyệt này. Hãy
-                xuất backup trước.
-              </p>
-            </>
-          )}
-          {tab === "appearance" && (
-            <>
-              <div className="setting-intro">
-                <h3>Hiển thị và bảo mật</h3>
-                <p>
-                  Tùy chỉnh thông tin hiển thị và passcode khóa màn hình trên thiết bị
-                  này.
-                </p>
-              </div>
-              <label className="field">
-                <span>Tên hiển thị</span>
-                <input
-                  value={displayName}
-                  onChange={(e) => onDisplayName(e.target.value)}
-                  placeholder="Ví dụ: Tuấn"
-                />
-              </label>
-              <label className="field settings-passcode">
-                <span>
-                  Passcode khóa màn hình{" "}
-                  <small>Để trống để không yêu cầu mật khẩu</small>
-                </span>
-                <div className="passcode-row">
-                  <input
-                    type="password"
-                    value={passcode}
-                    onChange={(e) => setPasscode(e.target.value)}
-                    placeholder="Để trống"
-                  />
-                  <button
-                    className="secondary-button"
-                    onClick={() => {
-                      if (safeSetLocalStorage("taskboard-lock-passcode-v1", passcode)) {
-                        onClose();
-                      } else {
-                        onToast("Không thể lưu passcode; hãy kiểm tra quyền lưu.");
-                      }
-                    }}
-                  >
-                    Lưu passcode
-                  </button>
-                </div>
-              </label>
-              <div className="setting-row">
-                <span>
-                  <b>Ngôn ngữ</b>
-                  <small>Ngôn ngữ ứng dụng</small>
-                </span>
-                <select defaultValue="vi">
-                  <option value="vi">Tiếng Việt</option>
-                  <option value="en">English (sắp có)</option>
-                </select>
-              </div>
-              <p className="muted-note">
-                Dark mode có thể bật nhanh bằng biểu tượng mặt trăng ở thanh trên cùng.
-              </p>
-            </>
-          )}
-        </div>
-        <footer className="modal-footer">
-          <span />
-          <button className="primary-button" onClick={onClose}>
-            Hoàn tất
-          </button>
-        </footer>
-      </section>
-    </div>
-  );
-}
-function ConfirmDialog({
-  title,
-  body,
-  onCancel,
-  onConfirm,
-}: {
-  title: string;
-  body: string;
-  onCancel: () => void;
-  onConfirm: () => void;
-}) {
-  return (
-    <div className="overlay confirm-overlay">
-      <section
-        className="confirm-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="confirm-dialog-title"
-      >
-        <div className="confirm-icon">
-          <AlertTriangle size={22} />
-        </div>
-        <h3 id="confirm-dialog-title">{title}</h3>
-        <p>{body}</p>
-        <footer>
-          <button className="secondary-button" onClick={onCancel}>
-            Hủy
-          </button>
-          <button className="danger-button" onClick={onConfirm}>
-            Xác nhận
-          </button>
-        </footer>
-      </section>
-    </div>
-  );
-}
-function LockModal({
-  onClose,
-  onToast,
-}: {
-  onClose: () => void;
-  onToast: (s: string) => void;
-}) {
-  const [pass, setPass] = useState("");
-  return (
-    <div className="overlay">
-      <section
-        className="confirm-dialog lock-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="lock-dialog-title"
-      >
-        <div className="confirm-icon">
-          <LockKeyhole size={22} />
-        </div>
-        <h3 id="lock-dialog-title">Khóa màn hình</h3>
-        <p>
-          Màn hình khóa tiện lợi phía client. Không thay thế đăng nhập và không bảo vệ
-          dữ liệu API.
-        </p>
-        <input
-          type="password"
-          placeholder="Nhập passcode để mở"
-          value={pass}
-          onChange={(e) => setPass(e.target.value)}
-        />
-        <footer>
-          <button className="secondary-button" onClick={onClose}>
-            Đóng
-          </button>
-          <button
-            className="primary-button"
-            onClick={() => {
-              const expected = localStorage.getItem("taskboard-lock-passcode-v1") || "";
-              if (!expected || pass === expected) {
-                sessionStorage.setItem(
-                  "taskboard-unlocked-until",
-                  String(Date.now() + 3600000),
-                );
-                onToast(
-                  expected
-                    ? "Đã mở khóa trong 1 giờ"
-                    : "Đã mở khóa; passcode đang để trống",
-                );
-                onClose();
-              } else onToast("Passcode chưa đúng");
-            }}
-          >
-            Mở khóa
-          </button>
-        </footer>
-      </section>
-    </div>
   );
 }
