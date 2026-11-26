@@ -7,8 +7,9 @@ test.beforeEach(async ({ page }) => {
       JSON.stringify({
         displayName: "E2E User",
         salt: "taskboard-e2e-salt",
-        passcodeHash: "cn/fF2gOX8OQyIFYO8xBPpNmP0fsZQQgud2d/g8gTaE=",
+        passcodeHash: "yYJDCSfixCJpGmLR2EXwjCc6hnMOOi3pZBGhOF7J3mo=",
         autoLockMinutes: 0,
+        passcodeLength: 6,
       }),
     );
     sessionStorage.setItem(
@@ -28,7 +29,7 @@ test("first launch asks for screen lock setup and accepts the safe defaults", as
   const gate = page.getByRole("dialog");
   await expect(gate.getByRole("heading", { name: "Thiết lập màn hình" })).toBeVisible();
   await expect(gate.getByText(/Anonymous/)).toBeVisible();
-  await expect(gate.getByText(/1234/)).toBeVisible();
+  await expect(gate.getByText(/123456/)).toBeVisible();
   await gate.getByRole("button", { name: "Bắt đầu sử dụng" }).click();
   await expect(gate).toHaveCount(0);
   await expect(page.locator(".topbar")).toBeVisible();
@@ -45,12 +46,12 @@ test("manual lock blocks the workspace until the correct passcode is entered", a
   await expect(
     gate.getByRole("heading", { name: "Workspace đang khóa" }),
   ).toBeVisible();
-  for (const [index, digit] of Array.from("0000").entries()) {
+  for (const [index, digit] of Array.from("000000").entries()) {
     await gate.getByLabel(`Passcode số ${index + 1}`).fill(digit);
   }
   await gate.getByRole("button", { name: "Mở khóa" }).click({ force: true });
   await expect(gate.getByRole("alert")).toContainText("chưa đúng");
-  for (const [index, digit] of Array.from("1234").entries()) {
+  for (const [index, digit] of Array.from("123456").entries()) {
     await gate.getByLabel(`Passcode số ${index + 1}`).fill(digit);
   }
   await gate.getByRole("button", { name: "Mở khóa" }).click({ force: true });
@@ -68,6 +69,47 @@ test("deleting the local screen-lock config re-enters setup instead of leaving a
   });
   await expect(page.getByRole("heading", { name: "Thiết lập màn hình" })).toBeVisible();
   await expect(page.getByText(/Anonymous/)).toBeVisible();
+});
+
+test("forgotten screen passcode can be reset without deleting workspace data", async ({
+  page,
+}) => {
+  await page.goto("/tasks");
+  await page.getByRole("button", { name: "Khóa màn hình" }).click({ force: true });
+  const gate = page.getByRole("dialog");
+  await gate.getByRole("button", { name: /Quên passcode/ }).click();
+  await gate.getByLabel("Xác nhận reset passcode").fill("RESET");
+  await gate.getByRole("button", { name: "Reset khóa màn hình" }).click();
+  await expect(gate.getByRole("heading", { name: "Thiết lập màn hình" })).toBeVisible();
+  await expect(page.getByText("Hoàn thiện luồng thanh toán")).toBeVisible();
+});
+
+test("legacy four-digit screen lock can be upgraded without losing access", async ({
+  browser,
+}) => {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      "taskboard-screen-lock-v2",
+      JSON.stringify({
+        displayName: "Legacy User",
+        salt: "taskboard-e2e-salt",
+        passcodeHash: "cn/fF2gOX8OQyIFYO8xBPpNmP0fsZQQgud2d/g8gTaE=",
+        autoLockMinutes: 0,
+      }),
+    );
+    sessionStorage.removeItem("taskboard-screen-unlocked-until-v2");
+  });
+  await page.goto("/tasks");
+  const gate = page.getByRole("dialog");
+  await expect(gate.getByText(/Nhập 6 số mới, hoặc dùng mã cũ 4 số/)).toBeVisible();
+  for (const [index, digit] of Array.from("1234").entries()) {
+    await gate.getByLabel(`Passcode số ${index + 1}`).fill(digit);
+  }
+  await gate.getByRole("button", { name: "Mở khóa" }).click({ force: true });
+  await expect(gate).toHaveCount(0);
+  await context.close();
 });
 
 test("task workspace stays usable at tablet width", async ({ page }) => {

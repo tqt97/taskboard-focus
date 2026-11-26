@@ -29,6 +29,8 @@ Mở http://localhost:3000. Không cần điền biến môi trường để dù
 - Schema bật RLS, giữ legacy `owner_id` snapshot và có contract multi-workspace qua `workspaces`, `workspace_members`, `workspace_snapshots` và `workspace_id`. Sau khi đăng nhập, UI hỗ trợ workspace catalog, snapshot push/pull, remote CRUD từng task, offline retry queue và role read-only cho viewer.
 - Schema hiện phù hợp cho project mới; nếu project Supabase đã có bảng từ trước, phải tạo migration riêng để backfill `owner_id` trước khi đặt `not null`, không chạy mù `create table if not exists` trên dữ liệu production.
 - Trước khi bật adapter: cấu hình Supabase Auth, chạy schema, kiểm tra owner/member isolation bằng request authenticated/anonymous và kiểm tra viewer không ghi/xóa rồi mới đưa keys vào Vercel.
+- Để bật OTP email: trong Supabase Auth cấu hình Email provider và email template có `{{ .Token }}` (mã 6 số), sau đó đặt `NEXT_PUBLIC_SUPABASE_URL` và `NEXT_PUBLIC_SUPABASE_ANON_KEY`. Nếu chưa cấu hình đủ hai biến, tab OTP không hiển thị và local mode vẫn hoạt động.
+- Sau khi deploy, kiểm tra email OTP trong project test: gửi mã, nhập mã đúng, mã sai, mã hết hạn và gửi lại trong cooldown. Không dùng service role key ở frontend.
 - Không dùng service role key trong `NEXT_PUBLIC_*`.
 
 ## Chatwork/Gmail

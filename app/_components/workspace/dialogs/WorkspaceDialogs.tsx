@@ -726,7 +726,7 @@ export function SettingsModal({
                 <label className="field settings-passcode">
                   <span>
                     Passcode khóa màn hình{" "}
-                    <small>Để trống nếu giữ passcode hiện tại · 4 chữ số</small>
+                    <small>Để trống nếu giữ passcode hiện tại · 6 chữ số</small>
                   </span>
                   <div className="passcode-row">
                     <input
@@ -735,7 +735,7 @@ export function SettingsModal({
                       value={passcode}
                       maxLength={4}
                       onChange={(e) => {
-                        setPasscode(e.target.value.replace(/\D/g, "").slice(0, 4));
+                        setPasscode(e.target.value.replace(/\D/g, "").slice(0, 6));
                         setPasscodeError("");
                       }}
                       placeholder="1234"
@@ -755,7 +755,7 @@ export function SettingsModal({
                       className="secondary-button"
                       onClick={() => {
                         if (passcode && passcode.length !== 4) {
-                          setPasscodeError("Passcode mới phải gồm đúng 4 chữ số.");
+                          setPasscodeError("Passcode mới phải gồm đúng 6 chữ số.");
                           return;
                         }
                         void onUpdateScreenLock(passcode, autoLockMinutes);

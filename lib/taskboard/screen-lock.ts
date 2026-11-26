@@ -6,11 +6,15 @@ export type ScreenLockConfig = {
   passcodeHash: string;
   salt: string;
   autoLockMinutes: number;
+  /** New local configs always use six digits. */
+  passcodeLength?: 6;
+  /** Allows one-time unlock of a config created before the six-digit migration. */
+  legacyPasscodeLength?: 4;
 };
 
 export const defaultScreenLockConfig = {
   displayName: "Anonymous",
-  passcode: "1234",
+  passcode: "123456",
   autoLockMinutes: 15,
 };
 
@@ -45,6 +49,7 @@ export async function createScreenLockConfig(
     passcodeHash: await hashPasscode(passcode, salt),
     salt,
     autoLockMinutes: normalizeAutoLockMinutes(autoLockMinutes),
+    passcodeLength: 6,
   };
 }
 
@@ -62,7 +67,8 @@ export function readScreenLockConfig(): ScreenLockConfig | null {
       typeof value.passcodeHash !== "string" ||
       typeof value.salt !== "string" ||
       typeof value.autoLockMinutes !== "number" ||
-      !Number.isFinite(value.autoLockMinutes)
+      !Number.isFinite(value.autoLockMinutes) ||
+      (value.passcodeLength !== undefined && value.passcodeLength !== 6)
     )
       return null;
     return {
@@ -70,6 +76,10 @@ export function readScreenLockConfig(): ScreenLockConfig | null {
       passcodeHash: value.passcodeHash,
       salt: value.salt,
       autoLockMinutes: normalizeAutoLockMinutes(value.autoLockMinutes),
+      passcodeLength: 6,
+      ...(value.passcodeLength === undefined
+        ? { legacyPasscodeLength: 4 as const }
+        : {}),
     };
   } catch {
     return null;

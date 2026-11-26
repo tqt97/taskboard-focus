@@ -1902,7 +1902,11 @@ export default function WorkspaceRuntime({
 
   return (
     <WorkspaceProvider value={runtimeValue}>
-      <main className="app-shell">
+      <main
+        className="app-shell"
+        inert={screenLockReady && !screenUnlocked ? true : undefined}
+        aria-hidden={screenLockReady && !screenUnlocked ? true : undefined}
+      >
         <WorkspaceSidebar
           collapsed={sidebarCollapsed}
           view={view}
@@ -2324,6 +2328,20 @@ export default function WorkspaceRuntime({
               setLastActivityAt(Date.now());
               setScreenUnlocked(true);
               setToast("Đã mở khóa workspace.");
+            }}
+            onReset={async () => {
+              const removed = safeRemoveLocalStorage("taskboard-screen-lock-v2");
+              clearUnlockSession();
+              if (!removed) {
+                setToast(
+                  "Không thể reset khóa màn hình; hãy kiểm tra quyền lưu trình duyệt.",
+                );
+                return;
+              }
+              setScreenLockConfig(null);
+              setScreenUnlocked(false);
+              setLastActivityAt(Date.now());
+              setToast("Đã reset khóa màn hình. Hãy thiết lập passcode mới.");
             }}
           />
         )}
