@@ -28,6 +28,10 @@ import type {
   Priority,
   Severity,
 } from "@/lib/types";
+import { Select } from "@/app/_components/ui/Select";
+import { Button } from "@/app/_components/ui/Button";
+import { DialogFrame } from "@/app/_components/ui/DialogFrame";
+import { DialogHeader } from "@/app/_components/ui/DialogHeader";
 import {
   fromDateInputValue,
   fromDateTimeLocalValue,
@@ -321,910 +325,879 @@ export function TaskModal({
     });
   };
   return (
-    <div
-      className="overlay"
-      onMouseDown={(e) => e.target === e.currentTarget && closeModal()}
+    <DialogFrame
+      panelClassName="modal task-modal"
+      labelledBy="task-modal-title"
+      onBackdropClick={closeModal}
     >
-      <section
-        className="modal task-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="task-modal-title"
-      >
-        <header className="modal-header">
-          <div>
-            <span className="eyebrow">
-              {isNew ? "TẠO CÔNG VIỆC" : "CHI TIẾT CÔNG VIỆC"}
-            </span>
-            <h2 id="task-modal-title">{isNew ? "Thêm task mới" : "Thông tin task"}</h2>
-          </div>
-          <button
-            className="icon-button"
-            aria-label="Đóng cửa sổ task"
-            title="Đóng cửa sổ task"
-            onClick={closeModal}
-          >
-            <X size={19} />
-          </button>
-        </header>
-        {readOnly && (
-          <div className="readonly-notice" role="status">
-            Workspace này đang ở chế độ chỉ xem. Bạn không có quyền chỉnh sửa task.
+      <DialogHeader
+        eyebrow={isNew ? "TẠO CÔNG VIỆC" : "CHI TIẾT CÔNG VIỆC"}
+        titleId="task-modal-title"
+        title={isNew ? "Thêm task mới" : "Thông tin task"}
+        closeLabel="Đóng cửa sổ task"
+        onClose={closeModal}
+      />
+      {readOnly && (
+        <div className="readonly-notice" role="status">
+          Workspace này đang ở chế độ chỉ xem. Bạn không có quyền chỉnh sửa task.
+        </div>
+      )}
+      <div className="modal-body">
+        {error && (
+          <div className="form-error" role="alert">
+            {error}
           </div>
         )}
-        <div className="modal-body">
-          {error && (
-            <div className="form-error" role="alert">
-              {error}
-            </div>
+        <div className="modal-tabs" role="tablist" aria-label="Nội dung task">
+          <Button
+            className={`modal-tab${activeTab === "details" ? " active" : ""}`}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === "details"}
+            aria-controls="task-details-panel"
+            onClick={() => setActiveTab("details")}
+          >
+            Thông tin task
+          </Button>
+          <Button
+            className={`modal-tab${activeTab === "history" ? " active" : ""}`}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === "history"}
+            aria-controls="task-history-panel"
+            onClick={() => setActiveTab("history")}
+          >
+            Lịch sử thay đổi
+            {form.activity?.length ? <span>{form.activity.length}</span> : null}
+          </Button>
+          {!isNew && (
+            <Button
+              className={`modal-tab${activeTab === "comments" ? " active" : ""}`}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === "comments"}
+              aria-controls="task-comments-panel"
+              onClick={() => setActiveTab("comments")}
+            >
+              <MessageCircle size={14} /> Thảo luận
+              {form.comments?.length ? <span>{form.comments.length}</span> : null}
+            </Button>
           )}
-          <div className="modal-tabs" role="tablist" aria-label="Nội dung task">
-            <button
-              className={`modal-tab${activeTab === "details" ? " active" : ""}`}
-              type="button"
-              role="tab"
-              aria-selected={activeTab === "details"}
-              aria-controls="task-details-panel"
-              onClick={() => setActiveTab("details")}
-            >
-              Thông tin task
-            </button>
-            <button
-              className={`modal-tab${activeTab === "history" ? " active" : ""}`}
-              type="button"
-              role="tab"
-              aria-selected={activeTab === "history"}
-              aria-controls="task-history-panel"
-              onClick={() => setActiveTab("history")}
-            >
-              Lịch sử thay đổi
-              {form.activity?.length ? <span>{form.activity.length}</span> : null}
-            </button>
-            {!isNew && (
-              <button
-                className={`modal-tab${activeTab === "comments" ? " active" : ""}`}
-                type="button"
-                role="tab"
-                aria-selected={activeTab === "comments"}
-                aria-controls="task-comments-panel"
-                onClick={() => setActiveTab("comments")}
+        </div>
+        {activeTab === "details" ? (
+          <fieldset className="task-form-fieldset" disabled={readOnly}>
+            <div className="form-grid" id="task-details-panel" role="tabpanel">
+              <details
+                className="form-block form-block-collapsible full"
+                aria-labelledby="task-core-heading"
+                open
               >
-                <MessageCircle size={14} /> Thảo luận
-                {form.comments?.length ? <span>{form.comments.length}</span> : null}
-              </button>
-            )}
-          </div>
-          {activeTab === "details" ? (
-            <fieldset className="task-form-fieldset" disabled={readOnly}>
-              <div className="form-grid" id="task-details-panel" role="tabpanel">
-                <details
-                  className="form-block form-block-collapsible full"
-                  aria-labelledby="task-core-heading"
-                  open
-                >
-                  <summary className="form-block-heading form-block-summary">
-                    <div>
-                      <h3 id="task-core-heading">Thông tin chính</h3>
-                      <p>Tên, mã và người phụ trách công việc.</p>
-                    </div>
-                    <span className="form-block-summary-control">
-                      <span>Thu gọn</span>
-                      <ChevronDown size={16} aria-hidden="true" />
-                    </span>
-                  </summary>
-                  <label className="field full">
-                    <span>
-                      Tên task <b>*</b>
-                    </span>
-                    <input
-                      autoFocus
-                      value={form.title}
-                      aria-invalid={Boolean(error && !form.title.trim())}
-                      onChange={(e) => field("title", e.target.value)}
-                      placeholder="Ví dụ: Hoàn thiện luồng thanh toán"
+                <summary className="form-block-heading form-block-summary">
+                  <div>
+                    <h3 id="task-core-heading">Thông tin chính</h3>
+                    <p>Tên, mã và người phụ trách công việc.</p>
+                  </div>
+                  <span className="form-block-summary-control">
+                    <span>Thu gọn</span>
+                    <ChevronDown size={16} aria-hidden="true" />
+                  </span>
+                </summary>
+                <label className="field full">
+                  <span>
+                    Tên task <b>*</b>
+                  </span>
+                  <input
+                    autoFocus
+                    value={form.title}
+                    aria-invalid={Boolean(error && !form.title.trim())}
+                    onChange={(e) => field("title", e.target.value)}
+                    placeholder="Ví dụ: Hoàn thiện luồng thanh toán"
+                  />
+                </label>
+                <div className="field full">
+                  <span>
+                    Mã task{" "}
+                    <small>Prefix mặc định có thể đổi trong từng workspace</small>
+                  </span>
+                  <div className="code-builder">
+                    <label className="checkbox-line">
+                      <input
+                        type="checkbox"
+                        checked={usePrefix}
+                        onChange={(e) => {
+                          setUsePrefix(e.target.checked);
+                          if (e.target.checked && !form.code)
+                            field("code", localPrefix);
+                        }}
+                      />{" "}
+                      Dùng prefix
+                    </label>
+                    {usePrefix ? (
+                      <>
+                        <input
+                          className="prefix-input"
+                          value={localPrefix}
+                          onChange={(e) => {
+                            setLocalPrefix(e.target.value);
+                          }}
+                          placeholder="MENSQZIN-"
+                        />
+                        <input
+                          value={form.code.replace(prefix, "").replace(localPrefix, "")}
+                          onChange={(e) => field("code", e.target.value)}
+                          placeholder="248"
+                        />
+                      </>
+                    ) : (
+                      <input
+                        value={form.code}
+                        onChange={(e) => field("code", e.target.value)}
+                        placeholder="Mã tự custom"
+                      />
+                    )}
+                  </div>
+                </div>
+                <div className="field full assignee-field">
+                  <span>
+                    Người phụ trách{" "}
+                    <small>
+                      {assigneeIds.length
+                        ? `${assigneeIds.length} người đã chọn`
+                        : "Chưa giao"}
+                    </small>
+                  </span>
+                  <div className="assignee-picker">
+                    {members
+                      .filter((m) => m.active)
+                      .map((member) => {
+                        const checked = assigneeIds.includes(member.id);
+                        return (
+                          <label
+                            className={`assignee-option${checked ? " selected" : ""}`}
+                            key={member.id}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() =>
+                                setAssigneeIds((ids) =>
+                                  checked
+                                    ? ids.filter((id) => id !== member.id)
+                                    : [...ids, member.id],
+                                )
+                              }
+                            />
+                            <span className={`avatar avatar-${member.color}`}>
+                              {member.name.slice(0, 1)}
+                            </span>
+                            <span>
+                              <b>{member.name}</b>
+                              <small>{member.role}</small>
+                            </span>
+                          </label>
+                        );
+                      })}
+                    {!members.some((member) => member.active) && (
+                      <small>Chưa có thành viên active</small>
+                    )}
+                  </div>
+                </div>
+              </details>
+              <details
+                className="form-block form-block-collapsible full"
+                aria-labelledby="task-planning-heading"
+                open
+              >
+                <summary className="form-block-heading form-block-summary">
+                  <div>
+                    <h3 id="task-planning-heading">Tiến độ và thời hạn</h3>
+                    <p>Xác định mức độ ưu tiên và các mốc cần theo dõi.</p>
+                  </div>
+                  <span className="form-block-summary-control">
+                    <span>Thu gọn</span>
+                    <ChevronDown size={16} aria-hidden="true" />
+                  </span>
+                </summary>
+                <div className="field-row field-row-3 full">
+                  <label className="field">
+                    <span>Trạng thái</span>
+                    <Select
+                      aria-label="Trạng thái"
+                      value={form.status}
+                      options={Object.entries(labels).map(([value, label]) => ({
+                        value,
+                        label,
+                      }))}
+                      onValueChange={(value) => field("status", value as Status)}
                     />
                   </label>
-                  <div className="field full">
-                    <span>
-                      Mã task{" "}
-                      <small>Prefix mặc định có thể đổi trong từng workspace</small>
-                    </span>
-                    <div className="code-builder">
-                      <label className="checkbox-line">
-                        <input
-                          type="checkbox"
-                          checked={usePrefix}
-                          onChange={(e) => {
-                            setUsePrefix(e.target.checked);
-                            if (e.target.checked && !form.code)
-                              field("code", localPrefix);
-                          }}
-                        />{" "}
-                        Dùng prefix
-                      </label>
-                      {usePrefix ? (
-                        <>
-                          <input
-                            className="prefix-input"
-                            value={localPrefix}
-                            onChange={(e) => {
-                              setLocalPrefix(e.target.value);
-                            }}
-                            placeholder="MENSQZIN-"
-                          />
-                          <input
-                            value={form.code
-                              .replace(prefix, "")
-                              .replace(localPrefix, "")}
-                            onChange={(e) => field("code", e.target.value)}
-                            placeholder="248"
-                          />
-                        </>
-                      ) : (
-                        <input
-                          value={form.code}
-                          onChange={(e) => field("code", e.target.value)}
-                          placeholder="Mã tự custom"
-                        />
-                      )}
-                    </div>
+                  <label className="field">
+                    <span>Thứ tự ưu tiên</span>
+                    <Select
+                      aria-label="Thứ tự ưu tiên"
+                      value={form.priority}
+                      options={Object.entries(priorityLabels).map(([value, label]) => ({
+                        value,
+                        label,
+                      }))}
+                      onValueChange={(value) => field("priority", value as Priority)}
+                    />
+                  </label>
+                  <label className="field">
+                    <span>Độ nghiêm trọng</span>
+                    <Select
+                      aria-label="Độ nghiêm trọng"
+                      value={form.severity}
+                      options={Object.entries(severityLabels).map(([value, label]) => ({
+                        value,
+                        label,
+                      }))}
+                      onValueChange={(value) => field("severity", value as Severity)}
+                    />
+                  </label>
+                </div>
+                <div className="field-row field-row-3 full">
+                  {(
+                    [
+                      ["dev_up", "Dev up"],
+                      ["staging_up", "Staging up"],
+                      ["release_at", "Release"],
+                    ] as const
+                  ).map(([key, label]) => (
+                    <label className="field" key={key}>
+                      <span>{label}</span>
+                      <input
+                        type="date"
+                        value={toDateInputValue(form[key])}
+                        onChange={(e) => field(key, fromDateInputValue(e.target.value))}
+                      />
+                    </label>
+                  ))}
+                </div>
+                <label className="field">
+                  <span>Deadline</span>
+                  <input
+                    type="date"
+                    value={toDateInputValue(form.deadline)}
+                    onChange={(e) =>
+                      field("deadline", fromDateInputValue(e.target.value))
+                    }
+                  />
+                </label>
+                <div className="field full">
+                  <span>
+                    Hoãn đến <small>Chỉ hiện ngoài card khi task đang được hoãn.</small>
+                  </span>
+                  <p className="field-hint">
+                    Dùng để tạm ẩn task khỏi Today. Task hoàn tất sẽ tự bỏ mốc hoãn.
+                  </p>
+                  <div className="field-row field-row-3">
+                    <input
+                      type="datetime-local"
+                      aria-label="Hoãn đến"
+                      value={toDateTimeLocalValue(form.snoozed_until || "")}
+                      onChange={(event) =>
+                        field(
+                          "snoozed_until",
+                          fromDateTimeLocalValue(event.target.value) || undefined,
+                        )
+                      }
+                      disabled={readOnly}
+                    />
+                    <Button
+                      variant="secondary"
+                      type="button"
+                      onClick={() => setSnooze(1)}
+                      disabled={readOnly}
+                    >
+                      1 ngày
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      type="button"
+                      onClick={() => setSnooze(7)}
+                      disabled={readOnly}
+                    >
+                      1 tuần
+                    </Button>
+                    {form.snoozed_until && (
+                      <Button
+                        variant="text"
+                        type="button"
+                        onClick={() => field("snoozed_until", undefined)}
+                        disabled={readOnly}
+                      >
+                        Bỏ hoãn
+                      </Button>
+                    )}
                   </div>
-                  <div className="field full assignee-field">
-                    <span>
-                      Người phụ trách{" "}
-                      <small>
-                        {assigneeIds.length
-                          ? `${assigneeIds.length} người đã chọn`
-                          : "Chưa giao"}
+                </div>
+                <div className="field full recurrence-field">
+                  <span>
+                    Lặp lại task <small>Tự tạo nhắc việc theo chu kỳ đã chọn.</small>
+                  </span>
+                  <p className="field-hint">
+                    Dùng khi công việc lặp lại đều đặn, ví dụ kiểm tra báo cáo mỗi tuần.
+                  </p>
+                  <div className="field-row field-row-3">
+                    <Select
+                      aria-label="Tần suất lặp lại"
+                      value={form.recurrence?.frequency || "none"}
+                      options={[
+                        { value: "none", label: "Không lặp" },
+                        { value: "daily", label: "Mỗi ngày" },
+                        { value: "weekly", label: "Mỗi tuần" },
+                        { value: "monthly", label: "Mỗi tháng" },
+                      ]}
+                      onValueChange={(value) =>
+                        field(
+                          "recurrence",
+                          value === "none"
+                            ? undefined
+                            : {
+                                frequency: value as "daily" | "weekly" | "monthly",
+                                interval: form.recurrence?.interval || 1,
+                              },
+                        )
+                      }
+                    />
+                    {form.recurrence && (
+                      <input
+                        type="number"
+                        min={1}
+                        max={365}
+                        aria-label="Khoảng lặp"
+                        value={form.recurrence.interval}
+                        onChange={(e) =>
+                          field("recurrence", {
+                            ...form.recurrence!,
+                            interval: Math.max(1, Number(e.target.value) || 1),
+                          })
+                        }
+                      />
+                    )}
+                    {form.recurrence && (
+                      <input
+                        type="date"
+                        aria-label="Ngày kết thúc lặp"
+                        value={toDateInputValue(form.recurrence.until || "")}
+                        onChange={(e) =>
+                          field("recurrence", {
+                            ...form.recurrence!,
+                            until: fromDateInputValue(e.target.value) || undefined,
+                          })
+                        }
+                      />
+                    )}
+                  </div>
+                </div>
+              </details>
+              <details
+                className="form-block form-block-collapsible full"
+                aria-labelledby="task-detail-heading"
+              >
+                <summary className="form-block-heading form-block-summary">
+                  <div>
+                    <h3 id="task-detail-heading">Nội dung công việc</h3>
+                    <p>Bối cảnh, bước tiếp theo và ghi chú review.</p>
+                  </div>
+                  <span className="form-block-summary-control">
+                    <span>Mở rộng</span>
+                    <ChevronDown size={16} aria-hidden="true" />
+                  </span>
+                </summary>
+                <label className="field full">
+                  <span>Mô tả / ghi chú</span>
+                  <textarea
+                    rows={4}
+                    value={form.description}
+                    onChange={(e) => field("description", e.target.value)}
+                    placeholder="Bối cảnh, yêu cầu, lưu ý..."
+                  />
+                </label>
+                <div className="checklist-panel field full">
+                  <div className="checklist-heading">
+                    <div>
+                      <b>
+                        <ListChecks size={15} /> Checklist
+                      </b>
+                      <small>Chia task thành các bước nhỏ để dễ hoàn thành.</small>
+                    </div>
+                    <Button
+                      variant="secondary"
+                      type="button"
+                      onClick={addChecklistItem}
+                    >
+                      <Plus size={14} /> Thêm bước
+                    </Button>
+                  </div>
+                  {checklist.length ? (
+                    <div className="checklist-list">
+                      {checklist.map((item, index) => (
+                        <div className="checklist-row" key={item.id}>
+                          <input
+                            type="checkbox"
+                            checked={item.done}
+                            aria-label={`Hoàn thành bước ${index + 1}`}
+                            onChange={(event) =>
+                              setChecklist((items) =>
+                                items.map((current) =>
+                                  current.id === item.id
+                                    ? { ...current, done: event.target.checked }
+                                    : current,
+                                ),
+                              )
+                            }
+                          />
+                          <input
+                            value={item.title}
+                            aria-label={`Nội dung bước ${index + 1}`}
+                            placeholder="Ví dụ: Kiểm tra trên mobile"
+                            onChange={(event) =>
+                              setChecklist((items) =>
+                                items.map((current) =>
+                                  current.id === item.id
+                                    ? { ...current, title: event.target.value }
+                                    : current,
+                                ),
+                              )
+                            }
+                          />
+                          <Button
+                            variant="icon"
+                            className="mini"
+                            type="button"
+                            title="Xóa bước checklist"
+                            aria-label={`Xóa bước ${index + 1}`}
+                            onClick={() =>
+                              setChecklist((items) =>
+                                items.filter((current) => current.id !== item.id),
+                              )
+                            }
+                          >
+                            <Trash2 size={14} />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="checklist-empty">Chưa có bước checklist.</p>
+                  )}
+                </div>
+                <label className="field full">
+                  <span>Bước tiếp theo</span>
+                  <input
+                    value={form.next_action || ""}
+                    onChange={(e) => field("next_action", e.target.value)}
+                    placeholder="Ví dụ: Chờ QA xác nhận luồng thanh toán"
+                  />
+                </label>
+                <label className="field full">
+                  <span>Ghi chú review / vướng mắc</span>
+                  <textarea
+                    rows={3}
+                    value={form.review_note || ""}
+                    onChange={(e) => field("review_note", e.target.value)}
+                    placeholder="Điều cần kiểm tra, phản hồi hoặc lý do đang review..."
+                  />
+                </label>
+              </details>
+              <details
+                className="form-block form-block-collapsible full"
+                aria-labelledby="task-relation-heading"
+              >
+                <summary className="form-block-heading form-block-summary">
+                  <div>
+                    <h3 id="task-relation-heading">Quan hệ và tài liệu</h3>
+                    <p>Chọn các task cần hoàn tất trước và gắn tài liệu liên quan.</p>
+                  </div>
+                  <span className="form-block-summary-control">
+                    <span>Mở rộng</span>
+                    <ChevronDown size={16} aria-hidden="true" />
+                  </span>
+                </summary>
+                <label className="field full">
+                  <span>
+                    Phụ thuộc task khác{" "}
+                    <small>{dependencyIds.length} task đã chọn</small>
+                  </span>
+                  <p className="field-hint" id="dependency-help">
+                    Đây là các task phải hoàn tất trước khi task hiện tại sẵn sàng. Có
+                    thể chọn nhiều task.
+                  </p>
+                  <div className="dependency-picker" aria-describedby="dependency-help">
+                    <input
+                      type="search"
+                      className="dependency-search"
+                      aria-label="Tìm task phụ thuộc"
+                      placeholder="Tìm theo mã hoặc tiêu đề..."
+                      value={dependencySearch}
+                      onChange={(event) => setDependencySearch(event.target.value)}
+                    />
+                    {(dependencySearch || dependencyMatches.length > 100) && (
+                      <small className="dependency-result-count">
+                        {dependencyMatches.length > 100
+                          ? `Có ${dependencyMatches.length} task phù hợp; đang hiển thị tối đa 100.`
+                          : `${dependencyMatches.length} task phù hợp.`}
                       </small>
-                    </span>
-                    <div className="assignee-picker">
-                      {members
-                        .filter((m) => m.active)
-                        .map((member) => {
-                          const checked = assigneeIds.includes(member.id);
+                    )}
+                    {dependencyCandidates.length ? (
+                      <div className="dependency-list">
+                        {dependencyCandidates.map((candidate) => {
+                          const checked = dependencyIds.includes(candidate.id);
                           return (
                             <label
-                              className={`assignee-option${checked ? " selected" : ""}`}
-                              key={member.id}
+                              className={`dependency-option${checked ? " selected" : ""}`}
+                              key={candidate.id}
                             >
                               <input
                                 type="checkbox"
                                 checked={checked}
-                                onChange={() =>
-                                  setAssigneeIds((ids) =>
-                                    checked
-                                      ? ids.filter((id) => id !== member.id)
-                                      : [...ids, member.id],
-                                  )
-                                }
+                                onChange={() => toggleDependency(candidate.id)}
                               />
-                              <span className={`avatar avatar-${member.color}`}>
-                                {member.name.slice(0, 1)}
-                              </span>
                               <span>
-                                <b>{member.name}</b>
-                                <small>{member.role}</small>
+                                <b>{candidate.code || "TASK"}</b>
+                                <small>{candidate.title}</small>
                               </span>
                             </label>
                           );
                         })}
-                      {!members.some((member) => member.active) && (
-                        <small>Chưa có thành viên active</small>
-                      )}
-                    </div>
-                  </div>
-                </details>
-                <details
-                  className="form-block form-block-collapsible full"
-                  aria-labelledby="task-planning-heading"
-                  open
-                >
-                  <summary className="form-block-heading form-block-summary">
-                    <div>
-                      <h3 id="task-planning-heading">Tiến độ và thời hạn</h3>
-                      <p>Xác định mức độ ưu tiên và các mốc cần theo dõi.</p>
-                    </div>
-                    <span className="form-block-summary-control">
-                      <span>Thu gọn</span>
-                      <ChevronDown size={16} aria-hidden="true" />
-                    </span>
-                  </summary>
-                  <div className="field-row field-row-3 full">
-                    <label className="field">
-                      <span>Trạng thái</span>
-                      <select
-                        value={form.status}
-                        onChange={(e) => field("status", e.target.value as Status)}
-                      >
-                        {Object.entries(labels).map(([k, v]) => (
-                          <option key={k} value={k}>
-                            {v}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="field">
-                      <span>Thứ tự ưu tiên</span>
-                      <select
-                        value={form.priority}
-                        onChange={(e) => field("priority", e.target.value as Priority)}
-                      >
-                        {Object.entries(priorityLabels).map(([k, v]) => (
-                          <option key={k} value={k}>
-                            {v}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="field">
-                      <span>Độ nghiêm trọng</span>
-                      <select
-                        value={form.severity}
-                        onChange={(e) => field("severity", e.target.value as Severity)}
-                      >
-                        {Object.entries(severityLabels).map(([k, v]) => (
-                          <option key={k} value={k}>
-                            {v}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  </div>
-                  <div className="field-row field-row-3 full">
-                    {(
-                      [
-                        ["dev_up", "Dev up"],
-                        ["staging_up", "Staging up"],
-                        ["release_at", "Release"],
-                      ] as const
-                    ).map(([key, label]) => (
-                      <label className="field" key={key}>
-                        <span>{label}</span>
-                        <input
-                          type="date"
-                          value={toDateInputValue(form[key])}
-                          onChange={(e) =>
-                            field(key, fromDateInputValue(e.target.value))
-                          }
-                        />
-                      </label>
-                    ))}
-                  </div>
-                  <label className="field">
-                    <span>Deadline</span>
-                    <input
-                      type="date"
-                      value={toDateInputValue(form.deadline)}
-                      onChange={(e) =>
-                        field("deadline", fromDateInputValue(e.target.value))
-                      }
-                    />
-                  </label>
-                  <div className="field full">
-                    <span>
-                      Hoãn đến{" "}
-                      <small>Chỉ hiện ngoài card khi task đang được hoãn.</small>
-                    </span>
-                    <p className="field-hint">
-                      Dùng để tạm ẩn task khỏi Today. Task hoàn tất sẽ tự bỏ mốc hoãn.
-                    </p>
-                    <div className="field-row field-row-3">
-                      <input
-                        type="datetime-local"
-                        aria-label="Hoãn đến"
-                        value={toDateTimeLocalValue(form.snoozed_until || "")}
-                        onChange={(event) =>
-                          field(
-                            "snoozed_until",
-                            fromDateTimeLocalValue(event.target.value) || undefined,
-                          )
-                        }
-                        disabled={readOnly}
-                      />
-                      <button
-                        className="secondary-button"
-                        type="button"
-                        onClick={() => setSnooze(1)}
-                        disabled={readOnly}
-                      >
-                        1 ngày
-                      </button>
-                      <button
-                        className="secondary-button"
-                        type="button"
-                        onClick={() => setSnooze(7)}
-                        disabled={readOnly}
-                      >
-                        1 tuần
-                      </button>
-                      {form.snoozed_until && (
-                        <button
-                          className="text-button"
-                          type="button"
-                          onClick={() => field("snoozed_until", undefined)}
-                          disabled={readOnly}
-                        >
-                          Bỏ hoãn
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  <div className="field full recurrence-field">
-                    <span>
-                      Lặp lại task <small>Tự tạo nhắc việc theo chu kỳ đã chọn.</small>
-                    </span>
-                    <p className="field-hint">
-                      Dùng khi công việc lặp lại đều đặn, ví dụ kiểm tra báo cáo mỗi
-                      tuần.
-                    </p>
-                    <div className="field-row field-row-3">
-                      <select
-                        aria-label="Tần suất lặp lại"
-                        value={form.recurrence?.frequency || "none"}
-                        onChange={(e) =>
-                          field(
-                            "recurrence",
-                            e.target.value === "none"
-                              ? undefined
-                              : {
-                                  frequency: e.target.value as
-                                    "daily" | "weekly" | "monthly",
-                                  interval: form.recurrence?.interval || 1,
-                                },
-                          )
-                        }
-                      >
-                        <option value="none">Không lặp</option>
-                        <option value="daily">Mỗi ngày</option>
-                        <option value="weekly">Mỗi tuần</option>
-                        <option value="monthly">Mỗi tháng</option>
-                      </select>
-                      {form.recurrence && (
-                        <input
-                          type="number"
-                          min={1}
-                          max={365}
-                          aria-label="Khoảng lặp"
-                          value={form.recurrence.interval}
-                          onChange={(e) =>
-                            field("recurrence", {
-                              ...form.recurrence!,
-                              interval: Math.max(1, Number(e.target.value) || 1),
-                            })
-                          }
-                        />
-                      )}
-                      {form.recurrence && (
-                        <input
-                          type="date"
-                          aria-label="Ngày kết thúc lặp"
-                          value={toDateInputValue(form.recurrence.until || "")}
-                          onChange={(e) =>
-                            field("recurrence", {
-                              ...form.recurrence!,
-                              until: fromDateInputValue(e.target.value) || undefined,
-                            })
-                          }
-                        />
-                      )}
-                    </div>
-                  </div>
-                </details>
-                <details
-                  className="form-block form-block-collapsible full"
-                  aria-labelledby="task-detail-heading"
-                >
-                  <summary className="form-block-heading form-block-summary">
-                    <div>
-                      <h3 id="task-detail-heading">Nội dung công việc</h3>
-                      <p>Bối cảnh, bước tiếp theo và ghi chú review.</p>
-                    </div>
-                    <span className="form-block-summary-control">
-                      <span>Mở rộng</span>
-                      <ChevronDown size={16} aria-hidden="true" />
-                    </span>
-                  </summary>
-                  <label className="field full">
-                    <span>Mô tả / ghi chú</span>
-                    <textarea
-                      rows={4}
-                      value={form.description}
-                      onChange={(e) => field("description", e.target.value)}
-                      placeholder="Bối cảnh, yêu cầu, lưu ý..."
-                    />
-                  </label>
-                  <div className="checklist-panel field full">
-                    <div className="checklist-heading">
-                      <div>
-                        <b>
-                          <ListChecks size={15} /> Checklist
-                        </b>
-                        <small>Chia task thành các bước nhỏ để dễ hoàn thành.</small>
                       </div>
-                      <button
-                        className="secondary-button"
-                        type="button"
-                        onClick={addChecklistItem}
-                      >
-                        <Plus size={14} /> Thêm bước
-                      </button>
+                    ) : (
+                      <p className="field-hint">Chưa có task khác để chọn.</p>
+                    )}
+                  </div>
+                </label>
+                <details
+                  className="resource-details field full"
+                  open={resourcesOpen}
+                  onToggle={(event) => setResourcesOpen(event.currentTarget.open)}
+                >
+                  <summary className="resource-summary">
+                    <span className="resource-summary-copy">
+                      <b>Tài liệu & liên kết</b>
+                      <small>
+                        {attachments.length || links.length
+                          ? `${attachments.length} file · ${links.length} liên kết`
+                          : "Chưa có tài liệu hoặc liên kết"}
+                      </small>
+                    </span>
+                    <span className="resource-summary-control">
+                      <span>{resourcesOpen ? "Thu gọn" : "Mở rộng"}</span>
+                      <ChevronDown size={16} aria-hidden="true" />
+                    </span>
+                  </summary>
+                  <div className="attachment-panel field full">
+                    <div className="attachment-heading">
+                      <div>
+                        <b>File đính kèm</b>
+                        <small>
+                          Thêm URL hoặc upload file để mở nhanh khi xử lý task.
+                        </small>
+                      </div>
+                      <div className="attachment-actions">
+                        <Button
+                          variant="secondary"
+                          type="button"
+                          onClick={addAttachment}
+                        >
+                          <Plus size={14} /> Thêm URL
+                        </Button>
+                        <label className="attachment-upload-button">
+                          <Upload size={14} />
+                          {uploadingAttachment ? "Đang upload…" : "Upload file"}
+                          <input
+                            type="file"
+                            hidden
+                            disabled={uploadingAttachment}
+                            onChange={async (event) => {
+                              const file = event.target.files?.[0];
+                              event.currentTarget.value = "";
+                              if (!file) return;
+                              setUploadingAttachment(true);
+                              const uploaded = await onUploadAttachment(file);
+                              if (uploaded) {
+                                if (uploaded.storage_path)
+                                  uploadedPathsRef.current.add(uploaded.storage_path);
+                                setAttachments((items) =>
+                                  [...items, uploaded].slice(-50),
+                                );
+                              }
+                              setUploadingAttachment(false);
+                            }}
+                          />
+                        </label>
+                      </div>
                     </div>
-                    {checklist.length ? (
-                      <div className="checklist-list">
-                        {checklist.map((item, index) => (
-                          <div className="checklist-row" key={item.id}>
-                            <input
-                              type="checkbox"
-                              checked={item.done}
-                              aria-label={`Hoàn thành bước ${index + 1}`}
-                              onChange={(event) =>
-                                setChecklist((items) =>
-                                  items.map((current) =>
-                                    current.id === item.id
-                                      ? { ...current, done: event.target.checked }
-                                      : current,
-                                  ),
-                                )
-                              }
-                            />
-                            <input
-                              value={item.title}
-                              aria-label={`Nội dung bước ${index + 1}`}
-                              placeholder="Ví dụ: Kiểm tra trên mobile"
-                              onChange={(event) =>
-                                setChecklist((items) =>
-                                  items.map((current) =>
-                                    current.id === item.id
-                                      ? { ...current, title: event.target.value }
-                                      : current,
-                                  ),
-                                )
-                              }
-                            />
-                            <button
-                              className="icon-button mini"
+                    {!attachments.length ? (
+                      <div className="attachment-empty">
+                        <FileText size={22} />
+                        <span>
+                          <b>Chưa có file đính kèm</b>
+                          <small>Upload file hoặc thêm URL thủ công.</small>
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="attachment-list">
+                        {attachments.map((attachment, index) => (
+                          <div className="attachment-card" key={attachment.id}>
+                            <FileText size={18} />
+                            <div className="attachment-fields">
+                              <input
+                                aria-label={`Tên file ${index + 1}`}
+                                value={attachment.name}
+                                placeholder="Tên file"
+                                onChange={(e) =>
+                                  setAttachments((items) =>
+                                    items.map((item, itemIndex) =>
+                                      itemIndex === index
+                                        ? { ...item, name: e.target.value }
+                                        : item,
+                                    ),
+                                  )
+                                }
+                              />
+                              <input
+                                aria-label={`URL file ${index + 1}`}
+                                value={attachment.url}
+                                placeholder="https://..."
+                                onChange={(e) =>
+                                  setAttachments((items) =>
+                                    items.map((item, itemIndex) =>
+                                      itemIndex === index
+                                        ? { ...item, url: e.target.value }
+                                        : item,
+                                    ),
+                                  )
+                                }
+                              />
+                            </div>
+                            {isSafeHttpUrl(attachment.url) ? (
+                              <a
+                                className="attachment-open-button"
+                                href={attachment.url.trim()}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                aria-label={`Mở file đính kèm ${index + 1} trong tab mới`}
+                                title="Mở file trong tab mới"
+                                onClick={(event) => event.stopPropagation()}
+                              >
+                                <ExternalLink size={15} />
+                              </a>
+                            ) : (
+                              <span
+                                className="attachment-open-spacer"
+                                aria-hidden="true"
+                              />
+                            )}
+                            <Button
+                              variant="icon"
+                              className="mini"
                               type="button"
-                              title="Xóa bước checklist"
-                              aria-label={`Xóa bước ${index + 1}`}
-                              onClick={() =>
-                                setChecklist((items) =>
-                                  items.filter((current) => current.id !== item.id),
-                                )
-                              }
+                              aria-label="Xóa file đính kèm"
+                              title="Xóa file đính kèm"
+                              onClick={() => {
+                                const removed = attachments[index];
+                                if (removed?.storage_path) {
+                                  const wasUploadedInSession =
+                                    uploadedPathsRef.current.delete(
+                                      removed.storage_path,
+                                    );
+                                  if (wasUploadedInSession) {
+                                    onDiscardAttachments?.([removed.storage_path]);
+                                  }
+                                }
+                                setAttachments((items) =>
+                                  items.filter((_, itemIndex) => itemIndex !== index),
+                                );
+                              }}
                             >
                               <Trash2 size={14} />
-                            </button>
+                            </Button>
                           </div>
                         ))}
                       </div>
-                    ) : (
-                      <p className="checklist-empty">Chưa có bước checklist.</p>
                     )}
                   </div>
-                  <label className="field full">
-                    <span>Bước tiếp theo</span>
-                    <input
-                      value={form.next_action || ""}
-                      onChange={(e) => field("next_action", e.target.value)}
-                      placeholder="Ví dụ: Chờ QA xác nhận luồng thanh toán"
-                    />
-                  </label>
-                  <label className="field full">
-                    <span>Ghi chú review / vướng mắc</span>
-                    <textarea
-                      rows={3}
-                      value={form.review_note || ""}
-                      onChange={(e) => field("review_note", e.target.value)}
-                      placeholder="Điều cần kiểm tra, phản hồi hoặc lý do đang review..."
-                    />
-                  </label>
-                </details>
-                <details
-                  className="form-block form-block-collapsible full"
-                  aria-labelledby="task-relation-heading"
-                >
-                  <summary className="form-block-heading form-block-summary">
-                    <div>
-                      <h3 id="task-relation-heading">Quan hệ và tài liệu</h3>
-                      <p>Chọn các task cần hoàn tất trước và gắn tài liệu liên quan.</p>
-                    </div>
-                    <span className="form-block-summary-control">
-                      <span>Mở rộng</span>
-                      <ChevronDown size={16} aria-hidden="true" />
-                    </span>
-                  </summary>
-                  <label className="field full">
-                    <span>
-                      Phụ thuộc task khác{" "}
-                      <small>{dependencyIds.length} task đã chọn</small>
-                    </span>
-                    <p className="field-hint" id="dependency-help">
-                      Đây là các task phải hoàn tất trước khi task hiện tại sẵn sàng. Có
-                      thể chọn nhiều task.
-                    </p>
-                    <div
-                      className="dependency-picker"
-                      aria-describedby="dependency-help"
-                    >
-                      <input
-                        type="search"
-                        className="dependency-search"
-                        aria-label="Tìm task phụ thuộc"
-                        placeholder="Tìm theo mã hoặc tiêu đề..."
-                        value={dependencySearch}
-                        onChange={(event) => setDependencySearch(event.target.value)}
-                      />
-                      {(dependencySearch || dependencyMatches.length > 100) && (
-                        <small className="dependency-result-count">
-                          {dependencyMatches.length > 100
-                            ? `Có ${dependencyMatches.length} task phù hợp; đang hiển thị tối đa 100.`
-                            : `${dependencyMatches.length} task phù hợp.`}
-                        </small>
-                      )}
-                      {dependencyCandidates.length ? (
-                        <div className="dependency-list">
-                          {dependencyCandidates.map((candidate) => {
-                            const checked = dependencyIds.includes(candidate.id);
-                            return (
-                              <label
-                                className={`dependency-option${checked ? " selected" : ""}`}
-                                key={candidate.id}
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={checked}
-                                  onChange={() => toggleDependency(candidate.id)}
-                                />
-                                <span>
-                                  <b>{candidate.code || "TASK"}</b>
-                                  <small>{candidate.title}</small>
-                                </span>
-                              </label>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <p className="field-hint">Chưa có task khác để chọn.</p>
-                      )}
-                    </div>
-                  </label>
-                  <details
-                    className="resource-details field full"
-                    open={resourcesOpen}
-                    onToggle={(event) => setResourcesOpen(event.currentTarget.open)}
-                  >
-                    <summary className="resource-summary">
-                      <span className="resource-summary-copy">
-                        <b>Tài liệu & liên kết</b>
+                  <div className="link-section full">
+                    <div className="link-section-heading">
+                      <span>
+                        <b>Liên kết và tài liệu</b>
                         <small>
-                          {attachments.length || links.length
-                            ? `${attachments.length} file · ${links.length} liên kết`
-                            : "Chưa có tài liệu hoặc liên kết"}
+                          Chọn mục đích của link; nếu chưa biết có thể để trống.
                         </small>
                       </span>
-                      <span className="resource-summary-control">
-                        <span>{resourcesOpen ? "Thu gọn" : "Mở rộng"}</span>
-                        <ChevronDown size={16} aria-hidden="true" />
-                      </span>
-                    </summary>
-                    <div className="attachment-panel field full">
-                      <div className="attachment-heading">
-                        <div>
-                          <b>File đính kèm</b>
-                          <small>
-                            Thêm URL hoặc upload file để mở nhanh khi xử lý task.
-                          </small>
-                        </div>
-                        <div className="attachment-actions">
-                          <button
-                            className="secondary-button"
-                            type="button"
-                            onClick={addAttachment}
+                      <Button variant="secondary" type="button" onClick={addLink}>
+                        <Plus size={14} /> Thêm liên kết
+                      </Button>
+                    </div>
+                    {!links.length ? (
+                      <p className="link-empty">Chưa có liên kết nào.</p>
+                    ) : (
+                      links.map((link, index) => {
+                        const isKnownPurpose = linkPurposes.includes(link.label);
+                        const purposeValue = isKnownPurpose ? link.label : "__custom__";
+                        return (
+                          <div
+                            className="link-row link-row-unified"
+                            key={`link-${index}`}
                           >
-                            <Plus size={14} /> Thêm URL
-                          </button>
-                          <label className="attachment-upload-button">
-                            <Upload size={14} />
-                            {uploadingAttachment ? "Đang upload…" : "Upload file"}
-                            <input
-                              type="file"
-                              hidden
-                              disabled={uploadingAttachment}
-                              onChange={async (event) => {
-                                const file = event.target.files?.[0];
-                                event.currentTarget.value = "";
-                                if (!file) return;
-                                setUploadingAttachment(true);
-                                const uploaded = await onUploadAttachment(file);
-                                if (uploaded) {
-                                  if (uploaded.storage_path)
-                                    uploadedPathsRef.current.add(uploaded.storage_path);
-                                  setAttachments((items) =>
-                                    [...items, uploaded].slice(-50),
-                                  );
-                                }
-                                setUploadingAttachment(false);
-                              }}
+                            <Link2 size={15} />
+                            <Select
+                              aria-label={`Mục đích liên kết ${index + 1}`}
+                              value={purposeValue}
+                              options={[
+                                ...linkPurposes.map((purpose) => ({
+                                  value: purpose,
+                                  label: purpose || "Chưa phân loại",
+                                })),
+                                { value: "__custom__", label: "Khác" },
+                              ]}
+                              onValueChange={(value) =>
+                                updateLink(
+                                  index,
+                                  "label",
+                                  value === "__custom__" ? "" : value,
+                                )
+                              }
                             />
-                          </label>
-                        </div>
-                      </div>
-                      {!attachments.length ? (
-                        <div className="attachment-empty">
-                          <FileText size={22} />
-                          <span>
-                            <b>Chưa có file đính kèm</b>
-                            <small>Upload file hoặc thêm URL thủ công.</small>
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="attachment-list">
-                          {attachments.map((attachment, index) => (
-                            <div className="attachment-card" key={attachment.id}>
-                              <FileText size={18} />
-                              <div className="attachment-fields">
-                                <input
-                                  aria-label={`Tên file ${index + 1}`}
-                                  value={attachment.name}
-                                  placeholder="Tên file"
-                                  onChange={(e) =>
-                                    setAttachments((items) =>
-                                      items.map((item, itemIndex) =>
-                                        itemIndex === index
-                                          ? { ...item, name: e.target.value }
-                                          : item,
-                                      ),
-                                    )
-                                  }
-                                />
-                                <input
-                                  aria-label={`URL file ${index + 1}`}
-                                  value={attachment.url}
-                                  placeholder="https://..."
-                                  onChange={(e) =>
-                                    setAttachments((items) =>
-                                      items.map((item, itemIndex) =>
-                                        itemIndex === index
-                                          ? { ...item, url: e.target.value }
-                                          : item,
-                                      ),
-                                    )
-                                  }
-                                />
-                              </div>
-                              {isSafeHttpUrl(attachment.url) ? (
-                                <a
-                                  className="attachment-open-button"
-                                  href={attachment.url.trim()}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  aria-label={`Mở file đính kèm ${index + 1} trong tab mới`}
-                                  title="Mở file trong tab mới"
-                                  onClick={(event) => event.stopPropagation()}
-                                >
-                                  <ExternalLink size={15} />
-                                </a>
-                              ) : (
-                                <span
-                                  className="attachment-open-spacer"
-                                  aria-hidden="true"
-                                />
-                              )}
-                              <button
-                                className="icon-button mini"
-                                type="button"
-                                aria-label="Xóa file đính kèm"
-                                title="Xóa file đính kèm"
-                                onClick={() => {
-                                  const removed = attachments[index];
-                                  if (removed?.storage_path) {
-                                    const wasUploadedInSession =
-                                      uploadedPathsRef.current.delete(
-                                        removed.storage_path,
-                                      );
-                                    if (wasUploadedInSession) {
-                                      onDiscardAttachments?.([removed.storage_path]);
-                                    }
-                                  }
-                                  setAttachments((items) =>
-                                    items.filter((_, itemIndex) => itemIndex !== index),
-                                  );
-                                }}
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <div className="link-section full">
-                      <div className="link-section-heading">
-                        <span>
-                          <b>Liên kết và tài liệu</b>
-                          <small>
-                            Chọn mục đích của link; nếu chưa biết có thể để trống.
-                          </small>
-                        </span>
-                        <button
-                          className="secondary-button"
-                          type="button"
-                          onClick={addLink}
-                        >
-                          <Plus size={14} /> Thêm liên kết
-                        </button>
-                      </div>
-                      {!links.length ? (
-                        <p className="link-empty">Chưa có liên kết nào.</p>
-                      ) : (
-                        links.map((link, index) => {
-                          const isKnownPurpose = linkPurposes.includes(link.label);
-                          const purposeValue = isKnownPurpose
-                            ? link.label
-                            : "__custom__";
-                          return (
-                            <div
-                              className="link-row link-row-unified"
-                              key={`link-${index}`}
-                            >
-                              <Link2 size={15} />
-                              <select
-                                aria-label={`Mục đích liên kết ${index + 1}`}
-                                value={purposeValue}
-                                onChange={(event) =>
-                                  updateLink(
-                                    index,
-                                    "label",
-                                    event.target.value === "__custom__"
-                                      ? ""
-                                      : event.target.value,
-                                  )
-                                }
-                              >
-                                {linkPurposes.map((purpose) => (
-                                  <option key={purpose || "empty"} value={purpose}>
-                                    {purpose || "Chưa phân loại"}
-                                  </option>
-                                ))}
-                                <option value="__custom__">Khác</option>
-                              </select>
-                              {purposeValue === "__custom__" && (
-                                <input
-                                  className="link-purpose-input"
-                                  aria-label={`Tên mục đích liên kết ${index + 1}`}
-                                  value={link.label}
-                                  onChange={(event) =>
-                                    updateLink(index, "label", event.target.value)
-                                  }
-                                  placeholder="Tên mục đích"
-                                />
-                              )}
-                              {purposeValue !== "__custom__" && (
-                                <span
-                                  className="link-purpose-spacer"
-                                  aria-hidden="true"
-                                />
-                              )}
+                            {purposeValue === "__custom__" && (
                               <input
-                                className="link-url"
-                                aria-label={`URL liên kết ${index + 1}`}
-                                value={link.url}
+                                className="link-purpose-input"
+                                aria-label={`Tên mục đích liên kết ${index + 1}`}
+                                value={link.label}
                                 onChange={(event) =>
-                                  updateLink(index, "url", event.target.value)
+                                  updateLink(index, "label", event.target.value)
                                 }
-                                placeholder="https://..."
+                                placeholder="Tên mục đích"
                               />
-                              {isSafeHttpUrl(link.url) ? (
-                                <a
-                                  className="link-open-button"
-                                  href={link.url.trim()}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  aria-label={`Mở liên kết ${index + 1} trong tab mới`}
-                                  title="Mở liên kết trong tab mới"
-                                  onClick={(event) => event.stopPropagation()}
-                                >
-                                  <ExternalLink size={15} />
-                                </a>
-                              ) : (
-                                <span className="link-open-spacer" aria-hidden="true" />
-                              )}
-                              <button
-                                className="icon-button mini"
-                                type="button"
-                                aria-label={`Xóa liên kết ${index + 1}`}
-                                title="Xóa liên kết"
-                                onClick={() => removeLink(index)}
+                            )}
+                            {purposeValue !== "__custom__" && (
+                              <span
+                                className="link-purpose-spacer"
+                                aria-hidden="true"
+                              />
+                            )}
+                            <input
+                              className="link-url"
+                              aria-label={`URL liên kết ${index + 1}`}
+                              value={link.url}
+                              onChange={(event) =>
+                                updateLink(index, "url", event.target.value)
+                              }
+                              placeholder="https://..."
+                            />
+                            {isSafeHttpUrl(link.url) ? (
+                              <a
+                                className="link-open-button"
+                                href={link.url.trim()}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                aria-label={`Mở liên kết ${index + 1} trong tab mới`}
+                                title="Mở liên kết trong tab mới"
+                                onClick={(event) => event.stopPropagation()}
                               >
-                                <Trash2 size={14} />
-                              </button>
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  </details>
+                                <ExternalLink size={15} />
+                              </a>
+                            ) : (
+                              <span className="link-open-spacer" aria-hidden="true" />
+                            )}
+                            <Button
+                              variant="icon"
+                              className="mini"
+                              type="button"
+                              aria-label={`Xóa liên kết ${index + 1}`}
+                              title="Xóa liên kết"
+                              onClick={() => removeLink(index)}
+                            >
+                              <Trash2 size={14} />
+                            </Button>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
                 </details>
-              </div>
-            </fieldset>
-          ) : activeTab === "history" ? (
-            <TaskHistoryPanel activity={form.activity} locale={locale} />
-          ) : (
-            <TaskCommentsPanel
-              comments={form.comments}
-              members={members}
-              locale={locale}
-              authorId={commentAuthorId}
-              canComment={!isNew && !readOnly}
-              onAddComment={(comment) => {
-                onAddComment?.(form.id, comment);
-                setForm((current) => ({
-                  ...current,
-                  comments: [...(current.comments || []), comment],
-                }));
-              }}
-              onTogglePin={(commentId) => {
-                onToggleCommentPin?.(form.id, commentId);
-                setForm((current) => ({
-                  ...current,
-                  comments: (current.comments || []).map((comment) =>
-                    comment.id === commentId
-                      ? { ...comment, pinned: !comment.pinned }
-                      : comment,
-                  ),
-                }));
-              }}
-            />
-          )}
-        </div>
-        <footer className="modal-footer">
-          {!isNew && (
-            <button
-              className="danger-button ghost"
-              disabled={readOnly}
-              onClick={task.archived_at ? onRestore : onDelete}
-            >
-              {task.archived_at ? <RotateCcw size={15} /> : <Archive size={15} />}
-              {task.archived_at ? "Khôi phục task" : "Lưu trữ task"}
-            </button>
-          )}
-          {!isNew && (
-            <button
-              className="text-button"
-              type="button"
-              disabled={readOnly}
-              onClick={onSaveTemplate}
-            >
-              <Copy size={14} />
-              Lưu thành template
-            </button>
-          )}
-          <span />
-          <button className="secondary-button" onClick={closeModal}>
-            <X size={15} />
-            Hủy
-          </button>
-          <button
-            className="secondary-button"
-            type="button"
-            disabled={readOnly || !form.title.trim()}
-            onClick={() => save(true)}
+              </details>
+            </div>
+          </fieldset>
+        ) : activeTab === "history" ? (
+          <TaskHistoryPanel activity={form.activity} locale={locale} />
+        ) : (
+          <TaskCommentsPanel
+            comments={form.comments}
+            members={members}
+            locale={locale}
+            authorId={commentAuthorId}
+            canComment={!isNew && !readOnly}
+            onAddComment={(comment) => {
+              onAddComment?.(form.id, comment);
+              setForm((current) => ({
+                ...current,
+                comments: [...(current.comments || []), comment],
+              }));
+            }}
+            onTogglePin={(commentId) => {
+              onToggleCommentPin?.(form.id, commentId);
+              setForm((current) => ({
+                ...current,
+                comments: (current.comments || []).map((comment) =>
+                  comment.id === commentId
+                    ? { ...comment, pinned: !comment.pinned }
+                    : comment,
+                ),
+              }));
+            }}
+          />
+        )}
+      </div>
+      <footer className="modal-footer">
+        {!isNew && (
+          <Button
+            variant="danger"
+            className="ghost"
+            disabled={readOnly}
+            onClick={task.archived_at ? onRestore : onDelete}
           >
-            <FilePenLine size={15} />
-            Lưu nháp
-          </button>
-          <button
-            className="primary-button"
+            {task.archived_at ? <RotateCcw size={15} /> : <Archive size={15} />}
+            {task.archived_at ? "Khôi phục task" : "Lưu trữ task"}
+          </Button>
+        )}
+        {!isNew && (
+          <Button
+            variant="text"
             type="button"
-            disabled={readOnly || !form.title.trim()}
-            onClick={() => save(false)}
+            disabled={readOnly}
+            onClick={onSaveTemplate}
           >
-            <Check size={15} />
-            Lưu task
-          </button>
-        </footer>
-      </section>
-    </div>
+            <Copy size={14} />
+            Lưu thành template
+          </Button>
+        )}
+        <span />
+        <Button variant="secondary" onClick={closeModal}>
+          <X size={15} />
+          Hủy
+        </Button>
+        <Button
+          variant="secondary"
+          type="button"
+          disabled={readOnly || !form.title.trim()}
+          onClick={() => save(true)}
+        >
+          <FilePenLine size={15} />
+          Lưu nháp
+        </Button>
+        <Button
+          variant="primary"
+          type="button"
+          disabled={readOnly || !form.title.trim()}
+          onClick={() => save(false)}
+        >
+          <Check size={15} />
+          Lưu task
+        </Button>
+      </footer>
+    </DialogFrame>
   );
 }

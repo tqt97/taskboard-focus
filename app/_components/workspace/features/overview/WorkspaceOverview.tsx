@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/app/_components/ui/Button";
 import {
   AlertTriangle,
   ArrowRight,
@@ -101,7 +102,7 @@ function ActionLane({
       {tasks.length ? (
         <div className="overview-action-list">
           {tasks.slice(0, 3).map((task) => (
-            <button
+            <Button
               className="overview-action-row"
               key={task.id}
               onClick={() => onOpenTask(task)}
@@ -113,7 +114,7 @@ function ActionLane({
               </span>
               <em>{task.deadline ? dueText(task.deadline, copy) : "—"}</em>
               <ArrowRight size={15} />
-            </button>
+            </Button>
           ))}
         </div>
       ) : (
@@ -289,33 +290,29 @@ export function WorkspaceOverview({
                 )}
               </div>
               <div className="overview-next-action-buttons">
-                <button
-                  className="primary-button"
+                <Button
+                  variant="primary"
                   onClick={() => onQuickUpdate(nextTask)}
                   type="button"
                 >
                   <CirclePlay size={16} /> {nextActionCopy.label}
-                </button>
-                <button
-                  className="secondary-button"
+                </Button>
+                <Button
+                  variant="secondary"
                   onClick={() => onOpenTask(nextTask)}
                   type="button"
                 >
                   Xem chi tiết <ArrowRight size={15} />
-                </button>
+                </Button>
               </div>
             </>
           ) : (
             <>
               <h2>{copy.overview.noWorkTitle}</h2>
               <p>{copy.overview.noWorkDescription}</p>
-              <button
-                className="secondary-button"
-                onClick={onBrowseTasks}
-                type="button"
-              >
+              <Button variant="secondary" onClick={onBrowseTasks} type="button">
                 <ListChecks size={16} /> {copy.overview.browseTasks}
-              </button>
+              </Button>
             </>
           )}
         </div>

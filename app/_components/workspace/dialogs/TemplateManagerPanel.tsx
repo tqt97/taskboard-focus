@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/app/_components/ui/Button";
 import { useState } from "react";
 import { Check, Pencil, Trash2, X } from "lucide-react";
 import type { TaskTemplate } from "@/lib/types";
@@ -39,17 +40,17 @@ export function TemplateManagerPanel({
                   value={draft}
                   onChange={(event) => setDraft(event.target.value)}
                 />
-                <button className="icon-button" aria-label="Lưu tên template">
+                <Button variant="icon" aria-label="Lưu tên template">
                   <Check size={16} />
-                </button>
-                <button
-                  className="icon-button"
+                </Button>
+                <Button
+                  variant="icon"
                   type="button"
                   aria-label="Hủy đổi tên"
                   onClick={() => setEditingId("")}
                 >
                   <X size={16} />
-                </button>
+                </Button>
               </form>
             ) : (
               <>
@@ -61,22 +62,23 @@ export function TemplateManagerPanel({
                   <small>Chỉ xem</small>
                 ) : deleteId === template.id ? (
                   <div className="template-manager-actions">
-                    <button
-                      className="text-button danger-text"
+                    <Button
+                      variant="text"
+                      className="danger-text"
                       onClick={() => {
                         if (onDelete(template.id)) setDeleteId("");
                       }}
                     >
                       Xác nhận xóa
-                    </button>
-                    <button className="text-button" onClick={() => setDeleteId("")}>
+                    </Button>
+                    <Button variant="text" onClick={() => setDeleteId("")}>
                       Hủy
-                    </button>
+                    </Button>
                   </div>
                 ) : (
                   <div className="template-manager-actions">
-                    <button
-                      className="icon-button"
+                    <Button
+                      variant="icon"
                       aria-label={`Đổi tên ${template.name}`}
                       onClick={() => {
                         setDraft(template.name);
@@ -85,14 +87,15 @@ export function TemplateManagerPanel({
                       }}
                     >
                       <Pencil size={15} />
-                    </button>
-                    <button
-                      className="icon-button danger-text"
+                    </Button>
+                    <Button
+                      variant="icon"
+                      className="danger-text"
                       aria-label={`Xóa ${template.name}`}
                       onClick={() => setDeleteId(template.id)}
                     >
                       <Trash2 size={15} />
-                    </button>
+                    </Button>
                   </div>
                 )}
               </>

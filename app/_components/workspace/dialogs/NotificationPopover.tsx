@@ -1,4 +1,5 @@
 "use client";
+import { Button } from "@/app/_components/ui/Button";
 import { AlertTriangle, Bell, Check, CheckCheck, Clock3, X } from "lucide-react";
 
 export type BoardNotification = {
@@ -35,23 +36,23 @@ export function NotificationPopover({
           </small>
         </div>
         <div className="notification-actions">
-          <button
+          <Button
             aria-label="Đánh dấu tất cả đã xem"
             onClick={onReadAll}
             disabled={!items.some((item) => !item.read)}
             title="Đánh dấu tất cả đã xem"
           >
             <CheckCheck size={15} />
-          </button>
-          <button onClick={onClose} aria-label="Đóng thông báo" title="Đóng thông báo">
+          </Button>
+          <Button onClick={onClose} aria-label="Đóng thông báo" title="Đóng thông báo">
             <X size={15} />
-          </button>
+          </Button>
         </div>
       </header>
       {items.length ? (
         <div className="notification-list">
           {items.map((item) => (
-            <button
+            <Button
               className={item.read ? "notification-row read" : "notification-row"}
               key={item.id}
               onClick={() => {
@@ -75,7 +76,7 @@ export function NotificationPopover({
               ) : (
                 <i className="unread-dot" />
               )}
-            </button>
+            </Button>
           ))}
         </div>
       ) : (

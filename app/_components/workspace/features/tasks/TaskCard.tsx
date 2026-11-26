@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/app/_components/ui/Button";
 import {
   CalendarDays,
   CheckCheck,
@@ -104,7 +105,7 @@ export function TaskCard({
             onChange={() => onToggleSelection(task.id)}
           />
         )}
-        <button
+        <Button
           className="task-code-copy"
           type="button"
           title={`Copy mã ${task.code || "TASK"}`}
@@ -116,7 +117,7 @@ export function TaskCard({
         >
           <span className="task-code">{task.code || "TASK"}</span>
           <Copy size={12} aria-hidden="true" />
-        </button>
+        </Button>
         {(task.priority === "urgent" || task.priority === "high") && (
           <span
             className={`priority-badge priority-badge-${task.priority}`}
@@ -125,8 +126,9 @@ export function TaskCard({
             {task.priority === "urgent" ? "KHẨN" : "CAO"}
           </span>
         )}
-        <button
-          className="icon-button mini"
+        <Button
+          variant="icon"
+          className="mini"
           aria-label="Mở task"
           title="Mở chi tiết task"
           onClick={(event) => {
@@ -135,7 +137,7 @@ export function TaskCard({
           }}
         >
           <MoreHorizontal size={17} />
-        </button>
+        </Button>
       </div>
       {editingTitle ? (
         <form
@@ -162,12 +164,18 @@ export function TaskCard({
               }
             }}
           />
-          <button type="submit" className="icon-button mini" aria-label="Lưu tiêu đề">
+          <Button
+            type="submit"
+            variant="icon"
+            className="mini"
+            aria-label="Lưu tiêu đề"
+          >
             <Save size={14} />
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
-            className="icon-button mini"
+            variant="icon"
+            className="mini"
             aria-label="Hủy sửa tiêu đề"
             onClick={() => {
               setEditingTitle(false);
@@ -175,15 +183,16 @@ export function TaskCard({
             }}
           >
             <X size={14} />
-          </button>
+          </Button>
         </form>
       ) : (
         <div className="task-title-row">
           <h3>{task.title}</h3>
           {canEdit && !selectionMode && (
-            <button
+            <Button
               type="button"
-              className="icon-button mini task-inline-edit"
+              variant="icon"
+              className="mini task-inline-edit"
               aria-label={`Sửa nhanh ${task.code || "TASK"}`}
               title="Sửa tiêu đề nhanh"
               onClick={(event) => {
@@ -193,7 +202,7 @@ export function TaskCard({
               }}
             >
               <Pencil size={13} />
-            </button>
+            </Button>
           )}
         </div>
       )}
@@ -220,7 +229,7 @@ export function TaskCard({
       ) : null}
       {!selectionMode && (
         <div className="task-card-actions" onClick={(event) => event.stopPropagation()}>
-          <button
+          <Button
             type="button"
             className={`task-quick-action${task.status === "review" ? " success" : ""}`}
             title={primaryAction.title}
@@ -235,7 +244,7 @@ export function TaskCard({
               <Play size={13} />
             )}
             {primaryAction.label}
-          </button>
+          </Button>
         </div>
       )}
       <div className="task-meta">

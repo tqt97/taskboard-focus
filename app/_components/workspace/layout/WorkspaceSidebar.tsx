@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/app/_components/ui/Button";
 import {
   CalendarDays,
   CalendarRange,
@@ -8,9 +9,9 @@ import {
   ListTodo,
   LockKeyhole,
   Plus,
-  ChevronDown,
 } from "lucide-react";
 import type { LocalWorkspaceSummary } from "@/lib/storage/indexed-db-board-storage";
+import { Select } from "@/app/_components/ui/Select";
 import type { WorkspaceView } from "./workspace-routes";
 
 export type WorkspaceNavigationCounts = {
@@ -58,76 +59,73 @@ export function WorkspaceSidebar({
       <div className="sidebar-workspace">
         <span className="sidebar-workspace-label">Workspace hiện tại</span>
         <div className="workspace-switcher-wrap">
-          <div className="workspace-switcher-display" aria-hidden="true">
-            <span className="workspace-switcher-name">{workspaceName}</span>
-            <ChevronDown size={15} />
-          </div>
-          <select
+          <Select
             className="workspace-switcher"
             aria-label="Chọn workspace"
             value={workspaceId}
-            onChange={(event) => void onSwitchWorkspace(event.target.value)}
-          >
-            {!workspaces.some((workspace) => workspace.id === "default") && (
-              <option value="default">Workspace cá nhân</option>
-            )}
-            {workspaces.map((workspace) => (
-              <option value={workspace.id} key={workspace.id}>
-                {workspace.name}
-              </option>
-            ))}
-          </select>
-          <button
-            className="icon-button mini"
+            options={[
+              ...(!workspaces.some((workspace) => workspace.id === "default")
+                ? [{ value: "default", label: "Workspace cá nhân" }]
+                : []),
+              ...workspaces.map((workspace) => ({
+                value: workspace.id,
+                label: workspace.name,
+              })),
+            ]}
+            onValueChange={(value) => void onSwitchWorkspace(value)}
+          />
+          <Button
+            variant="icon"
+            className="mini"
             type="button"
             aria-label="Tạo workspace"
             title="Tạo workspace mới"
             onClick={() => void onCreateWorkspace()}
           >
             <Plus size={14} />
-          </button>
+          </Button>
         </div>
       </div>
       <nav>
-        <button
+        <Button
           className={view === "overview" ? "nav-item active" : "nav-item"}
           onClick={() => onNavigate("/")}
         >
           <LayoutDashboard size={18} />
           Tổng quan
-        </button>
+        </Button>
         <span className="nav-divider" aria-hidden="true" />
-        <button
+        <Button
           className={view === "today" ? "nav-item active" : "nav-item"}
           onClick={() => onNavigate("/today")}
         >
           <CalendarDays size={18} />
           Hôm nay<span className="nav-count">{counts.today}</span>
-        </button>
+        </Button>
         <span className="nav-divider" aria-hidden="true" />
-        <button
+        <Button
           className={view === "drafts" ? "nav-item active" : "nav-item"}
           onClick={() => onNavigate("/drafts")}
         >
           <FilePenLine size={18} />
           Bản nháp<span className="nav-count">{counts.drafts}</span>
-        </button>
+        </Button>
         <span className="nav-divider" aria-hidden="true" />
-        <button
+        <Button
           className={view === "tasks" ? "nav-item active" : "nav-item"}
           onClick={() => onNavigate("/tasks")}
         >
           <ListTodo size={18} />
           Danh sách task<span className="nav-count">{counts.active}</span>
-        </button>
+        </Button>
         <span className="nav-divider" aria-hidden="true" />
-        <button
+        <Button
           className={view === "timeline" ? "nav-item active" : "nav-item"}
           onClick={() => onNavigate("/timeline")}
         >
           <CalendarRange size={18} />
           Lịch & timeline
-        </button>
+        </Button>
       </nav>
       <div className="sidebar-bottom">
         <div className="profile">
@@ -136,14 +134,14 @@ export function WorkspaceSidebar({
             <b>{displayName}</b>
             <small>Local workspace</small>
           </span>
-          <button
-            className="icon-button"
+          <Button
+            variant="icon"
             title="Khóa màn hình"
             aria-label="Khóa màn hình"
             onClick={onLock}
           >
             <LockKeyhole size={16} />
-          </button>
+          </Button>
         </div>
       </div>
     </aside>

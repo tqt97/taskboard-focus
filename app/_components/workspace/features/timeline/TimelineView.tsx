@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/app/_components/ui/Button";
 import { useMemo, useState } from "react";
 import {
   CalendarRange,
@@ -10,6 +11,7 @@ import {
 } from "lucide-react";
 import { intlLocale, type AppLocale } from "@/lib/i18n";
 import type { Member, Task } from "@/lib/types";
+import { Select } from "@/app/_components/ui/Select";
 
 type TimelineMode = "calendar" | "timeline";
 type MilestoneKey = "dev_up" | "staging_up" | "release_at" | "deadline";
@@ -206,67 +208,65 @@ export function TimelineView({
     <section className="timeline-view panel" aria-label={labels.aria}>
       <div className="timeline-toolbar">
         <div className="timeline-mode-switch" role="tablist" aria-label="Kiểu hiển thị">
-          <button
+          <Button
             className={mode === "calendar" ? "selected" : ""}
             role="tab"
             aria-selected={mode === "calendar"}
             onClick={() => setMode("calendar")}
           >
             <CalendarRange size={15} /> {labels.calendar}
-          </button>
-          <button
+          </Button>
+          <Button
             className={mode === "timeline" ? "selected" : ""}
             role="tab"
             aria-selected={mode === "timeline"}
             onClick={() => setMode("timeline")}
           >
             <GitBranch size={15} /> {labels.timeline}
-          </button>
+          </Button>
         </div>
         <div className="timeline-filters">
           <label>
             <span>{labels.assignee}</span>
-            <select
+            <Select
+              aria-label={labels.assignee}
               value={assignee}
-              onChange={(event) => setAssignee(event.target.value)}
-            >
-              <option value="all">{labels.all}</option>
-              {members
-                .filter((member) => member.active)
-                .map((member) => (
-                  <option value={member.id} key={member.id}>
-                    {member.name}
-                  </option>
-                ))}
-            </select>
+              options={[
+                { value: "all", label: labels.all },
+                ...members
+                  .filter((member) => member.active)
+                  .map((member) => ({ value: member.id, label: member.name })),
+              ]}
+              onValueChange={setAssignee}
+            />
           </label>
           <label>
             <span>{labels.milestone}</span>
-            <select
+            <Select
+              aria-label={labels.milestone}
               value={milestoneFilter}
-              onChange={(event) =>
-                setMilestoneFilter(event.target.value as MilestoneFilter)
-              }
-            >
-              <option value="all">{labels.allMilestones}</option>
-              {milestones.map((milestone) => (
-                <option value={milestone.key} key={milestone.key}>
-                  {milestone.label}
-                </option>
-              ))}
-            </select>
+              options={[
+                { value: "all", label: labels.allMilestones },
+                ...milestones.map((milestone) => ({
+                  value: milestone.key,
+                  label: milestone.label,
+                })),
+              ]}
+              onValueChange={(value) => setMilestoneFilter(value as MilestoneFilter)}
+            />
           </label>
         </div>
       </div>
       <div className="timeline-period-bar">
-        <button
-          className="icon-button mini"
+        <Button
+          variant="icon"
+          className="mini"
           title={labels.previous}
           aria-label={labels.previous}
           onClick={() => moveCursor(-1)}
         >
           <ChevronLeft size={16} />
-        </button>
+        </Button>
         <strong>
           {formatDate(days[0], { day: "2-digit", month: "short" }, locale)} —{" "}
           {formatDate(
@@ -279,20 +279,22 @@ export function TimelineView({
             locale,
           )}
         </strong>
-        <button
-          className="icon-button mini"
+        <Button
+          variant="icon"
+          className="mini"
           title={labels.next}
           aria-label={labels.next}
           onClick={() => moveCursor(1)}
         >
           <ChevronRight size={16} />
-        </button>
-        <button
-          className="secondary-button timeline-today"
+        </Button>
+        <Button
+          variant="secondary"
+          className="timeline-today"
           onClick={() => setCursor(startOfWeek(new Date()))}
         >
           {labels.today}
-        </button>
+        </Button>
         <span className="timeline-drag-hint">
           <Move size={13} /> {readOnly ? labels.readOnlyDragHint : labels.dragHint}
         </span>
@@ -315,7 +317,7 @@ export function TimelineView({
               <div className="calendar-events">
                 {visibleTasks.flatMap((task) =>
                   eventsForDay(task, day).map((milestone) => (
-                    <button
+                    <Button
                       className={`calendar-event milestone-${milestone.key}${milestone.key === "deadline" ? "" : " milestone-not-draggable"}`}
                       key={`${task.id}-${milestone.key}`}
                       draggable={milestone.key === "deadline" && !readOnly}
@@ -329,7 +331,7 @@ export function TimelineView({
                         <b>{task.code || "TASK"}</b>
                         <small>{milestone.short}</small>
                       </span>
-                    </button>
+                    </Button>
                   )),
                 )}
                 {!visibleTasks.some((task) => eventsForDay(task, day).length) && (
@@ -362,7 +364,7 @@ export function TimelineView({
               .filter((item): item is Task => Boolean(item));
             return (
               <div className="release-timeline-row" key={task.id}>
-                <button className="release-task-name" onClick={() => onOpenTask(task)}>
+                <Button className="release-task-name" onClick={() => onOpenTask(task)}>
                   <span>
                     <b>{task.code || "TASK"}</b> · {task.title}
                   </span>
@@ -379,7 +381,7 @@ export function TimelineView({
                       </>
                     )}
                   </small>
-                </button>
+                </Button>
                 {days.map((day) => (
                   <div
                     className={`release-day-cell${dateKey(day) === dateKey(new Date()) ? " today" : ""}`}
@@ -390,7 +392,7 @@ export function TimelineView({
                     onDrop={() => dropDeadline(day)}
                   >
                     {eventsForDay(task, day).map((milestone) => (
-                      <button
+                      <Button
                         className={`release-milestone milestone-${milestone.key}${milestone.key === "deadline" ? "" : " milestone-not-draggable"}`}
                         key={`${task.id}-${milestone.key}`}
                         draggable={milestone.key === "deadline" && !readOnly}
@@ -401,7 +403,7 @@ export function TimelineView({
                       >
                         <i />
                         <span>{milestone.short}</span>
-                      </button>
+                      </Button>
                     ))}
                   </div>
                 ))}

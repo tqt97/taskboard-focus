@@ -1,8 +1,10 @@
 "use client";
 
+import { Button } from "@/app/_components/ui/Button";
 import { useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Check, Clock3, Eye, EyeOff, LockKeyhole, ShieldCheck } from "lucide-react";
+import { Select } from "@/app/_components/ui/Select";
 import {
   createScreenLockConfig,
   defaultScreenLockConfig,
@@ -174,7 +176,7 @@ export function ScreenLockGate({
             <div className={`screen-lock-field ${errors.passcode ? "has-error" : ""}`}>
               <div className="screen-lock-field-heading">
                 <span>Passcode</span>
-                <button
+                <Button
                   className="screen-lock-show-passcode"
                   type="button"
                   onClick={() => setShowPasscode((value) => !value)}
@@ -182,7 +184,7 @@ export function ScreenLockGate({
                 >
                   {showPasscode ? <EyeOff size={14} /> : <Eye size={14} />}
                   <span>{showPasscode ? "Ẩn passcode" : "Hiện passcode"}</span>
-                </button>
+                </Button>
               </div>
               <div className="screen-lock-otp-row">
                 {digits.map((digit, index) => (
@@ -215,17 +217,19 @@ export function ScreenLockGate({
                 <span>
                   <Clock3 size={14} /> Tự khóa sau
                 </span>
-                <select
-                  value={minutes}
-                  onChange={(event) => setMinutes(Number(event.target.value))}
-                >
-                  <option value={0}>Không tự khóa</option>
-                  <option value={1}>1 phút không hoạt động</option>
-                  <option value={5}>5 phút không hoạt động</option>
-                  <option value={15}>15 phút không hoạt động</option>
-                  <option value={30}>30 phút không hoạt động</option>
-                  <option value={60}>60 phút không hoạt động</option>
-                </select>
+                <Select
+                  aria-label="Tự khóa sau"
+                  value={String(minutes)}
+                  options={[
+                    { value: "0", label: "Không tự khóa" },
+                    { value: "1", label: "1 phút không hoạt động" },
+                    { value: "5", label: "5 phút không hoạt động" },
+                    { value: "15", label: "15 phút không hoạt động" },
+                    { value: "30", label: "30 phút không hoạt động" },
+                    { value: "60", label: "60 phút không hoạt động" },
+                  ]}
+                  onValueChange={(value) => setMinutes(Number(value))}
+                />
               </label>
             )}
             {setup && (
@@ -244,23 +248,25 @@ export function ScreenLockGate({
                 <small>Bạn nên đổi passcode trước khi dùng dữ liệu nhạy cảm.</small>
               </p>
             )}
-            <button
-              className="primary-button screen-lock-submit"
+            <Button
+              variant="primary"
+              className="screen-lock-submit"
               type="submit"
               disabled={busy}
             >
               <Check size={16} /> {setup ? "Bắt đầu sử dụng" : "Mở khóa"}
-            </button>
+            </Button>
             {!setup && (
               <div className="screen-lock-reset">
                 {!resetOpen ? (
-                  <button
-                    className="text-button screen-lock-reset-trigger"
+                  <Button
+                    variant="text"
+                    className="screen-lock-reset-trigger"
                     type="button"
                     onClick={() => setResetOpen(true)}
                   >
                     Quên passcode hoặc đang dùng mã cũ?
-                  </button>
+                  </Button>
                 ) : (
                   <div className="screen-lock-reset-confirm">
                     <p>
@@ -278,8 +284,8 @@ export function ScreenLockGate({
                       autoFocus
                     />
                     <div>
-                      <button
-                        className="text-button"
+                      <Button
+                        variant="text"
                         type="button"
                         onClick={() => {
                           setResetOpen(false);
@@ -287,15 +293,15 @@ export function ScreenLockGate({
                         }}
                       >
                         Hủy
-                      </button>
-                      <button
-                        className="danger-button"
+                      </Button>
+                      <Button
+                        variant="danger"
                         type="button"
                         disabled={resetConfirmation.trim() !== "RESET" || busy}
                         onClick={() => void onReset()}
                       >
                         Reset khóa màn hình
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 )}

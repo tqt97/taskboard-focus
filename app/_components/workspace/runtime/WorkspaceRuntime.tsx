@@ -1,4 +1,5 @@
 "use client";
+import { Button } from "@/app/_components/ui/Button";
 import {
   useCallback,
   useDeferredValue,
@@ -73,6 +74,7 @@ import { createQuickCaptureTask } from "@/lib/taskboard/quick-capture";
 import { updateTaskTitleInline } from "@/lib/taskboard/inline-edit";
 import { parseBoardBackupText, restoreBoardSnapshot } from "@/lib/taskboard/backup";
 import { WorkspacePageHeading } from "../layout/WorkspacePageHeading";
+import { Select } from "@/app/_components/ui/Select";
 import { ScreenLockGate } from "../dialogs/ScreenLockGate";
 import {
   clearUnlockSession,
@@ -1976,16 +1978,20 @@ export default function WorkspaceRuntime({
                 {(view === "tasks" || view === "today" || view === "drafts") && (
                   <>
                     {templates.length > 0 && (
-                      <select
+                      <Select
                         className="template-select"
                         aria-label="Tạo task từ template"
-                        defaultValue=""
+                        value=""
                         disabled={!canEditWorkspace}
-                        onChange={(event) => {
-                          const template = templates.find(
-                            (item) => item.id === event.target.value,
-                          );
-                          event.currentTarget.value = "";
+                        options={[
+                          { value: "", label: "Template" },
+                          ...templates.map((template) => ({
+                            value: template.id,
+                            label: template.name,
+                          })),
+                        ]}
+                        onValueChange={(value) => {
+                          const template = templates.find((item) => item.id === value);
                           if (!template) return;
                           setTemplateCreateMode(true);
                           setEdit(
@@ -1996,17 +2002,10 @@ export default function WorkspaceRuntime({
                           );
                           setModal("task");
                         }}
-                      >
-                        <option value="">Template</option>
-                        {templates.map((template) => (
-                          <option key={template.id} value={template.id}>
-                            {template.name}
-                          </option>
-                        ))}
-                      </select>
+                      />
                     )}
-                    <button
-                      className="primary-button"
+                    <Button
+                      variant="primary"
                       disabled={!canEditWorkspace}
                       onClick={() => {
                         setTemplateCreateMode(false);
@@ -2015,7 +2014,7 @@ export default function WorkspaceRuntime({
                       }}
                     >
                       <Plus size={17} /> {canEditWorkspace ? "Tạo task" : "Chỉ xem"}
-                    </button>
+                    </Button>
                   </>
                 )}
               </div>
@@ -2101,8 +2100,8 @@ export default function WorkspaceRuntime({
                           động
                         </p>
                       </div>
-                      <button
-                        className="icon-button"
+                      <Button
+                        variant="icon"
                         aria-label="Mở quản lý thành viên"
                         title="Mở quản lý thành viên"
                         onClick={() => {
@@ -2111,7 +2110,7 @@ export default function WorkspaceRuntime({
                         }}
                       >
                         <Users size={17} />
-                      </button>
+                      </Button>
                     </div>
                     <div className="member-list">
                       {data.members
@@ -2138,7 +2137,7 @@ export default function WorkspaceRuntime({
                           </div>
                         ))}
                     </div>
-                    <button
+                    <Button
                       className="manage-button"
                       onClick={() => {
                         setSettingsTab("members");
@@ -2146,7 +2145,7 @@ export default function WorkspaceRuntime({
                       }}
                     >
                       Quản lý thành viên <span>→</span>
-                    </button>
+                    </Button>
                   </section>
                 </aside>
               )}
@@ -2423,9 +2422,9 @@ export default function WorkspaceRuntime({
             <Check size={16} />
             {toast}
             {undoState && (
-              <button className="toast-action" onClick={undoLast}>
+              <Button className="toast-action" onClick={undoLast}>
                 Hoàn tác
-              </button>
+              </Button>
             )}
           </div>
         )}

@@ -1,9 +1,11 @@
 "use client";
 
+import { Button } from "@/app/_components/ui/Button";
 import { useState } from "react";
 import { Pin, Reply } from "lucide-react";
 import type { Member, TaskComment } from "@/lib/types";
 import type { AppLocale } from "@/lib/i18n";
+import { Select } from "@/app/_components/ui/Select";
 import { createTaskComment } from "@/lib/taskboard/comments";
 import { formatActivityDate } from "@/lib/taskboard/activity";
 
@@ -74,22 +76,22 @@ export function TaskCommentsPanel({
                 )}
                 <p>{comment.body}</p>
                 <div className="task-comment-actions">
-                  <button
+                  <Button
                     type="button"
-                    className="text-button"
+                    variant="text"
                     disabled={!canComment}
                     onClick={() => setReplyTo(comment.id)}
                   >
                     <Reply size={13} /> Trả lời
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
-                    className="text-button"
+                    variant="text"
                     disabled={!canComment}
                     onClick={() => onTogglePin(comment.id)}
                   >
                     <Pin size={13} /> {comment.pinned ? "Bỏ ghim" : "Ghim"}
-                  </button>
+                  </Button>
                 </div>
               </article>
             );
@@ -106,13 +108,13 @@ export function TaskCommentsPanel({
           {replyTo && (
             <small>
               Đang trả lời một comment{" "}
-              <button
+              <Button
                 type="button"
-                className="text-button"
+                variant="text"
                 onClick={() => setReplyTo(undefined)}
               >
                 Hủy
-              </button>
+              </Button>
             </small>
           )}
           <textarea
@@ -128,36 +130,32 @@ export function TaskCommentsPanel({
             </small>
           )}
           <div className="task-comment-composer-footer">
-            <select
+            <Select
               aria-label="Mention thành viên"
-              defaultValue=""
-              onChange={(event) => {
-                const member = members.find((item) => item.id === event.target.value);
+              value=""
+              options={[
+                { value: "", label: "Mention thành viên" },
+                ...members
+                  .filter((member) => member.active)
+                  .map((member) => ({ value: member.id, label: `@${member.name}` })),
+              ]}
+              onValueChange={(value) => {
+                const member = members.find((item) => item.id === value);
                 if (member)
                   setBody(
                     (current) =>
                       `${current}${current && !current.endsWith(" ") ? " " : ""}@${member.name} `,
                   );
-                event.currentTarget.value = "";
               }}
-            >
-              <option value="">Mention thành viên</option>
-              {members
-                .filter((member) => member.active)
-                .map((member) => (
-                  <option value={member.id} key={member.id}>
-                    @{member.name}
-                  </option>
-                ))}
-            </select>
-            <button
+            />
+            <Button
               type="button"
-              className="primary-button"
+              variant="primary"
               disabled={!body.trim()}
               onClick={submit}
             >
               Gửi comment
-            </button>
+            </Button>
           </div>
         </div>
       )}
