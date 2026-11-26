@@ -26,6 +26,7 @@
 ## Giới hạn cần hiểu rõ
 
 - `WorkspaceRuntime` vẫn là UI orchestration lớn; `WorkspaceLayout`, `WorkspaceProvider`, `WorkspaceSidebar`, `WorkspaceHeader`, selector, storage, repository, permission và domain utility đã được tách thành các seam an toàn. Bước tiếp theo là tách persistence/mutations/permissions sâu hơn khi có profiler evidence, không rewrite toàn bộ cùng lúc với migration remote.
+- Palette đã có semantic token dùng chung cho surface, focus, info, warning, success, danger và status; light/dark mode không còn phụ thuộc vào các màu trạng thái hardcode chính trong task card, error, milestone và priority badge.
 - Supabase sync được gọi chủ động bằng nút push/pull: cần cấu hình Auth, `NEXT_PUBLIC_SUPABASE_URL` và anon key. Không đưa service role key vào client.
 - Push reminder chỉ gửi task đã đồng bộ cloud và chỉ cho `TASKBOARD_OWNER_ID`; browser reminder cục bộ vẫn chạy khi tab mở.
 - Backup nudge nhắc người dùng tải JSON; việc lưu file ở nơi an toàn vẫn do người dùng thực hiện.
