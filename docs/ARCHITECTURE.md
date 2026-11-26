@@ -1,6 +1,6 @@
 # Kiến trúc
 
-Typography dùng Geist Sans self-host với Latin và Latin Extended subsets; giao diện không gọi dịch vụ font bên ngoài khi người dùng mở app. `WorkspaceShell` là route entry nhẹ, hiển thị loading shell có cấu trúc và tải `WorkspaceCoordinator` bằng dynamic import. Coordinator giữ state và domain mutations; task modal, settings/dialogs, Kanban, timeline, dashboard analytics và notification popover vẫn được tách theo nhu cầu.
+Typography dùng Geist Sans self-host với Latin và Latin Extended subsets; giao diện không gọi dịch vụ font bên ngoài khi người dùng mở app. `layout/WorkspaceShell` là server route entry nhẹ; `layout/WorkspaceEntry` là client boundary để hiển thị loading shell có cấu trúc và tải `state/WorkspaceCoordinator` bằng dynamic import. Coordinator hiện là runtime state/mutation module; task modal, settings/dialogs, Kanban, timeline, dashboard analytics và notification popover được tách theo nhu cầu.
 
 Task details tách activity history và comments panel khỏi `TaskModal`; panel comments tự quản lý composer/reply state, còn mutation callback giữ đồng bộ form và workspace state.
 
@@ -11,8 +11,9 @@ Các view/dialog ít dùng được tải bằng dynamic import để giảm Jav
 - Next.js App Router 15 + React 19 + TypeScript.
 - Route entries giữ mỏng ở `app/page.tsx` và `app/tasks/page.tsx`; workspace UI nằm trong `app/_components/workspace/`.
 - Layout cross-route nằm trong `app/_components/layout/`; `app/layout.tsx`, `app/loading.tsx`, `app/error.tsx` và `app/manifest.ts` chỉ là thin entries cho App Router.
-- Các route workspace dùng `WorkspaceShell.tsx` làm entry point và defer `WorkspaceCoordinator.tsx` khỏi bundle khởi tạo. Coordinator điều phối state/view; dashboard analytics, saved views, shortcuts, backup restore và push delivery đã tách module/hook riêng. `TaskModal.tsx` phụ trách CRUD form và giới hạn dependency candidates theo search; `WorkspaceDialogs.tsx` giữ settings/confirm/lock dialog; `NotificationPopover.tsx` phụ trách notification UI. Design tokens và component styles dùng chung ở `app/globals.css`.
+- Các route workspace dùng `layout/WorkspaceShell.tsx` làm server entry và `layout/WorkspaceEntry.tsx` làm client boundary; `state/WorkspaceCoordinator.tsx` được defer khỏi bundle khởi tạo. `views/` chỉ chứa dashboard, timeline và task board; `dialogs/` chứa modal/popover; `hooks/` chứa side effect. Mỗi route có `loading.tsx` riêng nhưng dùng chung `layout/WorkspaceRouteLoading.tsx` để giữ layout ổn định khi chuyển trang. Coordinator điều phối state/view; dashboard analytics, saved views, shortcuts, backup restore và push delivery đã tách module/hook riêng. `dialogs/task/TaskModal.tsx` phụ trách CRUD form và giới hạn dependency candidates theo search; `dialogs/WorkspaceDialogs.tsx` giữ settings/confirm/lock dialog; `dialogs/NotificationPopover.tsx` phụ trách notification UI. Design tokens và component styles dùng chung ở `app/globals.css`.
 - `lib/data.ts` giữ demo seed và adapter dữ liệu; persistence local ưu tiên IndexedDB, localStorage được giữ làm fallback/migration cho môi trường không hỗ trợ IndexedDB.
+- `lib/supabase-config.ts` chỉ kiểm tra cấu hình cloud bằng biến môi trường; Auth, repository, realtime và Supabase SDK được tải qua `loadCloudModules()` khi cloud thực sự được dùng. Attachment storage cũng lazy-load theo thao tác upload/mở link.
 - `lib/types.ts` là hợp đồng dữ liệu.
 - `lib/taskboard/constraints.ts` kiểm tra các quan hệ xuyên entity (assignee, dependency, activity) sau khi từng entity đã hợp lệ.
 - `lib/taskboard/permissions.ts` tách quyền workspace (`owner/admin/member/viewer`) khỏi chức danh công việc của member.
@@ -44,7 +45,7 @@ Validation shape nằm ở `lib/data.ts`; validation relation nằm ở `lib/tas
 
 ## Performance budget hiện tại
 
-- Build production lần rà soát 2026-11-25 tạo First Load JS khoảng 203 kB cho các route workspace (`/`, `/tasks`, `/today`, `/inbox`, `/timeline`). Mốc trước đợt tối ưu gần nhất là 208 kB; con số phụ thuộc phiên bản dependency và cần cập nhật sau build có thay đổi bundle.
+- Build production lần rà soát 2026-11-26 ghi First Load JS khoảng 105 kB cho các route workspace (`/`, `/tasks`, `/today`, `/inbox`, `/timeline`). Bảng summary của Next chưa phải waterfall đầy đủ; cần bundle analyzer hoặc production trace để xác nhận các deferred cloud chunks không bị tải sớm.
 - Task modal được tải theo nhu cầu bằng dynamic import để initial render không phải tải form CRUD và attachment controls.
 - Settings/confirm/lock dialog cũng được tải theo nhu cầu; route metadata có title, description và canonical riêng cho `/tasks`, `/today`, `/login`.
 - Geist Sans được self-host với Latin/Latin Extended; file font có content hash và cache `public, max-age=31536000, immutable`. CSS vẫn có system fallback để xử lý khi font tải lỗi.

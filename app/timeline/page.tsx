@@ -1,4 +1,4 @@
-import { WorkspaceShell } from "@/app/_components/workspace/WorkspaceShell";
+import { WorkspaceShell } from "@/app/_components/workspace/layout/WorkspaceShell";
 
 export const metadata = {
   title: "Calendar & timeline | Taskboard",

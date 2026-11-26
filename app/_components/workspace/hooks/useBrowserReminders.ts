@@ -6,7 +6,7 @@ import {
   getBrowserReminderId,
   isWithinQuietHours,
 } from "@/lib/taskboard/notifications";
-import type { ReminderSettings } from "../WorkspaceDialogs";
+import type { ReminderSettings } from "../dialogs/WorkspaceDialogs";
 
 const storageKey = "taskboard-browser-reminders-v1";
 const milestoneFields = [

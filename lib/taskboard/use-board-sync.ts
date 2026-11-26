@@ -1,14 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { getCurrentUser } from "../auth";
-import {
-  createSupabaseRemoteTaskRepository,
-  createSupabaseTaskRepository,
-  fromRemoteEntityId,
-  type SyncState,
-} from "../repositories/task-repository";
-import { supabase } from "../supabase";
+import { loadCloudModules, isSupabaseConfigured } from "../supabase-config";
+import type { SyncState } from "../repositories/task-repository";
+import { fromRemoteEntityId } from "./remote-identifiers";
 import type { BoardData, Member, Task } from "../types";
 import { mergeConflictFields } from "./conflicts";
 import {
@@ -31,17 +26,18 @@ export function useBoardSync(
   const [conflictCount, setConflictCount] = useState(0);
   const revisionRef = useRef<string | undefined>(undefined);
   const flushQueuedTasks = useCallback(async () => {
-    const user = await getCurrentUser();
+    const { auth, repository } = await loadCloudModules();
+    const user = await auth.getCurrentUser();
     if (!user) return;
     for (const item of remoteSyncQueue.listDue(new Date(), user.id)) {
       try {
-        const repository = createSupabaseRemoteTaskRepository(
+        const remoteRepository = repository.createSupabaseRemoteTaskRepository(
           user.id,
           item.workspaceId === "default" ? undefined : item.workspaceId,
         );
         if (item.operation === "remove")
-          await repository.remove(item.task.id, item.task.updated_at);
-        else await repository.upsert(item.task, item.members);
+          await remoteRepository.remove(item.task.id, item.task.updated_at);
+        else await remoteRepository.upsert(item.task, item.members);
         remoteSyncQueue.acknowledge(item.key, user.id);
       } catch (error) {
         const message =
@@ -53,7 +49,7 @@ export function useBoardSync(
     }
   }, [workspaceId]);
   useEffect(() => {
-    if (!supabase) return;
+    if (!isSupabaseConfigured) return;
     const flush = () => void flushQueuedTasks();
     flush();
     window.addEventListener("online", flush);
@@ -64,10 +60,11 @@ export function useBoardSync(
     };
   }, [flushQueuedTasks]);
   useEffect(() => {
-    if (!supabase) return;
+    if (!isSupabaseConfigured) return;
     let cancelled = false;
     void (async () => {
-      const user = await getCurrentUser();
+      const { auth, repository } = await loadCloudModules();
+      const user = await auth.getCurrentUser();
       if (!user || cancelled) return;
       const blockedItems = remoteSyncQueue
         .listBlocked(user.id)
@@ -78,11 +75,11 @@ export function useBoardSync(
       const local = data.tasks.find((task) => task.id === blocked.task.id);
       if (!local) return;
       try {
-        const repository = createSupabaseRemoteTaskRepository(
+        const remoteRepository = repository.createSupabaseRemoteTaskRepository(
           user.id,
           workspaceId === "default" ? undefined : workspaceId,
         );
-        const remote = await repository.get(local.id);
+        const remote = await remoteRepository.get(local.id);
         if (!cancelled && remote) {
           setConflict({
             local,
@@ -99,101 +96,106 @@ export function useBoardSync(
     };
   }, [data.tasks, workspaceId]);
   useEffect(() => {
-    const client = supabase;
-    if (!client) return;
-    let channel: ReturnType<typeof client.channel> | undefined;
+    if (!isSupabaseConfigured) return;
+    let client: Awaited<ReturnType<typeof loadCloudModules>>["client"]["supabase"];
+    let channel: ReturnType<NonNullable<typeof client>["channel"]> | undefined;
     let cancelled = false;
-    void getCurrentUser().then((user) => {
-      if (!user || cancelled) return;
-      const refreshRemoteTask = (id: string) => {
-        void (async () => {
-          try {
-            const repository = createSupabaseRemoteTaskRepository(
-              user.id,
-              workspaceId === "default" ? undefined : workspaceId,
-            );
-            const task = await repository.get(id);
-            if (cancelled || !task?.title) return;
-            setData((current) => ({
-              ...current,
-              tasks: current.tasks.some((item) => item.id === task.id)
-                ? current.tasks.map((item) => {
-                    if (item.id !== task.id) return item;
-                    const localTime = new Date(item.updated_at).getTime();
-                    const remoteTime = new Date(task.updated_at).getTime();
-                    return localTime > remoteTime ? item : { ...item, ...task };
-                  })
-                : [...current.tasks, task],
-            }));
-          } catch {
-            // A transient read failure will be recovered by the next realtime event or Pull.
-          }
-        })();
-      };
-      channel = client
-        .channel(`taskboard-tasks-${user.id}`)
-        .on(
-          "postgres_changes",
-          {
-            event: "*",
-            schema: "public",
-            table: "tasks",
-            filter:
-              workspaceId === "default"
-                ? `owner_id=eq.${user.id}`
-                : `workspace_id=eq.${workspaceId}`,
-          },
-          (payload) => {
-            if (payload.eventType === "DELETE") {
-              const old = payload.old as { id?: string; updated_at?: string };
-              const id = fromRemoteEntityId(
-                String(old.id || ""),
+    void loadCloudModules().then(({ auth, repository, client: modules }) => {
+      const cloudClient = modules.supabase;
+      if (!cloudClient) return;
+      client = cloudClient;
+      return auth.getCurrentUser().then((user) => {
+        if (!user || cancelled) return;
+        const refreshRemoteTask = (id: string) => {
+          void (async () => {
+            try {
+              const remoteRepository = repository.createSupabaseRemoteTaskRepository(
                 user.id,
                 workspaceId === "default" ? undefined : workspaceId,
               );
-              if (id)
-                setData((current) => {
-                  const localTask = current.tasks.find((task) => task.id === id);
-                  const localTime = localTask
-                    ? new Date(localTask.updated_at).getTime()
-                    : 0;
-                  const remoteTime = old.updated_at
-                    ? new Date(old.updated_at).getTime()
-                    : Number.MAX_SAFE_INTEGER;
-                  return localTask && localTime > remoteTime
-                    ? current
-                    : {
-                        ...current,
-                        tasks: current.tasks.filter((task) => task.id !== id),
-                      };
-                });
-              return;
+              const task = await remoteRepository.get(id);
+              if (cancelled || !task?.title) return;
+              setData((current) => ({
+                ...current,
+                tasks: current.tasks.some((item) => item.id === task.id)
+                  ? current.tasks.map((item) => {
+                      if (item.id !== task.id) return item;
+                      const localTime = new Date(item.updated_at).getTime();
+                      const remoteTime = new Date(task.updated_at).getTime();
+                      return localTime > remoteTime ? item : { ...item, ...task };
+                    })
+                  : [...current.tasks, task],
+              }));
+            } catch {
+              // A transient read failure will be recovered by the next realtime event or Pull.
             }
-            const id = String((payload.new as { id?: string }).id || "");
-            if (!id) return;
-            refreshRemoteTask(id);
-          },
-        )
-        .on(
-          "postgres_changes",
-          {
-            event: "*",
-            schema: "public",
-            table: "task_assignees",
-          },
-          (payload) => {
-            const next = payload.new as { task_id?: string };
-            const previous = payload.old as { task_id?: string };
-            const id = String(next.task_id || previous.task_id || "");
-            if (!id) return;
-            refreshRemoteTask(id);
-          },
-        )
-        .subscribe();
+          })();
+        };
+        channel = cloudClient
+          .channel(`taskboard-tasks-${user.id}`)
+          .on(
+            "postgres_changes",
+            {
+              event: "*",
+              schema: "public",
+              table: "tasks",
+              filter:
+                workspaceId === "default"
+                  ? `owner_id=eq.${user.id}`
+                  : `workspace_id=eq.${workspaceId}`,
+            },
+            (payload) => {
+              if (payload.eventType === "DELETE") {
+                const old = payload.old as { id?: string; updated_at?: string };
+                const id = fromRemoteEntityId(
+                  String(old.id || ""),
+                  user.id,
+                  workspaceId === "default" ? undefined : workspaceId,
+                );
+                if (id)
+                  setData((current) => {
+                    const localTask = current.tasks.find((task) => task.id === id);
+                    const localTime = localTask
+                      ? new Date(localTask.updated_at).getTime()
+                      : 0;
+                    const remoteTime = old.updated_at
+                      ? new Date(old.updated_at).getTime()
+                      : Number.MAX_SAFE_INTEGER;
+                    return localTask && localTime > remoteTime
+                      ? current
+                      : {
+                          ...current,
+                          tasks: current.tasks.filter((task) => task.id !== id),
+                        };
+                  });
+                return;
+              }
+              const id = String((payload.new as { id?: string }).id || "");
+              if (!id) return;
+              refreshRemoteTask(id);
+            },
+          )
+          .on(
+            "postgres_changes",
+            {
+              event: "*",
+              schema: "public",
+              table: "task_assignees",
+            },
+            (payload) => {
+              const next = payload.new as { task_id?: string };
+              const previous = payload.old as { task_id?: string };
+              const id = String(next.task_id || previous.task_id || "");
+              if (!id) return;
+              refreshRemoteTask(id);
+            },
+          )
+          .subscribe();
+      });
     });
     return () => {
       cancelled = true;
-      if (channel) void client.removeChannel(channel);
+      if (channel && client) void client.removeChannel(channel);
     };
   }, [setData, workspaceId]);
   const syncTask = useCallback(
@@ -204,16 +206,21 @@ export function useBoardSync(
     ) => {
       setSyncState({ status: "syncing" });
       let ownerId = "anonymous";
+      let cloudRepository:
+        Awaited<ReturnType<typeof loadCloudModules>>["repository"] | null = null;
       try {
-        const user = await getCurrentUser();
+        const { auth, repository } = await loadCloudModules();
+        cloudRepository = repository;
+        const user = await auth.getCurrentUser();
         if (!user) throw new Error("Hãy đăng nhập Supabase trước khi đồng bộ task.");
         ownerId = user.id;
-        const repository = createSupabaseRemoteTaskRepository(
+        const remoteRepository = repository.createSupabaseRemoteTaskRepository(
           user.id,
           workspaceId === "default" ? undefined : workspaceId,
         );
-        if (operation === "remove") await repository.remove(task.id, task.updated_at);
-        else await repository.upsert(task, members);
+        if (operation === "remove")
+          await remoteRepository.remove(task.id, task.updated_at);
+        else await remoteRepository.upsert(task, members);
         remoteSyncQueue.acknowledge(`${workspaceId}:${task.id}`, ownerId);
         setSyncState({ status: "synced", at: new Date().toISOString() });
       } catch (error) {
@@ -244,11 +251,14 @@ export function useBoardSync(
           );
           if (isRemoteConflict(message)) {
             try {
-              const remoteRepository = createSupabaseRemoteTaskRepository(
-                ownerId,
-                workspaceId === "default" ? undefined : workspaceId,
-              );
-              const remote = await remoteRepository.get(task.id);
+              const remoteRepository =
+                cloudRepository?.createSupabaseRemoteTaskRepository(
+                  ownerId,
+                  workspaceId === "default" ? undefined : workspaceId,
+                );
+              const remote = remoteRepository
+                ? await remoteRepository.get(task.id)
+                : null;
               if (remote) setConflict({ local: task, remote, message });
             } catch {
               // The sync error remains visible even when the comparison read fails.
@@ -271,18 +281,19 @@ export function useBoardSync(
     async (direction: "pull" | "push") => {
       setSyncState({ status: "syncing" });
       try {
-        const user = await getCurrentUser();
+        const { auth, repository } = await loadCloudModules();
+        const user = await auth.getCurrentUser();
         if (!user) throw new Error("Hãy đăng nhập Supabase trước khi đồng bộ.");
-        const repository = createSupabaseTaskRepository(
+        const taskRepository = repository.createSupabaseTaskRepository(
           user.id,
           workspaceId === "default" ? undefined : workspaceId,
         );
         if (direction === "pull") {
-          const { data: remote, revision } = await repository.loadWithRevision();
+          const { data: remote, revision } = await taskRepository.loadWithRevision();
           revisionRef.current = revision;
           setData(remote);
         } else {
-          revisionRef.current = await repository.save(data, revisionRef.current);
+          revisionRef.current = await taskRepository.save(data, revisionRef.current);
         }
         setSyncState({ status: "synced", at: new Date().toISOString() });
       } catch (error) {
@@ -300,9 +311,10 @@ export function useBoardSync(
       remoteFields: ReadonlySet<keyof Task> = new Set(),
     ) => {
       if (!conflict) return;
-      const user = await getCurrentUser();
+      const { auth, repository } = await loadCloudModules();
+      const user = await auth.getCurrentUser();
       if (!user) throw new Error("Hãy đăng nhập Supabase trước khi xử lý conflict.");
-      const repository = createSupabaseRemoteTaskRepository(
+      const remoteRepository = repository.createSupabaseRemoteTaskRepository(
         user.id,
         workspaceId === "default" ? undefined : workspaceId,
       );
@@ -326,7 +338,7 @@ export function useBoardSync(
           },
         ].slice(-200),
       };
-      await repository.resolveConflict(next, data.members);
+      await remoteRepository.resolveConflict(next, data.members);
       remoteSyncQueue.acknowledge(`${workspaceId}:${next.id}`, user.id);
       setConflictCount((count) => Math.max(0, count - 1));
       setData((current) => ({

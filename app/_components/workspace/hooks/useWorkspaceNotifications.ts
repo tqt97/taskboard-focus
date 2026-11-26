@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import type { AppLocale, UiCopy } from "@/lib/i18n";
 import type { Member, Task } from "@/lib/types";
-import type { BoardNotification } from "../NotificationPopover";
+import type { BoardNotification } from "../dialogs/NotificationPopover";
 
 type ReminderItem = { task: Task; label: string; date: string };
 

@@ -1,4 +1,4 @@
-import { WorkspaceShell } from "../_components/workspace/WorkspaceShell";
+import { WorkspaceShell } from "../_components/workspace/layout/WorkspaceShell";
 
 export const metadata = {
   title: "Today | Taskboard",

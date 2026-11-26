@@ -52,7 +52,7 @@ import type {
   TaskActivity,
   TaskTemplate,
 } from "@/lib/types";
-import type { ReminderSettings } from "./WorkspaceDialogs";
+import type { ReminderSettings } from "../dialogs/WorkspaceDialogs";
 import { getTodayTasks, isArchived, isDueToday } from "@/lib/taskboard/selectors";
 import { toDateInputValue } from "@/lib/taskboard/dates";
 import {
@@ -77,95 +77,97 @@ import {
   deleteTaskTemplate,
   renameTaskTemplate,
 } from "@/lib/taskboard/templates";
-import { getAccessToken, getCurrentUser } from "@/lib/auth";
-import {
-  deleteTaskAttachment,
-  resolveTaskAttachmentUrl,
-  uploadTaskAttachment,
-} from "@/lib/storage/attachment-storage";
-import { supabase } from "@/lib/supabase";
-import {
-  createSupabaseTaskRepository,
-  createSupabaseWorkspaceRepository,
-  type RemoteWorkspaceMember,
-} from "@/lib/repositories/task-repository";
+import { loadCloudModules, isSupabaseConfigured } from "@/lib/supabase-config";
+import type { RemoteWorkspaceMember } from "@/lib/repositories/task-repository";
 import { can, type WorkspaceRole } from "@/lib/taskboard/permissions";
 import {
   getPrimaryStatusAction,
   resolveStatusTransition,
 } from "@/lib/taskboard/status-transitions";
-import { useTaskMutations } from "./hooks/useTaskMutations";
+import { useTaskMutations } from "../hooks/useTaskMutations";
 import { mergeBoardImport } from "@/lib/taskboard/import-merge";
 import { diffTaskFields } from "@/lib/taskboard/activity-diff";
-import { useWorkspacePersistence } from "./hooks/useWorkspacePersistence";
-import { useWorkspaceNotifications } from "./hooks/useWorkspaceNotifications";
-import { useBrowserReminders } from "./hooks/useBrowserReminders";
+import { useWorkspacePersistence } from "../hooks/useWorkspacePersistence";
+import { useWorkspaceNotifications } from "../hooks/useWorkspaceNotifications";
+import { useBrowserReminders } from "../hooks/useBrowserReminders";
 import { createQuickCaptureTask } from "@/lib/taskboard/quick-capture";
 import { updateTaskTitleInline } from "@/lib/taskboard/inline-edit";
 import { parseBoardBackupText, restoreBoardSnapshot } from "@/lib/taskboard/backup";
-import { QuickCapture } from "./QuickCapture";
-import { WorkspacePageHeading } from "./WorkspacePageHeading";
-import { persistSavedViews, useSavedViews } from "./hooks/useSavedViews";
-import { useWorkspaceShortcuts } from "./hooks/useWorkspaceShortcuts";
-import { WorkspaceLoading } from "./WorkspaceLoading";
-import type { WorkspaceView } from "./WorkspaceShell";
+import { WorkspacePageHeading } from "../layout/WorkspacePageHeading";
+import { persistSavedViews, useSavedViews } from "../hooks/useSavedViews";
+import { useWorkspaceShortcuts } from "../hooks/useWorkspaceShortcuts";
+import { WorkspaceLoading } from "../layout/WorkspaceLoading";
+import type { WorkspaceView } from "../layout/WorkspaceShell";
 
 const StructuredTaskModal = dynamic(
-  () => import("./TaskModal").then((module) => module.TaskModal),
+  () => import("../dialogs/task/TaskModal").then((module) => module.TaskModal),
   {
     ssr: false,
     loading: () => <div className="overlay" aria-label="Đang mở biểu mẫu" />,
   },
 );
+const QuickCapture = dynamic(
+  () => import("../dialogs/QuickCapture").then((module) => module.QuickCapture),
+  { ssr: false },
+);
 const SettingsModal = dynamic(
-  () => import("./WorkspaceDialogs").then((module) => module.SettingsModal),
+  () => import("../dialogs/WorkspaceDialogs").then((module) => module.SettingsModal),
   { ssr: false },
 );
 const ConfirmDialog = dynamic(
-  () => import("./WorkspaceDialogs").then((module) => module.ConfirmDialog),
+  () => import("../dialogs/WorkspaceDialogs").then((module) => module.ConfirmDialog),
   { ssr: false },
 );
 const LockModal = dynamic(
-  () => import("./WorkspaceDialogs").then((module) => module.LockModal),
+  () => import("../dialogs/WorkspaceDialogs").then((module) => module.LockModal),
   { ssr: false },
 );
 const WorkspaceOverview = dynamic(
-  () => import("./WorkspaceOverview").then((module) => module.WorkspaceOverview),
+  () =>
+    import("../views/overview/WorkspaceOverview").then(
+      (module) => module.WorkspaceOverview,
+    ),
   { ssr: false, loading: () => <div className="board-loading" aria-busy="true" /> },
 );
 const TaskBoardColumns = dynamic(
-  () => import("./TaskBoardColumns").then((module) => module.TaskBoardColumns),
+  () =>
+    import("../views/tasks/TaskBoardColumns").then((module) => module.TaskBoardColumns),
   {
     ssr: false,
     loading: () => <div className="board-loading" aria-busy="true" />,
   },
 );
 const LazyTaskCard = dynamic(
-  () => import("./TaskCard").then((module) => module.TaskCard),
+  () => import("../views/tasks/TaskCard").then((module) => module.TaskCard),
   { ssr: false },
 );
 const TimelineView = dynamic(
-  () => import("./TimelineView").then((module) => module.TimelineView),
+  () => import("../views/timeline/TimelineView").then((module) => module.TimelineView),
   {
     ssr: false,
     loading: () => <div className="timeline-loading" aria-busy="true" />,
   },
 );
 const NotificationPopover = dynamic(
-  () => import("./NotificationPopover").then((module) => module.NotificationPopover),
+  () =>
+    import("../dialogs/NotificationPopover").then(
+      (module) => module.NotificationPopover,
+    ),
   { ssr: false },
 );
 const ImportDialog = dynamic(
-  () => import("./ImportDialog").then((module) => module.ImportDialog),
+  () => import("../dialogs/ImportDialog").then((module) => module.ImportDialog),
   { ssr: false },
 );
 const ConflictDialog = dynamic(
-  () => import("./ConflictDialog").then((module) => module.ConflictDialog),
+  () => import("../dialogs/ConflictDialog").then((module) => module.ConflictDialog),
   { ssr: false },
 );
 const TemplateManagerDialog = dynamic(
   () =>
-    import("./TemplateManagerDialog").then((module) => module.TemplateManagerDialog),
+    import("../dialogs/TemplateManagerDialog").then(
+      (module) => module.TemplateManagerDialog,
+    ),
   { ssr: false },
 );
 
@@ -328,10 +330,8 @@ function formatDate(s: string, locale: AppLocale) {
 }
 export default function Board({
   initialView = "overview",
-  quickCaptureRequest = 0,
 }: {
   initialView?: WorkspaceView;
-  quickCaptureRequest?: number;
 }) {
   const router = useRouter();
   const view = initialView;
@@ -392,7 +392,6 @@ export default function Board({
     [cloudUserId, setCloudUserId] = useState(""),
     [cloudUserEmail, setCloudUserEmail] = useState(""),
     [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "error">("saved");
-  const lastQuickCaptureRequest = useRef(0);
   const { savedViews, setSavedViews } = useSavedViews(workspaceId, ready);
   useEffect(() => setSelectedSavedViewId(""), [workspaceId]);
   const {
@@ -404,7 +403,7 @@ export default function Board({
     resolveConflict,
     dismissConflict,
   } = useBoardSync(data, setData, workspaceId);
-  const cloudConfigured = Boolean(supabase);
+  const cloudConfigured = isSupabaseConfigured;
   const copy = getUiCopy(locale);
   const reminderDueText = useCallback((value: string) => dueText(value, copy), [copy]);
   const currentWorkspaceRole = remoteWorkspaceRoles[workspaceId] || "owner";
@@ -430,11 +429,6 @@ export default function Board({
     searchRef,
     onQuickCapture: openQuickCapture,
   });
-  useEffect(() => {
-    if (quickCaptureRequest <= lastQuickCaptureRequest.current) return;
-    lastQuickCaptureRequest.current = quickCaptureRequest;
-    if (!modal && canEditWorkspace) setModal("quick-capture");
-  }, [canEditWorkspace, modal, quickCaptureRequest]);
   const labels = copy.status;
   const priorityLabels = copy.priority;
   const greeting =
@@ -473,34 +467,37 @@ export default function Board({
     setDisplayName(readDisplayName());
     setLocale(readStoredLocale());
     if (cloudConfigured) {
-      void getCurrentUser().then((user) => {
-        setCloudUserId(user?.id || "");
-        setCloudUserEmail(user?.email || "");
-        if (!user) return;
-        void createSupabaseWorkspaceRepository(user.id)
-          .list()
-          .then((workspaces) => {
-            setRemoteWorkspaceIds(workspaces.map((workspace) => workspace.id));
-            setRemoteWorkspaceRoles(
-              Object.fromEntries(
-                workspaces.map((workspace) => [workspace.id, workspace.role]),
-              ),
-            );
-            setLocalWorkspaces((current) => [
-              ...current.filter(
-                (item) => !workspaces.some((workspace) => workspace.id === item.id),
-              ),
-              ...workspaces.map((workspace) => ({
-                id: workspace.id,
-                name: workspace.name,
-                updatedAt: workspace.updated_at,
-              })),
-            ]);
-          })
-          .catch(() => {
-            // Local mode remains usable when the remote workspace catalog is unavailable.
-          });
-      });
+      void loadCloudModules().then(({ auth, repository }) =>
+        auth.getCurrentUser().then((user) => {
+          setCloudUserId(user?.id || "");
+          setCloudUserEmail(user?.email || "");
+          if (!user) return;
+          void repository
+            .createSupabaseWorkspaceRepository(user.id)
+            .list()
+            .then((workspaces) => {
+              setRemoteWorkspaceIds(workspaces.map((workspace) => workspace.id));
+              setRemoteWorkspaceRoles(
+                Object.fromEntries(
+                  workspaces.map((workspace) => [workspace.id, workspace.role]),
+                ),
+              );
+              setLocalWorkspaces((current) => [
+                ...current.filter(
+                  (item) => !workspaces.some((workspace) => workspace.id === item.id),
+                ),
+                ...workspaces.map((workspace) => ({
+                  id: workspace.id,
+                  name: workspace.name,
+                  updatedAt: workspace.updated_at,
+                })),
+              ]);
+            })
+            .catch(() => {
+              // Local mode remains usable when the remote workspace catalog is unavailable.
+            });
+        }),
+      );
     }
     if ("Notification" in window) setBrowserPermission(Notification.permission);
     else setBrowserPermission("unsupported");
@@ -829,12 +826,15 @@ export default function Board({
     }
     let nextData: BoardData | null = null;
     if (remoteWorkspaceIds.includes(nextId) && cloudUserEmail) {
-      const user = await getCurrentUser();
+      const { auth, repository } = await loadCloudModules();
+      const user = await auth.getCurrentUser();
       if (user) {
         try {
-          const workspaceRepository = createSupabaseWorkspaceRepository(user.id);
+          const workspaceRepository = repository.createSupabaseWorkspaceRepository(
+            user.id,
+          );
           const [snapshot, memberships, taskMembers] = await Promise.all([
-            createSupabaseTaskRepository(user.id, nextId).loadWithRevision(),
+            repository.createSupabaseTaskRepository(user.id, nextId).loadWithRevision(),
             workspaceRepository.listMembers(nextId),
             workspaceRepository.listTaskMembers(nextId),
           ]);
@@ -871,10 +871,13 @@ export default function Board({
     const name = window.prompt("Tên workspace mới", "Workspace mới")?.trim();
     if (!name) return;
     if (cloudConfigured && cloudUserEmail) {
-      const user = await getCurrentUser();
+      const { auth, repository } = await loadCloudModules();
+      const user = await auth.getCurrentUser();
       if (user) {
         try {
-          const workspaceRepository = createSupabaseWorkspaceRepository(user.id);
+          const workspaceRepository = repository.createSupabaseWorkspaceRepository(
+            user.id,
+          );
           const workspace = await workspaceRepository.create(name);
           const initialData: BoardData = {
             ...demoData,
@@ -884,7 +887,9 @@ export default function Board({
             sort_mode: "smart",
           };
           try {
-            await createSupabaseTaskRepository(user.id, workspace.id).save(initialData);
+            await repository
+              .createSupabaseTaskRepository(user.id, workspace.id)
+              .save(initialData);
           } catch (snapshotError) {
             await workspaceRepository.remove(workspace.id).catch(() => undefined);
             throw snapshotError;
@@ -953,14 +958,13 @@ export default function Board({
       setToast("Bạn không có quyền quản lý thành viên workspace này.");
       return;
     }
-    const user = await getCurrentUser();
+    const { auth, repository } = await loadCloudModules();
+    const user = await auth.getCurrentUser();
     if (!user) return;
     try {
-      await createSupabaseWorkspaceRepository(user.id).setMemberRole(
-        workspaceId,
-        userId,
-        role,
-      );
+      await repository
+        .createSupabaseWorkspaceRepository(user.id)
+        .setMemberRole(workspaceId, userId, role);
       setRemoteMembers((members) =>
         members.some((member) => member.user_id === userId)
           ? members.map((member) =>
@@ -986,17 +990,17 @@ export default function Board({
       setToast("Bạn không có quyền quản lý thành viên workspace này.");
       return;
     }
-    const user = await getCurrentUser();
+    const { auth, repository } = await loadCloudModules();
+    const user = await auth.getCurrentUser();
     if (!user) return;
     if (userId === user.id) {
       setToast("Không thể tự xóa owner khỏi workspace.");
       return;
     }
     try {
-      await createSupabaseWorkspaceRepository(user.id).removeMember(
-        workspaceId,
-        userId,
-      );
+      await repository
+        .createSupabaseWorkspaceRepository(user.id)
+        .removeMember(workspaceId, userId);
       setRemoteMembers((members) =>
         members.filter((member) => member.user_id !== userId),
       );
@@ -1013,7 +1017,8 @@ export default function Board({
       setToast("Bạn không có quyền mời thành viên workspace này.");
       return;
     }
-    const token = await getAccessToken();
+    const { auth, repository } = await loadCloudModules();
+    const token = await auth.getAccessToken();
     if (!token) {
       setToast("Phiên cloud đã hết hạn; hãy đăng nhập lại rồi thử mời.");
       return;
@@ -1032,11 +1037,11 @@ export default function Board({
         user_id?: string;
       };
       if (!response.ok) throw new Error(payload.error || "Không thể gửi lời mời.");
-      const user = await getCurrentUser();
+      const user = await auth.getCurrentUser();
       if (user) {
-        const members = await createSupabaseWorkspaceRepository(user.id).listMembers(
-          workspaceId,
-        );
+        const members = await repository
+          .createSupabaseWorkspaceRepository(user.id)
+          .listMembers(workspaceId);
         setRemoteMembers(members);
       }
       setToast(`Đã gửi lời mời tới ${email}.`);
@@ -1183,7 +1188,8 @@ export default function Board({
     return true;
   };
   const togglePushNotifications = async (enabled: boolean) => {
-    const accessToken = await getAccessToken();
+    const { auth } = await loadCloudModules();
+    const accessToken = await auth.getAccessToken();
     const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
     if (!accessToken || !vapidPublicKey) {
       setToast("Push cần phiên owner cloud và VAPID public key đã cấu hình.");
@@ -1294,11 +1300,14 @@ export default function Board({
       const removedPaths = (previous.attachments || [])
         .map((item) => item.storage_path)
         .filter((path): path is string => Boolean(path) && !nextPaths.has(path));
-      void Promise.all(removedPaths.map((path) => deleteTaskAttachment(path))).catch(
-        (error) =>
-          setToast(
-            error instanceof Error ? error.message : "Không thể dọn file đã xóa.",
-          ),
+      void Promise.all(
+        removedPaths.map(async (path) => {
+          const { deleteTaskAttachment } =
+            await import("@/lib/storage/attachment-storage");
+          return deleteTaskAttachment(path);
+        }),
+      ).catch((error) =>
+        setToast(error instanceof Error ? error.message : "Không thể dọn file đã xóa."),
       );
     }
     const activityType: TaskActivity["type"] = !previous
@@ -1576,8 +1585,10 @@ export default function Board({
       return null;
     }
     try {
-      const user = await getCurrentUser();
+      const { auth } = await loadCloudModules();
+      const user = await auth.getCurrentUser();
       if (!user) throw new Error("Hãy đăng nhập Supabase để upload file.");
+      const { uploadTaskAttachment } = await import("@/lib/storage/attachment-storage");
       return await uploadTaskAttachment(
         file,
         user.id,
@@ -1589,7 +1600,9 @@ export default function Board({
     }
   };
   const resolveAttachmentUrl = async (storagePath: string) =>
-    resolveTaskAttachmentUrl(storagePath);
+    (await import("@/lib/storage/attachment-storage")).resolveTaskAttachmentUrl(
+      storagePath,
+    );
   const restoreTask = (id: string) => {
     rememberUndo("khôi phục task");
     const timestamp = new Date().toISOString();
@@ -2646,7 +2659,11 @@ export default function Board({
           onResolveAttachmentUrl={resolveAttachmentUrl}
           onDiscardAttachments={(storagePaths) => {
             void Promise.all(
-              storagePaths.map((path) => deleteTaskAttachment(path)),
+              storagePaths.map(async (path) => {
+                const { deleteTaskAttachment } =
+                  await import("@/lib/storage/attachment-storage");
+                return deleteTaskAttachment(path);
+              }),
             ).catch((error) =>
               setToast(
                 error instanceof Error
