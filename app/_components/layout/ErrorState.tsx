@@ -1,6 +1,6 @@
 export function ErrorState({ reset }: { reset: () => void }) {
   return (
-    <main className="app-shell loading-shell">
+    <main className="app-shell loading-shell loading-card-shell">
       <div className="loading-card error-card" role="alert">
         <strong>Không thể tải workspace</strong>
         <button className="secondary-button" onClick={reset}>

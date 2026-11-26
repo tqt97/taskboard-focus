@@ -4,11 +4,11 @@ import dynamic from "next/dynamic";
 import type { WorkspaceView } from "./WorkspaceShell";
 import { WorkspaceLoading } from "./WorkspaceLoading";
 
-const WorkspaceCoordinator = dynamic(() => import("../state/WorkspaceCoordinator"), {
+const WorkspaceRuntime = dynamic(() => import("../runtime/WorkspaceRuntime"), {
   ssr: false,
   loading: () => <WorkspaceLoading />,
 });
 
 export function WorkspaceEntry({ view }: { view: WorkspaceView }) {
-  return <WorkspaceCoordinator initialView={view} />;
+  return <WorkspaceRuntime initialView={view} />;
 }

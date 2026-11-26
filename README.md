@@ -107,7 +107,7 @@ Lock screen trong MVP chỉ là giao diện tiện ích, không phải xác th�
 app/
   _components/
     layout/          Root document, SEO metadata, icons, manifest, loading/error states
-    workspace/       Board, task modal, notification popover
+    workspace/       Runtime, route features, dialogs và workspace hooks
   globals.css        Responsive UI và dark mode
   layout.tsx         Thin App Router root entry
   loading.tsx        Thin route loading entry
@@ -137,7 +137,7 @@ supabase/
 ### Quy ước mở rộng
 
 - Route entries trong `app/` chỉ nên giữ wiring; component UI đặt trong `app/_components/<feature>/`.
-- Layout dùng chung đặt trong `app/_components/layout/`; workspace features đặt trong `app/_components/workspace/`.
+- Layout dùng chung đặt trong `app/_components/layout/`; workspace runtime đặt trong `app/_components/workspace/runtime/`, còn UI theo route đặt trong `app/_components/workspace/features/`.
 - Logic dữ liệu, validators và repository adapters đặt trong `lib/`.
 - Khi thêm tab mới, tạo feature folder riêng và nối vào route/navigation hiện có thay vì mở rộng thêm một file root lớn.
 

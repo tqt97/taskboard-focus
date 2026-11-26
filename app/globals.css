@@ -5962,6 +5962,11 @@ textarea::placeholder {
   background: var(--bg);
 }
 
+.loading-shell.loading-card-shell {
+  grid-template-columns: minmax(0, 1fr);
+  place-items: center;
+}
+
 .loading-sidebar,
 .loading-topbar {
   border-color: var(--line);

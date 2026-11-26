@@ -10,20 +10,15 @@ import {
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import {
-  AlertTriangle,
-  ArrowDownUp,
   Bell,
   CalendarDays,
   CalendarRange,
   Check,
-  CheckCheck,
   CloudDownload,
   CloudUpload,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Download,
-  Filter,
   LogIn,
   LayoutDashboard,
   ListTodo,
@@ -31,13 +26,10 @@ import {
   Moon,
   Menu,
   Plus,
-  Search,
-  Save,
   Settings2,
   Sun,
   Users,
   X,
-  ListFilter,
 } from "lucide-react";
 import { demoData, maxBackupBytes } from "@/lib/data";
 import type {
@@ -98,6 +90,11 @@ import { persistSavedViews, useSavedViews } from "../hooks/useSavedViews";
 import { useWorkspaceShortcuts } from "../hooks/useWorkspaceShortcuts";
 import { WorkspaceLoading } from "../layout/WorkspaceLoading";
 import type { WorkspaceView } from "../layout/WorkspaceShell";
+import { WorkspaceRouteContent } from "../features/WorkspaceRouteContent";
+import {
+  WorkspaceRuntimeProvider,
+  type WorkspaceRuntimeValue,
+} from "./WorkspaceRuntimeContext";
 
 const StructuredTaskModal = dynamic(
   () => import("../dialogs/task/TaskModal").then((module) => module.TaskModal),
@@ -122,31 +119,9 @@ const LockModal = dynamic(
   () => import("../dialogs/WorkspaceDialogs").then((module) => module.LockModal),
   { ssr: false },
 );
-const WorkspaceOverview = dynamic(
-  () =>
-    import("../views/overview/WorkspaceOverview").then(
-      (module) => module.WorkspaceOverview,
-    ),
-  { ssr: false, loading: () => <div className="board-loading" aria-busy="true" /> },
-);
-const TaskBoardColumns = dynamic(
-  () =>
-    import("../views/tasks/TaskBoardColumns").then((module) => module.TaskBoardColumns),
-  {
-    ssr: false,
-    loading: () => <div className="board-loading" aria-busy="true" />,
-  },
-);
 const LazyTaskCard = dynamic(
-  () => import("../views/tasks/TaskCard").then((module) => module.TaskCard),
+  () => import("../features/tasks/TaskCard").then((module) => module.TaskCard),
   { ssr: false },
-);
-const TimelineView = dynamic(
-  () => import("../views/timeline/TimelineView").then((module) => module.TimelineView),
-  {
-    ssr: false,
-    loading: () => <div className="timeline-loading" aria-busy="true" />,
-  },
 );
 const NotificationPopover = dynamic(
   () =>
@@ -328,7 +303,7 @@ function formatDate(s: string, locale: AppLocale) {
       }).format(new Date(s))
     : "—";
 }
-export default function Board({
+export default function WorkspaceRuntime({
   initialView = "overview",
 }: {
   initialView?: WorkspaceView;
@@ -442,16 +417,22 @@ export default function Board({
     const saved = loaded.data;
     setData(saved);
     setSortMode(saved.sort_mode || "smart");
-    void indexedDbBoardStorage.load().then((indexedData) => {
-      if (indexedData) {
-        setData(indexedData);
-        setSortMode(indexedData.sort_mode || "smart");
-      } else {
-        void indexedDbBoardStorage.save(saved);
-      }
-      setPersistenceReady(true);
-    });
-    void indexedDbBoardStorage.list().then(setLocalWorkspaces);
+    const indexedDataPromise = indexedDbBoardStorage.load();
+    const localWorkspacesPromise = indexedDbBoardStorage.list();
+    void Promise.all([indexedDataPromise, localWorkspacesPromise])
+      .then(([indexedData, workspaces]) => {
+        if (indexedData) {
+          setData(indexedData);
+          setSortMode(indexedData.sort_mode || "smart");
+        } else {
+          void indexedDbBoardStorage.save(saved);
+        }
+        setLocalWorkspaces(workspaces);
+        setPersistenceReady(true);
+      })
+      .catch(() => {
+        setPersistenceReady(true);
+      });
     if (loaded.error) {
       setToast(
         `${loaded.error} Hãy export backup nếu bạn còn bản dữ liệu cũ trước khi tiếp tục.`,
@@ -1816,1024 +1797,799 @@ export default function Board({
       onDrop={dropTask}
     />
   );
+  const runtimeValue: WorkspaceRuntimeValue = {
+    view,
+    data,
+    now,
+    locale,
+    copy,
+    canEditWorkspace,
+    activeTasks: active,
+    todayTasks,
+    visibleTasks,
+    reminderItems,
+    upcomingGroups,
+    templates,
+    sortMode,
+    focusMode,
+    setFocusMode,
+    selectionMode,
+    selectedTaskIds,
+    toggleSelectionMode,
+    setSelectedTaskIds: (ids) => setSelectedTaskIds(ids),
+    taskCard,
+    dropOnStatus,
+    bulkUpdateTasks,
+    savedViews,
+    selectedSavedViewId,
+    applySavedView,
+    saveCurrentView,
+    deleteSavedView,
+    searchRef,
+    search,
+    setSearch,
+    statusFilter,
+    setStatusFilter,
+    priorityFilter,
+    setPriorityFilter,
+    advancedFiltersOpen,
+    setAdvancedFiltersOpen,
+    archiveFilter,
+    setArchiveFilter,
+    assigneeFilter,
+    setAssigneeFilter,
+    dueFilter,
+    setDueFilter,
+    onOpenTask: (task) => {
+      setEdit(task);
+      setModal("task");
+    },
+    onBrowseTasks: () => router.push("/tasks"),
+    onUpdateDeadline: updateTaskDeadline,
+    dueText,
+    dueState,
+    formatDate,
+    onOpenSettings: () => setModal("settings"),
+  };
   if (!ready) {
     return <WorkspaceLoading />;
   }
 
   return (
-    <main className="app-shell">
-      <aside className={sidebarCollapsed ? "sidebar collapsed" : "sidebar"}>
-        <div className="brand">
-          <div className="brand-mark">
-            <ListTodo size={21} />
-          </div>
-          <div>
-            <strong>Taskboard</strong>
-            <small>PERSONAL WORKSPACE</small>
-          </div>
-        </div>
-        <nav>
-          <button
-            className={view === "overview" ? "nav-item active" : "nav-item"}
-            onClick={() => router.push("/")}
-          >
-            <LayoutDashboard size={18} />
-            Tổng quan
-          </button>
-          <button
-            className={view === "tasks" ? "nav-item active" : "nav-item"}
-            onClick={() => router.push("/tasks")}
-          >
-            <ListTodo size={18} />
-            Danh sách task<span className="nav-count">{navigationCounts.active}</span>
-          </button>
-          <button
-            className={view === "today" ? "nav-item active" : "nav-item"}
-            onClick={() => router.push("/today")}
-          >
-            <CalendarDays size={18} />
-            Hôm nay<span className="nav-count">{navigationCounts.today}</span>
-          </button>
-          <button
-            className={view === "inbox" ? "nav-item active" : "nav-item"}
-            onClick={() => router.push("/inbox")}
-          >
-            <ListTodo size={18} />
-            Inbox<span className="nav-count">{navigationCounts.inbox}</span>
-          </button>
-          <button
-            className={view === "timeline" ? "nav-item active" : "nav-item"}
-            onClick={() => router.push("/timeline")}
-          >
-            <CalendarRange size={18} />
-            Lịch & timeline
-          </button>
-        </nav>
-        <div className="sidebar-bottom">
-          <div className="profile">
-            <span className="avatar avatar-blue">T</span>
-            <span>
-              <b>{displayName}</b>
-              <small>Local workspace</small>
-            </span>
-            <button
-              className="icon-button"
-              title="Khóa màn hình"
-              onClick={() => setModal("lock")}
-            >
-              <LockKeyhole size={16} />
-            </button>
-          </div>
-        </div>
-      </aside>
-      <section className="main-area">
-        <header className="topbar">
-          <button
-            className="sidebar-collapse"
-            aria-label={sidebarCollapsed ? "Mở rộng sidebar" : "Thu gọn sidebar"}
-            title={sidebarCollapsed ? "Mở rộng sidebar" : "Thu gọn sidebar"}
-            onClick={() => setSidebarCollapsed((value) => !value)}
-          >
-            {sidebarCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-          </button>
-          <div className="mobile-brand">
+    <WorkspaceRuntimeProvider value={runtimeValue}>
+      <main className="app-shell">
+        <aside className={sidebarCollapsed ? "sidebar collapsed" : "sidebar"}>
+          <div className="brand">
             <div className="brand-mark">
-              <ListTodo size={19} />
+              <ListTodo size={21} />
             </div>
-            <strong>Taskboard</strong>
+            <div>
+              <strong>Taskboard</strong>
+              <small>PERSONAL WORKSPACE</small>
+            </div>
           </div>
-          <div className="breadcrumbs">
-            Workspace <span>/</span>{" "}
-            {view === "overview"
-              ? "Tổng quan"
-              : view === "today"
-                ? "Hôm nay"
-                : view === "timeline"
-                  ? "Lịch & timeline"
-                  : "Danh sách task"}
-          </div>
-          <div className="top-actions">
+          <nav>
             <button
-              className="mobile-menu-button"
-              aria-label={mobileMenuOpen ? "Đóng menu" : "Mở menu"}
-              title={mobileMenuOpen ? "Đóng menu" : "Mở menu"}
-              aria-expanded={mobileMenuOpen}
-              onClick={() => setMobileMenuOpen((open) => !open)}
+              className={view === "overview" ? "nav-item active" : "nav-item"}
+              onClick={() => router.push("/")}
             >
-              {mobileMenuOpen ? <X size={19} /> : <Menu size={19} />}
+              <LayoutDashboard size={18} />
+              Tổng quan
             </button>
-            {mobileMenuOpen && (
-              <>
-                <button
-                  className="mobile-nav-backdrop"
-                  aria-label="Đóng menu"
-                  onClick={() => setMobileMenuOpen(false)}
-                />
-                <nav className="mobile-nav" aria-label="Điều hướng mobile">
-                  <div className="mobile-nav-header">
-                    <b>Menu</b>
-                    <button
-                      className="mobile-nav-close"
-                      aria-label="Đóng menu"
-                      onClick={() => setMobileMenuOpen(false)}
-                    >
-                      <X size={17} />
-                    </button>
-                  </div>
-                  <button
-                    className={view === "overview" ? "active" : ""}
-                    onClick={() => {
-                      setMobileMenuOpen(false);
-                      router.push("/");
-                    }}
-                  >
-                    <LayoutDashboard size={17} /> Tổng quan
-                  </button>
-                  <button
-                    className={view === "tasks" ? "active" : ""}
-                    onClick={() => {
-                      setMobileMenuOpen(false);
-                      router.push("/tasks");
-                    }}
-                  >
-                    <ListTodo size={17} /> Danh sách task
-                    <span>{navigationCounts.active}</span>
-                  </button>
-                  <button
-                    className={view === "today" ? "active" : ""}
-                    onClick={() => {
-                      setMobileMenuOpen(false);
-                      router.push("/today");
-                    }}
-                  >
-                    <CalendarDays size={17} /> Hôm nay
-                    <span>{navigationCounts.today}</span>
-                  </button>
-                  <button
-                    className={view === "inbox" ? "active" : ""}
-                    onClick={() => {
-                      setMobileMenuOpen(false);
-                      router.push("/inbox");
-                    }}
-                  >
-                    <ListTodo size={17} /> Inbox
-                    <span>{navigationCounts.inbox}</span>
-                  </button>
-                  <button
-                    className={view === "timeline" ? "active" : ""}
-                    onClick={() => {
-                      setMobileMenuOpen(false);
-                      router.push("/timeline");
-                    }}
-                  >
-                    <CalendarRange size={17} /> Lịch & timeline
-                  </button>
-                </nav>
-              </>
-            )}
-            <div className="live-date">
-              <span className="live-dot" />
-              {clock}
-            </div>
-            <span className={`autosave-status ${saveStatus}`} aria-live="polite">
-              {saveStatus === "saving"
-                ? "Đang lưu"
-                : saveStatus === "error"
-                  ? "Lỗi lưu"
-                  : "Đã lưu"}
-            </span>
-            <div className="workspace-switcher-wrap">
-              <select
-                className="workspace-switcher"
-                aria-label="Chọn workspace"
-                value={workspaceId}
-                onChange={(event) => void switchWorkspace(event.target.value)}
-              >
-                {!localWorkspaces.some((workspace) => workspace.id === "default") && (
-                  <option value="default">Workspace cá nhân</option>
-                )}
-                {localWorkspaces.map((workspace) => (
-                  <option value={workspace.id} key={workspace.id}>
-                    {workspace.name}
-                  </option>
-                ))}
-              </select>
-              <button
-                className="icon-button mini"
-                type="button"
-                aria-label="Tạo workspace"
-                title="Tạo workspace mới"
-                onClick={() => void createWorkspace()}
-              >
-                <Plus size={14} />
-              </button>
-            </div>
-            <span
-              className={`sync-status sync-${syncState.status}`}
-              title={
-                syncState.status === "error"
-                  ? syncState.message
-                  : !cloudConfigured
-                    ? "Local mode: dữ liệu được lưu trong trình duyệt này"
-                    : cloudUserEmail
-                      ? `Cloud đã kết nối: ${cloudUserEmail}`
-                      : "Cloud đã cấu hình nhưng chưa đăng nhập"
-              }
-              aria-live="polite"
+            <button
+              className={view === "tasks" ? "nav-item active" : "nav-item"}
+              onClick={() => router.push("/tasks")}
             >
-              {!cloudConfigured
-                ? "Local"
-                : syncState.status === "syncing"
-                  ? "Đang sync"
-                  : syncState.status === "synced"
-                    ? "Cloud đã sync"
-                    : syncState.status === "error"
-                      ? "Sync lỗi"
-                      : cloudUserEmail
-                        ? "Cloud đã kết nối"
-                        : "Cloud cần đăng nhập"}
-            </span>
-            {cloudConfigured && cloudUserEmail ? (
-              <>
-                <button
-                  className="icon-button"
-                  aria-label="Đẩy workspace lên cloud"
-                  title="Đẩy workspace lên cloud"
-                  onClick={() => void sync("push")}
-                  disabled={syncState.status === "syncing"}
-                >
-                  <CloudUpload size={17} />
-                </button>
-                <button
-                  className="icon-button"
-                  aria-label="Tải workspace từ cloud"
-                  title="Tải workspace từ cloud"
-                  onClick={() => void sync("pull")}
-                  disabled={syncState.status === "syncing"}
-                >
-                  <CloudDownload size={17} />
-                </button>
-              </>
-            ) : cloudConfigured ? (
+              <ListTodo size={18} />
+              Danh sách task<span className="nav-count">{navigationCounts.active}</span>
+            </button>
+            <button
+              className={view === "today" ? "nav-item active" : "nav-item"}
+              onClick={() => router.push("/today")}
+            >
+              <CalendarDays size={18} />
+              Hôm nay<span className="nav-count">{navigationCounts.today}</span>
+            </button>
+            <button
+              className={view === "inbox" ? "nav-item active" : "nav-item"}
+              onClick={() => router.push("/inbox")}
+            >
+              <ListTodo size={18} />
+              Inbox<span className="nav-count">{navigationCounts.inbox}</span>
+            </button>
+            <button
+              className={view === "timeline" ? "nav-item active" : "nav-item"}
+              onClick={() => router.push("/timeline")}
+            >
+              <CalendarRange size={18} />
+              Lịch & timeline
+            </button>
+          </nav>
+          <div className="sidebar-bottom">
+            <div className="profile">
+              <span className="avatar avatar-blue">T</span>
+              <span>
+                <b>{displayName}</b>
+                <small>Local workspace</small>
+              </span>
               <button
                 className="icon-button"
-                aria-label="Đăng nhập cloud"
-                title="Đăng nhập cloud để đồng bộ workspace"
-                onClick={() => router.push("/login")}
+                title="Khóa màn hình"
+                onClick={() => setModal("lock")}
               >
-                <LogIn size={17} />
+                <LockKeyhole size={16} />
               </button>
-            ) : null}
-            <button
-              className="icon-button"
-              aria-label="Tải dữ liệu"
-              title="Tải dữ liệu"
-              onClick={exportData}
-            >
-              <Download size={18} />
-            </button>
-            <div className="notification-wrap" ref={notificationRef}>
-              <button
-                className={
-                  unreadNotificationCount ? "icon-button has-unread" : "icon-button"
-                }
-                aria-label="Thông báo"
-                title="Thông báo"
-                onClick={() => setNotificationsOpen((open) => !open)}
-              >
-                <Bell size={18} />
-                {unreadNotificationCount > 0 && (
-                  <span className="notification-badge">
-                    {unreadNotificationCount > 9 ? "9+" : unreadNotificationCount}
-                  </span>
-                )}
-              </button>
-              {notificationsOpen && (
-                <NotificationPopover
-                  items={notifications}
-                  onRead={markNotificationRead}
-                  onReadAll={markAllNotificationsRead}
-                  onOpenTask={openTaskFromNotification}
-                  onClose={() => setNotificationsOpen(false)}
-                />
-              )}
             </div>
-            <button
-              className="icon-button"
-              aria-label="Đổi giao diện"
-              title={dark ? "Chuyển sang giao diện sáng" : "Chuyển sang giao diện tối"}
-              onClick={() => setDark(!dark)}
-            >
-              {dark ? <Sun size={18} /> : <Moon size={18} />}
-            </button>
-            <button
-              className="icon-button"
-              aria-label="Cài đặt"
-              title="Mở cài đặt workspace"
-              onClick={() => setModal("settings")}
-            >
-              <Settings2 size={18} />
-            </button>
-            <span className="avatar avatar-blue">T</span>
           </div>
-        </header>
-        <div className="content">
-          <div className="page-heading">
-            <WorkspacePageHeading
-              view={view}
-              greeting={greeting}
-              displayName={displayName}
-            />
-            <div className="page-actions">
+        </aside>
+        <section className="main-area">
+          <header className="topbar">
+            <button
+              className="sidebar-collapse"
+              aria-label={sidebarCollapsed ? "Mở rộng sidebar" : "Thu gọn sidebar"}
+              title={sidebarCollapsed ? "Mở rộng sidebar" : "Thu gọn sidebar"}
+              onClick={() => setSidebarCollapsed((value) => !value)}
+            >
+              {sidebarCollapsed ? (
+                <ChevronRight size={16} />
+              ) : (
+                <ChevronLeft size={16} />
+              )}
+            </button>
+            <div className="mobile-brand">
+              <div className="brand-mark">
+                <ListTodo size={19} />
+              </div>
+              <strong>Taskboard</strong>
+            </div>
+            <div className="breadcrumbs">
+              Workspace <span>/</span>{" "}
+              {view === "overview"
+                ? "Tổng quan"
+                : view === "today"
+                  ? "Hôm nay"
+                  : view === "timeline"
+                    ? "Lịch & timeline"
+                    : "Danh sách task"}
+            </div>
+            <div className="top-actions">
               <button
-                className="secondary-button quick-capture-trigger"
-                disabled={!canEditWorkspace}
-                title="Ghi nhanh task (N)"
-                onClick={() => setModal("quick-capture")}
+                className="mobile-menu-button"
+                aria-label={mobileMenuOpen ? "Đóng menu" : "Mở menu"}
+                title={mobileMenuOpen ? "Đóng menu" : "Mở menu"}
+                aria-expanded={mobileMenuOpen}
+                onClick={() => setMobileMenuOpen((open) => !open)}
               >
-                <Plus size={16} /> Ghi nhanh <kbd>N</kbd>
+                {mobileMenuOpen ? <X size={19} /> : <Menu size={19} />}
               </button>
-              {(view === "tasks" || view === "today" || view === "inbox") && (
+              {mobileMenuOpen && (
                 <>
-                  {templates.length > 0 && (
-                    <select
-                      className="template-select"
-                      aria-label="Tạo task từ template"
-                      defaultValue=""
+                  <button
+                    className="mobile-nav-backdrop"
+                    aria-label="Đóng menu"
+                    onClick={() => setMobileMenuOpen(false)}
+                  />
+                  <nav className="mobile-nav" aria-label="Điều hướng mobile">
+                    <div className="mobile-nav-header">
+                      <b>Menu</b>
+                      <button
+                        className="mobile-nav-close"
+                        aria-label="Đóng menu"
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        <X size={17} />
+                      </button>
+                    </div>
+                    <button
+                      className={view === "overview" ? "active" : ""}
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                        router.push("/");
+                      }}
+                    >
+                      <LayoutDashboard size={17} /> Tổng quan
+                    </button>
+                    <button
+                      className={view === "tasks" ? "active" : ""}
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                        router.push("/tasks");
+                      }}
+                    >
+                      <ListTodo size={17} /> Danh sách task
+                      <span>{navigationCounts.active}</span>
+                    </button>
+                    <button
+                      className={view === "today" ? "active" : ""}
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                        router.push("/today");
+                      }}
+                    >
+                      <CalendarDays size={17} /> Hôm nay
+                      <span>{navigationCounts.today}</span>
+                    </button>
+                    <button
+                      className={view === "inbox" ? "active" : ""}
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                        router.push("/inbox");
+                      }}
+                    >
+                      <ListTodo size={17} /> Inbox
+                      <span>{navigationCounts.inbox}</span>
+                    </button>
+                    <button
+                      className={view === "timeline" ? "active" : ""}
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                        router.push("/timeline");
+                      }}
+                    >
+                      <CalendarRange size={17} /> Lịch & timeline
+                    </button>
+                  </nav>
+                </>
+              )}
+              <div className="live-date">
+                <span className="live-dot" />
+                {clock}
+              </div>
+              <span className={`autosave-status ${saveStatus}`} aria-live="polite">
+                {saveStatus === "saving"
+                  ? "Đang lưu"
+                  : saveStatus === "error"
+                    ? "Lỗi lưu"
+                    : "Đã lưu"}
+              </span>
+              <div className="workspace-switcher-wrap">
+                <select
+                  className="workspace-switcher"
+                  aria-label="Chọn workspace"
+                  value={workspaceId}
+                  onChange={(event) => void switchWorkspace(event.target.value)}
+                >
+                  {!localWorkspaces.some((workspace) => workspace.id === "default") && (
+                    <option value="default">Workspace cá nhân</option>
+                  )}
+                  {localWorkspaces.map((workspace) => (
+                    <option value={workspace.id} key={workspace.id}>
+                      {workspace.name}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  className="icon-button mini"
+                  type="button"
+                  aria-label="Tạo workspace"
+                  title="Tạo workspace mới"
+                  onClick={() => void createWorkspace()}
+                >
+                  <Plus size={14} />
+                </button>
+              </div>
+              <span
+                className={`sync-status sync-${syncState.status}`}
+                title={
+                  syncState.status === "error"
+                    ? syncState.message
+                    : !cloudConfigured
+                      ? "Local mode: dữ liệu được lưu trong trình duyệt này"
+                      : cloudUserEmail
+                        ? `Cloud đã kết nối: ${cloudUserEmail}`
+                        : "Cloud đã cấu hình nhưng chưa đăng nhập"
+                }
+                aria-live="polite"
+              >
+                {!cloudConfigured
+                  ? "Local"
+                  : syncState.status === "syncing"
+                    ? "Đang sync"
+                    : syncState.status === "synced"
+                      ? "Cloud đã sync"
+                      : syncState.status === "error"
+                        ? "Sync lỗi"
+                        : cloudUserEmail
+                          ? "Cloud đã kết nối"
+                          : "Cloud cần đăng nhập"}
+              </span>
+              {cloudConfigured && cloudUserEmail ? (
+                <>
+                  <button
+                    className="icon-button"
+                    aria-label="Đẩy workspace lên cloud"
+                    title="Đẩy workspace lên cloud"
+                    onClick={() => void sync("push")}
+                    disabled={syncState.status === "syncing"}
+                  >
+                    <CloudUpload size={17} />
+                  </button>
+                  <button
+                    className="icon-button"
+                    aria-label="Tải workspace từ cloud"
+                    title="Tải workspace từ cloud"
+                    onClick={() => void sync("pull")}
+                    disabled={syncState.status === "syncing"}
+                  >
+                    <CloudDownload size={17} />
+                  </button>
+                </>
+              ) : cloudConfigured ? (
+                <button
+                  className="icon-button"
+                  aria-label="Đăng nhập cloud"
+                  title="Đăng nhập cloud để đồng bộ workspace"
+                  onClick={() => router.push("/login")}
+                >
+                  <LogIn size={17} />
+                </button>
+              ) : null}
+              <button
+                className="icon-button"
+                aria-label="Tải dữ liệu"
+                title="Tải dữ liệu"
+                onClick={exportData}
+              >
+                <Download size={18} />
+              </button>
+              <div className="notification-wrap" ref={notificationRef}>
+                <button
+                  className={
+                    unreadNotificationCount ? "icon-button has-unread" : "icon-button"
+                  }
+                  aria-label="Thông báo"
+                  title="Thông báo"
+                  onClick={() => setNotificationsOpen((open) => !open)}
+                >
+                  <Bell size={18} />
+                  {unreadNotificationCount > 0 && (
+                    <span className="notification-badge">
+                      {unreadNotificationCount > 9 ? "9+" : unreadNotificationCount}
+                    </span>
+                  )}
+                </button>
+                {notificationsOpen && (
+                  <NotificationPopover
+                    items={notifications}
+                    onRead={markNotificationRead}
+                    onReadAll={markAllNotificationsRead}
+                    onOpenTask={openTaskFromNotification}
+                    onClose={() => setNotificationsOpen(false)}
+                  />
+                )}
+              </div>
+              <button
+                className="icon-button"
+                aria-label="Đổi giao diện"
+                title={
+                  dark ? "Chuyển sang giao diện sáng" : "Chuyển sang giao diện tối"
+                }
+                onClick={() => setDark(!dark)}
+              >
+                {dark ? <Sun size={18} /> : <Moon size={18} />}
+              </button>
+              <button
+                className="icon-button"
+                aria-label="Cài đặt"
+                title="Mở cài đặt workspace"
+                onClick={() => setModal("settings")}
+              >
+                <Settings2 size={18} />
+              </button>
+              <span className="avatar avatar-blue">T</span>
+            </div>
+          </header>
+          <div className="content">
+            <div className="page-heading">
+              <WorkspacePageHeading
+                view={view}
+                greeting={greeting}
+                displayName={displayName}
+              />
+              <div className="page-actions">
+                <button
+                  className="secondary-button quick-capture-trigger"
+                  disabled={!canEditWorkspace}
+                  title="Ghi nhanh task (N)"
+                  onClick={() => setModal("quick-capture")}
+                >
+                  <Plus size={16} /> Ghi nhanh <kbd>N</kbd>
+                </button>
+                {(view === "tasks" || view === "today" || view === "inbox") && (
+                  <>
+                    {templates.length > 0 && (
+                      <select
+                        className="template-select"
+                        aria-label="Tạo task từ template"
+                        defaultValue=""
+                        disabled={!canEditWorkspace}
+                        onChange={(event) => {
+                          const template = templates.find(
+                            (item) => item.id === event.target.value,
+                          );
+                          event.currentTarget.value = "";
+                          if (!template) return;
+                          setTemplateCreateMode(true);
+                          setEdit(
+                            createTaskFromTemplate(
+                              template,
+                              `${data.code_prefix || "MENSQZIN-"}NEW`,
+                            ),
+                          );
+                          setModal("task");
+                        }}
+                      >
+                        <option value="">Template</option>
+                        {templates.map((template) => (
+                          <option key={template.id} value={template.id}>
+                            {template.name}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    <button
+                      className="text-button template-manage-trigger"
                       disabled={!canEditWorkspace}
-                      onChange={(event) => {
-                        const template = templates.find(
-                          (item) => item.id === event.target.value,
-                        );
-                        event.currentTarget.value = "";
-                        if (!template) return;
-                        setTemplateCreateMode(true);
-                        setEdit(
-                          createTaskFromTemplate(
-                            template,
-                            `${data.code_prefix || "MENSQZIN-"}NEW`,
-                          ),
-                        );
+                      onClick={() => setModal("templates")}
+                    >
+                      Quản lý template
+                    </button>
+                    <button
+                      className="primary-button"
+                      disabled={!canEditWorkspace}
+                      onClick={() => {
+                        setTemplateCreateMode(false);
+                        setEdit(null);
                         setModal("task");
                       }}
                     >
-                      <option value="">Template</option>
-                      {templates.map((template) => (
-                        <option key={template.id} value={template.id}>
-                          {template.name}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                  <button
-                    className="text-button template-manage-trigger"
-                    disabled={!canEditWorkspace}
-                    onClick={() => setModal("templates")}
-                  >
-                    Quản lý template
-                  </button>
-                  <button
-                    className="primary-button"
-                    disabled={!canEditWorkspace}
-                    onClick={() => {
-                      setTemplateCreateMode(false);
-                      setEdit(null);
-                      setModal("task");
-                    }}
-                  >
-                    <Plus size={17} /> {canEditWorkspace ? "Tạo task" : "Chỉ xem"}
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-          {view === "overview" && (
-            <WorkspaceOverview
-              tasks={data.tasks}
-              members={data.members}
-              now={now}
-              copy={copy}
-              dueText={reminderDueText}
-              onOpenTask={(task) => {
-                setEdit(task);
-                setModal("task");
-              }}
-              onBrowseTasks={() => router.push("/tasks")}
-            />
-          )}
-          {view === "timeline" && (
-            <TimelineView
-              tasks={active}
-              members={data.members}
-              readOnly={!canEditWorkspace}
-              locale={locale}
-              onOpenTask={(task) => {
-                setEdit(task);
-                setModal("task");
-              }}
-              onUpdateDeadline={updateTaskDeadline}
-            />
-          )}
-          <div
-            className={
-              view === "tasks" || view === "today" || view === "inbox"
-                ? "tasks-layout"
-                : "overview-layout"
-            }
-          >
-            {(view === "tasks" || view === "today" || view === "inbox") && (
-              <section className="tasks-panel panel">
-                <div className="panel-heading">
-                  <div>
-                    <h2>Ưu tiên công việc</h2>
-                    <p>
-                      {(view === "today" ? todayTasks : visibleTasks).length} task
-                      {view === "today"
-                        ? " cần xử lý hôm nay"
-                        : focusMode
-                          ? " cần tập trung"
-                          : " · trạng thái đi từ trái sang phải"}
-                    </p>
-                  </div>
-                  <div className="task-panel-actions">
-                    <button
-                      className={`selection-toggle${selectionMode ? " active" : ""}`}
-                      type="button"
-                      aria-pressed={selectionMode}
-                      onClick={toggleSelectionMode}
-                    >
-                      <CheckCheck size={14} />
-                      {selectionMode ? "Đang chọn" : "Chọn nhiều"}
+                      <Plus size={17} /> {canEditWorkspace ? "Tạo task" : "Chỉ xem"}
                     </button>
-                    <div className="view-switch">
-                      <button
-                        className={focusMode ? "" : "selected"}
-                        onClick={() => setFocusMode(false)}
-                      >
-                        Kanban
-                      </button>
-                      <button
-                        className={focusMode ? "selected" : ""}
-                        onClick={() => setFocusMode(true)}
-                      >
-                        Focus
-                      </button>
-                      <span className="view-switch-note">
-                        {sortMode === "manual"
-                          ? "Thứ tự kéo thả"
-                          : "Ưu tiên → deadline"}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <div className="saved-view-bar">
-                  <span>Saved views</span>
-                  <select
-                    aria-label="Chọn saved view"
-                    value={selectedSavedViewId}
-                    onChange={(e) => applySavedView(e.target.value)}
-                  >
-                    <option value="">Chọn view đã lưu</option>
-                    {savedViews.map((savedView) => (
-                      <option value={savedView.id} key={savedView.id}>
-                        {savedView.name}
-                      </option>
-                    ))}
-                  </select>
-                  <button className="text-button" onClick={saveCurrentView}>
-                    <Save size={14} />
-                    Lưu view hiện tại
-                  </button>
-                  <button
-                    className="text-button"
-                    onClick={deleteSavedView}
-                    disabled={!selectedSavedViewId}
-                    aria-label="Xóa bộ lọc đã lưu"
-                  >
-                    <X size={14} />
-                    Xóa view
-                  </button>
-                </div>
-                <div className="filters">
-                  <label className="search-box">
-                    <Search size={16} />
-                    <input
-                      ref={searchRef}
-                      placeholder="Tìm task, mã, mô tả..."
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                    />
-                    <kbd>Ctrl/⌘ K</kbd>
-                  </label>
-                  <label className="select-wrap">
-                    <Filter size={15} />
-                    <select
-                      value={statusFilter}
-                      onChange={(e) => setStatusFilter(e.target.value)}
-                    >
-                      <option value="all">Mọi trạng thái</option>
-                      {Object.entries(labels).map(([k, v]) => (
-                        <option key={k} value={k}>
-                          {v}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown size={13} />
-                  </label>
-                  <label className="select-wrap priority-filter">
-                    <select
-                      value={priorityFilter}
-                      onChange={(e) => setPriorityFilter(e.target.value)}
-                    >
-                      <option value="all">Mọi ưu tiên</option>
-                      {Object.entries(priorityLabels).map(([k, v]) => (
-                        <option key={k} value={k}>
-                          {v}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown size={13} />
-                  </label>
-                  <button
-                    className={`filter-toggle${advancedFiltersOpen ? " active" : ""}`}
-                    type="button"
-                    aria-expanded={advancedFiltersOpen}
-                    onClick={() => setAdvancedFiltersOpen((open) => !open)}
-                  >
-                    <ListFilter size={14} />
-                    Bộ lọc nâng cao
-                    {(assigneeFilter !== "all" || dueFilter !== "all") && (
-                      <span className="filter-count">
-                        {Number(assigneeFilter !== "all") + Number(dueFilter !== "all")}
-                      </span>
-                    )}
-                  </button>
-                  {advancedFiltersOpen && (
-                    <>
-                      <label className="select-wrap advanced-filter">
-                        <select
-                          value={archiveFilter}
-                          onChange={(e) =>
-                            setArchiveFilter(e.target.value as "active" | "archived")
-                          }
-                        >
-                          <option value="active">Đang hoạt động</option>
-                          <option value="archived">Đã lưu trữ</option>
-                        </select>
-                        <ChevronDown size={13} />
-                      </label>
-                      <label className="select-wrap advanced-filter">
-                        <select
-                          value={assigneeFilter}
-                          onChange={(e) => setAssigneeFilter(e.target.value)}
-                        >
-                          <option value="all">Mọi người phụ trách</option>
-                          <option value="__unassigned">Chưa giao</option>
-                          {data.members
-                            .filter((member) => member.active)
-                            .map((member) => (
-                              <option value={member.id} key={member.id}>
-                                {member.name}
-                              </option>
-                            ))}
-                        </select>
-                        <ChevronDown size={13} />
-                      </label>
-                      <label className="select-wrap advanced-filter">
-                        <select
-                          value={dueFilter}
-                          onChange={(e) => setDueFilter(e.target.value)}
-                        >
-                          <option value="all">Mọi deadline</option>
-                          <option value="overdue">Quá hạn</option>
-                          <option value="today">Hôm nay</option>
-                          <option value="week">7 ngày tới</option>
-                        </select>
-                        <ChevronDown size={13} />
-                      </label>
-                    </>
-                  )}
-                </div>
-                {selectedTaskIds.length > 0 && (
-                  <div
-                    className="bulk-toolbar"
-                    role="toolbar"
-                    aria-label="Thao tác hàng loạt"
-                  >
-                    <strong>{selectedTaskIds.length} task đã chọn</strong>
-                    <button
-                      className="secondary-button action-progress"
-                      onClick={() =>
-                        bulkUpdateTasks(
-                          { status: "in_progress" },
-                          "Đã chuyển task sang Đang làm",
-                        )
-                      }
-                    >
-                      <Check size={14} />
-                      Đang làm
-                    </button>
-                    <button
-                      className="secondary-button action-priority"
-                      onClick={() =>
-                        bulkUpdateTasks({ priority: "high" }, "Đã đặt ưu tiên cao")
-                      }
-                    >
-                      <AlertTriangle size={14} />
-                      Ưu tiên cao
-                    </button>
-                    <button
-                      className="text-button action-clear"
-                      onClick={() => setSelectedTaskIds([])}
-                    >
-                      <X size={14} />
-                      Bỏ chọn
-                    </button>
-                  </div>
+                  </>
                 )}
-                <div className="priority-guide">
-                  <span className="guide-note">
-                    <i className="urgent" />
-                    Trên cùng = cần xử lý trước
-                  </span>
-                  <span className="guide-note">
-                    <ArrowDownUp size={13} /> Kanban: tiến độ trái → phải
-                  </span>
-                  <div className="legend-group">
-                    <b>Priority</b>
-                    <span>
-                      <i className="legend-swatch urgent" />
-                      Khẩn
-                    </span>
-                    <span>
-                      <i className="legend-swatch high" />
-                      Cao
-                    </span>
-                    <span>
-                      <i className="legend-swatch medium" />
-                      Vừa
-                    </span>
-                    <span>
-                      <i className="legend-swatch low" />
-                      Thấp
-                    </span>
-                  </div>
-                  <div className="legend-group">
-                    <b>Severity</b>
-                    <span>
-                      <i className="legend-swatch severity-critical" />
-                      Nghiêm trọng
-                    </span>
-                    <span>
-                      <i className="legend-swatch severity-high" />
-                      Cao
-                    </span>
-                    <span>
-                      <i className="legend-swatch severity-medium" />
-                      Vừa
-                    </span>
-                    <span>
-                      <i className="legend-swatch severity-low" />
-                      Thấp
-                    </span>
-                  </div>
-                </div>
-                <TaskBoardColumns
-                  tasks={view === "today" ? todayTasks : visibleTasks}
-                  taskCard={taskCard}
-                  onDropStatus={dropOnStatus}
-                />
-              </section>
+              </div>
+            </div>
+            {(view === "overview" || view === "timeline") && (
+              <WorkspaceRouteContent view={view} />
             )}
-            {view === "overview" && (
-              <aside className="right-rail">
-                <section className="panel timeline-panel">
-                  <div className="panel-heading">
-                    <div>
-                      <h2>Mốc sắp tới</h2>
-                      <p>Trong 7 ngày tiếp theo</p>
+            <div
+              className={
+                view === "tasks" || view === "today" || view === "inbox"
+                  ? "tasks-layout"
+                  : "overview-layout"
+              }
+            >
+              {isTaskListView && <WorkspaceRouteContent view={view} />}
+              {view === "overview" && (
+                <aside className="right-rail">
+                  <section className="panel timeline-panel">
+                    <div className="panel-heading">
+                      <div>
+                        <h2>Mốc sắp tới</h2>
+                        <p>Trong 7 ngày tiếp theo</p>
+                      </div>
+                      <span className="round-icon">
+                        <CalendarDays size={17} />
+                      </span>
                     </div>
-                    <span className="round-icon">
-                      <CalendarDays size={17} />
-                    </span>
-                  </div>
-                  {reminderItems.length ? (
-                    <div className="timeline-groups">
-                      {upcomingGroups.map((group) => (
-                        <section
-                          className={`timeline-group timeline-group-${group.label
-                            .toLowerCase()
-                            .replaceAll(" ", "-")}`}
-                          key={group.label}
-                        >
-                          <div className="timeline-group-heading">
-                            <i className="timeline-group-marker" />
-                            <b>{group.label}</b>
-                            <span>{group.items.length}</span>
-                          </div>
-                          {group.items.length ? (
-                            <div className="timeline">
-                              {group.items.map((item) => (
-                                <div
-                                  className="timeline-row"
-                                  key={`${item.task.id}-${item.label}`}
-                                >
-                                  <div
-                                    className={`timeline-marker ${dueState(item.date)}`}
-                                  >
-                                    <i />
-                                  </div>
-                                  <div className="timeline-copy">
-                                    <div className="timeline-title">
-                                      <b>{item.task.code || "TASK"}</b>
-                                      <span className={dueState(item.date)}>
-                                        {dueText(item.date, copy)}
-                                      </span>
-                                    </div>
-                                    <p>{item.task.title}</p>
-                                    <small>{formatDate(item.date, locale)}</small>
-                                  </div>
-                                </div>
-                              ))}
+                    {reminderItems.length ? (
+                      <div className="timeline-groups">
+                        {upcomingGroups.map((group) => (
+                          <section
+                            className={`timeline-group timeline-group-${group.label
+                              .toLowerCase()
+                              .replaceAll(" ", "-")}`}
+                            key={group.label}
+                          >
+                            <div className="timeline-group-heading">
+                              <i className="timeline-group-marker" />
+                              <b>{group.label}</b>
+                              <span>{group.items.length}</span>
                             </div>
-                          ) : (
-                            <p className="timeline-group-empty">Chưa có mốc</p>
-                          )}
-                        </section>
-                      ))}
+                            {group.items.length ? (
+                              <div className="timeline">
+                                {group.items.map((item) => (
+                                  <div
+                                    className="timeline-row"
+                                    key={`${item.task.id}-${item.label}`}
+                                  >
+                                    <div
+                                      className={`timeline-marker ${dueState(item.date)}`}
+                                    >
+                                      <i />
+                                    </div>
+                                    <div className="timeline-copy">
+                                      <div className="timeline-title">
+                                        <b>{item.task.code || "TASK"}</b>
+                                        <span className={dueState(item.date)}>
+                                          {dueText(item.date, copy)}
+                                        </span>
+                                      </div>
+                                      <p>{item.task.title}</p>
+                                      <small>{formatDate(item.date, locale)}</small>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="timeline-group-empty">Chưa có mốc</p>
+                            )}
+                          </section>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="empty-small">
+                        Mọi thứ đang yên ắng. Chưa có mốc gần.
+                      </div>
+                    )}
+                  </section>
+                  <section className="panel team-panel">
+                    <div className="panel-heading">
+                      <div>
+                        <h2>Đội ngũ</h2>
+                        <p>
+                          {data.members.filter((m) => m.active).length} thành viên hoạt
+                          động
+                        </p>
+                      </div>
+                      <button
+                        className="icon-button"
+                        aria-label="Mở quản lý thành viên"
+                        title="Mở quản lý thành viên"
+                        onClick={() => {
+                          setSettingsTab("members");
+                          setModal("settings");
+                        }}
+                      >
+                        <Users size={17} />
+                      </button>
                     </div>
-                  ) : (
-                    <div className="empty-small">
-                      Mọi thứ đang yên ắng. Chưa có mốc gần.
-                    </div>
-                  )}
-                </section>
-                <section className="panel team-panel">
-                  <div className="panel-heading">
-                    <div>
-                      <h2>Đội ngũ</h2>
-                      <p>
-                        {data.members.filter((m) => m.active).length} thành viên hoạt
-                        động
-                      </p>
+                    <div className="member-list">
+                      {data.members
+                        .filter((m) => m.active)
+                        .map((m) => (
+                          <div className="member-row" key={m.id}>
+                            <span className={`avatar avatar-${m.color}`}>
+                              {m.name.slice(0, 1)}
+                            </span>
+                            <span>
+                              <b>{m.name}</b>
+                              <small>{m.role}</small>
+                            </span>
+                            <span className="member-work">
+                              {
+                                data.tasks.filter(
+                                  (t) =>
+                                    taskAssigneeIds(t).includes(m.id) &&
+                                    t.status !== "done",
+                                ).length
+                              }{" "}
+                              task
+                            </span>
+                          </div>
+                        ))}
                     </div>
                     <button
-                      className="icon-button"
-                      aria-label="Mở quản lý thành viên"
-                      title="Mở quản lý thành viên"
+                      className="manage-button"
                       onClick={() => {
                         setSettingsTab("members");
                         setModal("settings");
                       }}
                     >
-                      <Users size={17} />
+                      Quản lý thành viên <span>→</span>
                     </button>
-                  </div>
-                  <div className="member-list">
-                    {data.members
-                      .filter((m) => m.active)
-                      .map((m) => (
-                        <div className="member-row" key={m.id}>
-                          <span className={`avatar avatar-${m.color}`}>
-                            {m.name.slice(0, 1)}
-                          </span>
-                          <span>
-                            <b>{m.name}</b>
-                            <small>{m.role}</small>
-                          </span>
-                          <span className="member-work">
-                            {
-                              data.tasks.filter(
-                                (t) =>
-                                  taskAssigneeIds(t).includes(m.id) &&
-                                  t.status !== "done",
-                              ).length
-                            }{" "}
-                            task
-                          </span>
-                        </div>
-                      ))}
-                  </div>
-                  <button
-                    className="manage-button"
-                    onClick={() => {
-                      setSettingsTab("members");
-                      setModal("settings");
-                    }}
-                  >
-                    Quản lý thành viên <span>→</span>
-                  </button>
-                </section>
-              </aside>
+                  </section>
+                </aside>
+              )}
+            </div>
+            <footer className="footer">
+              <span>
+                Taskboard <span className="footer-dot">·</span> Cá nhân, rõ ràng, đúng
+                hạn.
+              </span>
+              <span>
+                Lưu trên thiết bị <Check size={13} />
+              </span>
+            </footer>
+          </div>
+        </section>
+        {modal === "task" && (
+          <StructuredTaskModal
+            task={edit || emptyTask(data.code_prefix || "MENSQZIN-")}
+            tasks={data.tasks}
+            prefix={data.code_prefix || "MENSQZIN-"}
+            members={data.members}
+            isNew={!edit || templateCreateMode}
+            onClose={() => {
+              setModal(null);
+              setEdit(null);
+              setTemplateCreateMode(false);
+            }}
+            onSave={saveTask}
+            onPrefixChange={(prefix) => setData((d) => ({ ...d, code_prefix: prefix }))}
+            onDelete={() => setConfirm("delete")}
+            onRestore={() => restoreTask(edit?.id || "")}
+            onSaveTemplate={() => edit && saveTemplateFromTask(edit)}
+            onUploadAttachment={uploadAttachment}
+            onResolveAttachmentUrl={resolveAttachmentUrl}
+            onDiscardAttachments={(storagePaths) => {
+              void Promise.all(
+                storagePaths.map(async (path) => {
+                  const { deleteTaskAttachment } =
+                    await import("@/lib/storage/attachment-storage");
+                  return deleteTaskAttachment(path);
+                }),
+              ).catch((error) =>
+                setToast(
+                  error instanceof Error
+                    ? error.message
+                    : "Không thể dọn file upload chưa lưu.",
+                ),
+              );
+            }}
+            locale={locale}
+            commentAuthorId={
+              data.members.find((member) => member.name === displayName)?.id
+            }
+            onAddComment={addTaskComment}
+            onToggleCommentPin={toggleTaskCommentPin}
+            readOnly={!canEditWorkspace}
+          />
+        )}
+        {modal === "quick-capture" && (
+          <QuickCapture onClose={() => setModal(null)} onSave={saveQuickCapture} />
+        )}
+        {modal === "templates" && (
+          <TemplateManagerDialog
+            templates={templates}
+            onRename={renameTemplate}
+            onDelete={deleteTemplate}
+            onClose={() => setModal(null)}
+          />
+        )}
+        {modal === "settings" && (
+          <SettingsModal
+            data={data}
+            tab={settingsTab}
+            setTab={setSettingsTab}
+            onMember={setMember}
+            onClose={() => setModal(null)}
+            onExport={exportData}
+            onImport={
+              canEditWorkspace
+                ? importData
+                : () => setToast("Bạn chỉ có quyền xem workspace này.")
+            }
+            onClear={() => {
+              if (!canEditWorkspace) {
+                setToast("Bạn chỉ có quyền xem workspace này.");
+                return;
+              }
+              setModal(null);
+              setConfirm("clear");
+            }}
+            workspaceId={workspaceId}
+            onRestoreBackup={(backup) => {
+              setModal(null);
+              setImportPreview(backup);
+              setToast("Đã mở bản sao tự động để xem trước khi khôi phục.");
+            }}
+            displayName={displayName}
+            onDisplayName={(name) => {
+              const nextName = name.trim();
+              setDisplayName(nextName || "Tuấn");
+              const saved = nextName
+                ? safeSetLocalStorage(displayNameStorageKey, nextName)
+                : safeRemoveLocalStorage(displayNameStorageKey);
+              if (!saved) {
+                setToast("Không thể lưu tên hiển thị; hãy kiểm tra quyền lưu.");
+              }
+            }}
+            reminderSettings={reminderSettings}
+            browserPermission={browserPermission}
+            onReminderSettings={updateReminderSettings}
+            onRequestBrowserNotifications={requestBrowserNotifications}
+            onTogglePushNotifications={togglePushNotifications}
+            onToast={setToast}
+            locale={locale}
+            onLocaleChange={setLocale}
+            remoteMembers={remoteMembers}
+            canManageRemoteMembers={
+              remoteWorkspaceIds.includes(workspaceId) && canManageMembers
+            }
+            onRemoteMemberRole={updateRemoteMemberRole}
+            onRemoveRemoteMember={removeRemoteMember}
+            onInviteRemoteMember={inviteRemoteMember}
+          />
+        )}
+        {modal === "lock" && (
+          <LockModal onClose={() => setModal(null)} onToast={setToast} />
+        )}
+        {confirm && (
+          <ConfirmDialog
+            title={
+              confirm === "delete" ? "Lưu trữ task này?" : "Xóa toàn bộ dữ liệu local?"
+            }
+            body={
+              confirm === "delete"
+                ? "Task sẽ được đưa vào kho lưu trữ và có thể khôi phục lại sau."
+                : "Dữ liệu lưu trên trình duyệt này sẽ bị xóa. Hãy xuất bản sao trước nếu cần."
+            }
+            onCancel={() => setConfirm(null)}
+            onConfirm={() =>
+              confirm === "delete" && edit
+                ? removeTask(edit.id)
+                : (setData((d) => ({ ...d, tasks: [], members: [] })),
+                  setConfirm(null),
+                  setToast("Đã xóa dữ liệu local"))
+            }
+          />
+        )}
+        {importPreview && (
+          <ImportDialog
+            current={data}
+            incoming={importPreview}
+            onCancel={() => setImportPreview(null)}
+            onReplace={() => {
+              rememberUndo("nhập backup thay thế workspace");
+              const removedTasks = data.tasks.filter(
+                (task) =>
+                  !importPreview.tasks.some((incoming) => incoming.id === task.id),
+              );
+              setData(importPreview);
+              setSortMode(importPreview.sort_mode || "smart");
+              syncRemoteTasks(importPreview.tasks, importPreview.members);
+              removedTasks.forEach((task) => void syncTask(task, "remove"));
+              setImportPreview(null);
+              setToast("Đã nhập backup; bạn có thể Hoàn tác trong 10 giây.");
+            }}
+            onMerge={(keepIncoming) => {
+              rememberUndo("merge backup vào workspace");
+              const local = data;
+              const incoming = importPreview;
+              const merged = mergeBoardImport(local, incoming, keepIncoming);
+              const changedIds = new Set(
+                incoming.tasks
+                  .filter(
+                    (task) =>
+                      !local.tasks.some((current) => current.id === task.id) ||
+                      keepIncoming.has(task.id),
+                  )
+                  .map((task) => task.id),
+              );
+              setData(merged);
+              setSortMode(merged.sort_mode || "smart");
+              syncRemoteTasks(
+                merged.tasks.filter((task) => changedIds.has(task.id)),
+                merged.members,
+              );
+              setImportPreview(null);
+              setToast("Đã merge backup; các task conflict được xử lý theo lựa chọn.");
+            }}
+          />
+        )}
+        {conflict && (
+          <ConflictDialog
+            local={conflict.local}
+            remote={conflict.remote}
+            message={conflict.message}
+            remainingConflicts={conflictCount}
+            onResolve={resolveConflict}
+            onClose={dismissConflict}
+          />
+        )}
+        {toast && (
+          <div className="toast" role="status" aria-live="polite">
+            <Check size={16} />
+            {toast}
+            {undoState && (
+              <button className="toast-action" onClick={undoLast}>
+                Hoàn tác
+              </button>
             )}
           </div>
-          <footer className="footer">
-            <span>
-              Taskboard <span className="footer-dot">·</span> Cá nhân, rõ ràng, đúng
-              hạn.
-            </span>
-            <span>
-              Lưu trên thiết bị <Check size={13} />
-            </span>
-          </footer>
-        </div>
-      </section>
-      {modal === "task" && (
-        <StructuredTaskModal
-          task={edit || emptyTask(data.code_prefix || "MENSQZIN-")}
-          tasks={data.tasks}
-          prefix={data.code_prefix || "MENSQZIN-"}
-          members={data.members}
-          isNew={!edit || templateCreateMode}
-          onClose={() => {
-            setModal(null);
-            setEdit(null);
-            setTemplateCreateMode(false);
-          }}
-          onSave={saveTask}
-          onPrefixChange={(prefix) => setData((d) => ({ ...d, code_prefix: prefix }))}
-          onDelete={() => setConfirm("delete")}
-          onRestore={() => restoreTask(edit?.id || "")}
-          onSaveTemplate={() => edit && saveTemplateFromTask(edit)}
-          onUploadAttachment={uploadAttachment}
-          onResolveAttachmentUrl={resolveAttachmentUrl}
-          onDiscardAttachments={(storagePaths) => {
-            void Promise.all(
-              storagePaths.map(async (path) => {
-                const { deleteTaskAttachment } =
-                  await import("@/lib/storage/attachment-storage");
-                return deleteTaskAttachment(path);
-              }),
-            ).catch((error) =>
-              setToast(
-                error instanceof Error
-                  ? error.message
-                  : "Không thể dọn file upload chưa lưu.",
-              ),
-            );
-          }}
-          locale={locale}
-          commentAuthorId={
-            data.members.find((member) => member.name === displayName)?.id
-          }
-          onAddComment={addTaskComment}
-          onToggleCommentPin={toggleTaskCommentPin}
-          readOnly={!canEditWorkspace}
-        />
-      )}
-      {modal === "quick-capture" && (
-        <QuickCapture onClose={() => setModal(null)} onSave={saveQuickCapture} />
-      )}
-      {modal === "templates" && (
-        <TemplateManagerDialog
-          templates={templates}
-          onRename={renameTemplate}
-          onDelete={deleteTemplate}
-          onClose={() => setModal(null)}
-        />
-      )}
-      {modal === "settings" && (
-        <SettingsModal
-          data={data}
-          tab={settingsTab}
-          setTab={setSettingsTab}
-          onMember={setMember}
-          onClose={() => setModal(null)}
-          onExport={exportData}
-          onImport={
-            canEditWorkspace
-              ? importData
-              : () => setToast("Bạn chỉ có quyền xem workspace này.")
-          }
-          onClear={() => {
-            if (!canEditWorkspace) {
-              setToast("Bạn chỉ có quyền xem workspace này.");
-              return;
-            }
-            setModal(null);
-            setConfirm("clear");
-          }}
-          workspaceId={workspaceId}
-          onRestoreBackup={(backup) => {
-            setModal(null);
-            setImportPreview(backup);
-            setToast("Đã mở bản sao tự động để xem trước khi khôi phục.");
-          }}
-          displayName={displayName}
-          onDisplayName={(name) => {
-            const nextName = name.trim();
-            setDisplayName(nextName || "Tuấn");
-            const saved = nextName
-              ? safeSetLocalStorage(displayNameStorageKey, nextName)
-              : safeRemoveLocalStorage(displayNameStorageKey);
-            if (!saved) {
-              setToast("Không thể lưu tên hiển thị; hãy kiểm tra quyền lưu.");
-            }
-          }}
-          reminderSettings={reminderSettings}
-          browserPermission={browserPermission}
-          onReminderSettings={updateReminderSettings}
-          onRequestBrowserNotifications={requestBrowserNotifications}
-          onTogglePushNotifications={togglePushNotifications}
-          onToast={setToast}
-          locale={locale}
-          onLocaleChange={setLocale}
-          remoteMembers={remoteMembers}
-          canManageRemoteMembers={
-            remoteWorkspaceIds.includes(workspaceId) && canManageMembers
-          }
-          onRemoteMemberRole={updateRemoteMemberRole}
-          onRemoveRemoteMember={removeRemoteMember}
-          onInviteRemoteMember={inviteRemoteMember}
-        />
-      )}
-      {modal === "lock" && (
-        <LockModal onClose={() => setModal(null)} onToast={setToast} />
-      )}
-      {confirm && (
-        <ConfirmDialog
-          title={
-            confirm === "delete" ? "Lưu trữ task này?" : "Xóa toàn bộ dữ liệu local?"
-          }
-          body={
-            confirm === "delete"
-              ? "Task sẽ được đưa vào kho lưu trữ và có thể khôi phục lại sau."
-              : "Dữ liệu lưu trên trình duyệt này sẽ bị xóa. Hãy xuất bản sao trước nếu cần."
-          }
-          onCancel={() => setConfirm(null)}
-          onConfirm={() =>
-            confirm === "delete" && edit
-              ? removeTask(edit.id)
-              : (setData((d) => ({ ...d, tasks: [], members: [] })),
-                setConfirm(null),
-                setToast("Đã xóa dữ liệu local"))
-          }
-        />
-      )}
-      {importPreview && (
-        <ImportDialog
-          current={data}
-          incoming={importPreview}
-          onCancel={() => setImportPreview(null)}
-          onReplace={() => {
-            rememberUndo("nhập backup thay thế workspace");
-            const removedTasks = data.tasks.filter(
-              (task) =>
-                !importPreview.tasks.some((incoming) => incoming.id === task.id),
-            );
-            setData(importPreview);
-            setSortMode(importPreview.sort_mode || "smart");
-            syncRemoteTasks(importPreview.tasks, importPreview.members);
-            removedTasks.forEach((task) => void syncTask(task, "remove"));
-            setImportPreview(null);
-            setToast("Đã nhập backup; bạn có thể Hoàn tác trong 10 giây.");
-          }}
-          onMerge={(keepIncoming) => {
-            rememberUndo("merge backup vào workspace");
-            const local = data;
-            const incoming = importPreview;
-            const merged = mergeBoardImport(local, incoming, keepIncoming);
-            const changedIds = new Set(
-              incoming.tasks
-                .filter(
-                  (task) =>
-                    !local.tasks.some((current) => current.id === task.id) ||
-                    keepIncoming.has(task.id),
-                )
-                .map((task) => task.id),
-            );
-            setData(merged);
-            setSortMode(merged.sort_mode || "smart");
-            syncRemoteTasks(
-              merged.tasks.filter((task) => changedIds.has(task.id)),
-              merged.members,
-            );
-            setImportPreview(null);
-            setToast("Đã merge backup; các task conflict được xử lý theo lựa chọn.");
-          }}
-        />
-      )}
-      {conflict && (
-        <ConflictDialog
-          local={conflict.local}
-          remote={conflict.remote}
-          message={conflict.message}
-          remainingConflicts={conflictCount}
-          onResolve={resolveConflict}
-          onClose={dismissConflict}
-        />
-      )}
-      {toast && (
-        <div className="toast" role="status" aria-live="polite">
-          <Check size={16} />
-          {toast}
-          {undoState && (
-            <button className="toast-action" onClick={undoLast}>
-              Hoàn tác
-            </button>
-          )}
-        </div>
-      )}
-    </main>
+        )}
+      </main>
+    </WorkspaceRuntimeProvider>
   );
 }
