@@ -1,10 +1,10 @@
 "use client";
 
 import { createContext, useContext } from "react";
-import type { RefObject, ReactNode } from "react";
+import type { ReactNode, RefObject } from "react";
 import type { AppLocale, UiCopy } from "@/lib/i18n";
 import type { BoardData, SavedView, SortMode, Task, TaskTemplate } from "@/lib/types";
-import type { WorkspaceView } from "../layout/WorkspaceShell";
+import type { WorkspaceView } from "../layout/workspace-routes";
 
 export type WorkspaceRuntimeValue = {
   view: WorkspaceView;
@@ -62,9 +62,9 @@ export type WorkspaceRuntimeValue = {
   onOpenSettings: () => void;
 };
 
-const WorkspaceRuntimeContext = createContext<WorkspaceRuntimeValue | null>(null);
+const WorkspaceContext = createContext<WorkspaceRuntimeValue | null>(null);
 
-export function WorkspaceRuntimeProvider({
+export function WorkspaceProvider({
   value,
   children,
 }: {
@@ -72,15 +72,12 @@ export function WorkspaceRuntimeProvider({
   children: ReactNode;
 }) {
   return (
-    <WorkspaceRuntimeContext.Provider value={value}>
-      {children}
-    </WorkspaceRuntimeContext.Provider>
+    <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>
   );
 }
 
 export function useWorkspaceRuntime() {
-  const value = useContext(WorkspaceRuntimeContext);
-  if (!value)
-    throw new Error("Workspace view phải nằm trong WorkspaceRuntimeProvider.");
+  const value = useContext(WorkspaceContext);
+  if (!value) throw new Error("Workspace view phải nằm trong WorkspaceProvider.");
   return value;
 }

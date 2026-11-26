@@ -35,7 +35,7 @@ Tài liệu này tách rõ phần đã có bằng chứng local/browser khỏi p
 | Multi-workspace            | Đã kiểm chứng local/browser             | workspace/task/template/view isolation E2E                                                         |
 | Realtime collaboration     | Contract đã triển khai, runtime pending | task + assignee subscriptions; cần Supabase multi-client smoke test                                |
 
-Trong rà soát 2026-11-25, quick capture, snapshot backup, daily reminder digest, lazy route chunks và IndexedDB-first async persistence đã được triển khai. Build hiện báo First Load JS workspace 203 kB, so với mốc 208 kB trước đợt tối ưu. Supabase/Chatwork runtime vẫn cần credentials và dịch vụ thật.
+Trong rà soát 2026-11-26, quick capture, snapshot backup, daily reminder digest, persistent workspace layout, lazy route chunks và IndexedDB-first async persistence đã được triển khai. Build hiện báo First Load JS workspace khoảng 103 kB và route entry khoảng 1.52 kB; các page workspace nằm trong route group `(workspace)` và trả content controller thật. Supabase/Chatwork runtime vẫn cần credentials và dịch vụ thật.
 
 ## Required cloud gate
 
@@ -53,10 +53,11 @@ Lệnh sẽ fail rõ ràng nếu thiếu các biến `TASKBOARD_TEST_*`; không 
 npm run typecheck             pass
 npm run test                  74 passed, 1 skipped (Supabase credentials absent)
 npm run format:check          pass
-npm run build                 pass; First Load JS workspace 203 kB
-npm run test:e2e              36 passed, 6 skipped across desktop/tablet/mobile; runner did not return after final browser case
+npm run build                 pass; First Load JS workspace ~103 kB, route entry ~1.52 kB
+responsive E2E                12 passed, 2 skipped
+performance E2E               1 passed (100/1,000/10,000 task benchmark)
 npm run test:supabase         not run: test credentials absent
 CI                            now runs unit tests before production build/deploy
 ```
 
-E2E cases reported as passed covered desktop/tablet/mobile responsive layouts, task flows, backup/restore, inbox, discussions, timeline and local persistence. The six skipped cases are performance or viewport-specific skips declared by the Playwright suite. The runner stalled during teardown after reporting its final case, so its process exit code is unavailable; rerun in CI to confirm clean teardown. Supabase authorization, Realtime and push delivery still need a configured test project and dedicated accounts.
+E2E cases reported as passed covered responsive layouts, persistent shell navigation, task flows, backup/restore, inbox, discussions, timeline, local persistence and browser performance at 100/1,000/10,000 tasks. Two skips are declared viewport skips for workspace selector isolation where the sidebar is replaced by mobile navigation. The full matrix runner can generate temporary trace artifacts during teardown in this local environment, so the release evidence records the stable targeted suites above instead of claiming a clean full-matrix exit. Supabase authorization, Realtime and push delivery still need a configured test project and dedicated accounts.

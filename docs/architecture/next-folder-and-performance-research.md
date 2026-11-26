@@ -12,9 +12,9 @@ Next.js cho phép colocate file trong route segment; chỉ `page`/`route` làm s
 
 Áp dụng tại repo:
 
-- `app/page.tsx`, `app/today/page.tsx` là entry mỏng; UI workspace nằm ở `app/_components/workspace/` (source: `app/page.tsx:1-4`, `app/today/page.tsx:1-10`).
+- `app/(workspace)/page.tsx`, `app/(workspace)/today/page.tsx` là entry mỏng; mỗi page trả controller tương ứng, còn UI workspace nằm ở `app/_components/workspace/`.
 - `layout/`, `features/`, `dialogs/`, `hooks/`, `runtime/` phản ánh boundary theo feature/runtime, dễ tìm hơn một thư mục components phẳng (source: `app/_components/workspace/`).
-- `_components` là private folder hợp lệ; không cần route group chỉ để “làm đẹp”. Chỉ thêm `(workspace)` nếu cần gom layout/loading/error hoặc cấu trúc route mà vẫn giữ URL.
+- Route group `(workspace)` gom layout/loading/error mà không thêm segment vào URL. Đây là lý do thực tế để dùng route group, không phải để “làm đẹp” cây thư mục.
 - `lib/` phù hợp cho domain, storage và repository dùng chung; không nên đẩy browser-only adapter vào Server Component import graph.
 
 Không áp dụng máy móc: “mỗi component một folder” hoặc một kiến trúc `services/repositories/use-cases` lớn không được docs yêu cầu và có thể làm app UI nhỏ khó navigable. Tên thư mục không tạo được server/client boundary; boundary do module graph và directive quyết định.
@@ -25,7 +25,7 @@ Trong App Router, layout/page mặc định là Server Components; Client Compon
 
 Áp dụng:
 
-- `app/layout.tsx`, `app/page.tsx`, `app/today/page.tsx` đang là server entries mỏng; `WorkspaceEntry.tsx` và `WorkspaceRuntime.tsx` là client boundary (source: `app/_components/workspace/layout/WorkspaceEntry.tsx:1-14`, `.../runtime/WorkspaceRuntime.tsx:1-9`).
+- `app/layout.tsx` là server entry mỏng; `app/(workspace)/layout.tsx` là route-group entry; `WorkspaceLayout.tsx`, `WorkspaceEntry.tsx` và `WorkspaceRuntime.tsx` là client boundary cho shell/state runtime. Các page workspace vẫn là Server Components mặc định, giữ metadata/SEO và truyền content controller vào shell mà không dựng lại shell.
 - Client-heavy là hợp lý vì state, event, `localStorage`, IndexedDB, browser reminders và realtime đều cần browser (source: `WorkspaceRuntime.tsx:57-65`, `lib/storage/indexed-db-board-storage.ts:30-47`, `lib/taskboard/use-board-sync.ts:51-61`).
 - `ssr: false` có lý do ở coordinator/dialogs browser-dependent; không nên biến mọi presentational component thành client chỉ vì một ancestor đã là client.
 
@@ -35,11 +35,11 @@ Không áp dụng: server-side `fetch`/RSC cache làm nguồn dữ liệu chính
 
 Next khuyến nghị lazy-load component/library nặng hoặc hiếm dùng bằng `next/dynamic`; `ssr: false` chỉ dành cho component không thể render trên server. `loading` của dynamic import là fallback trong lúc chunk tải. Xem [Lazy loading](https://nextjs.org/docs/app/guides/lazy-loading).
 
-Repo đã dùng đúng seam cho runtime, TaskModal, settings/confirm/lock, notification, import/conflict/template dialogs và TaskCard (source: `WorkspaceEntry.tsx:3-10`, `WorkspaceRuntime.tsx:99-146`). Đây là phân chia theo interaction frequency, không chỉ theo file size.
+Repo đã dùng đúng seam cho WorkspaceLayout, WorkspaceProvider, sidebar/header, runtime, TaskModal, settings/confirm/lock, notification, import/conflict/template dialogs và TaskCard. Đây là phân chia theo lifecycle/interaction frequency, không chỉ theo file size.
 
 `loading.tsx` tự tạo Suspense boundary cho segment và cho phép shell/streaming; `error.tsx` là Client Component error boundary, nhận `reset`. Xem [Loading UI and Streaming](https://nextjs.org/docs/app/building-your-application/routing/loading-ui-and-streaming) và [Error handling](https://nextjs.org/docs/app/getting-started/error-handling).
 
-Áp dụng tại repo: `app/loading.tsx`, route-level `today/loading.tsx` và `app/error.tsx` đã có; route loading tái sử dụng `WorkspaceRouteLoading` (source: `app/loading.tsx:1-5`, `app/today/loading.tsx:1`, `app/error.tsx:1-11`). Nên giữ fallback có cùng geometry để giảm layout shift. Error boundary không thay thế xử lý lỗi persistence/sync: các lỗi đó cần trạng thái domain và recovery/export UI.
+Áp dụng tại repo: `app/loading.tsx`, `app/(workspace)/loading.tsx` và `app/error.tsx` đã có; workspace loading/error tái sử dụng `WorkspaceRouteLoading` và `WorkspaceRouteError` (source: `app/(workspace)/loading.tsx`, `app/(workspace)/error.tsx`). Nên giữ fallback có cùng geometry để giảm layout shift. Error boundary không thay thế xử lý lỗi persistence/sync: các lỗi đó cần trạng thái domain và recovery/export UI.
 
 ## 4. Caching và parallel data fetching
 
@@ -55,23 +55,23 @@ Phần áp dụng có giới hạn:
 ## 5. Performance checklist phù hợp Taskboard
 
 - Đo production build và browser trace trước/sau: First Load JS, chunk tải sau interaction, LCP/INP/CLS, thời gian hydrate và long task. Hướng dẫn tổng hợp: [Next.js Optimizing](https://nextjs.org/docs/app/building-your-application/optimizing) và [React `<Profiler>`](https://react.dev/reference/react/Profiler).
-- Giữ `WorkspaceRuntime` không phình thêm; tách state/controller theo feature khi context khiến toàn workspace rerender. Context hiện gom nhiều derived data và callbacks (source: `WorkspaceRuntimeContext.tsx:9-62`), nên đây là điểm cần đo, không phải mặc định phải rewrite.
+- Giữ `WorkspaceRuntime` không phình thêm; `WorkspaceProvider` là seam context cho feature content, còn sidebar/header đã tách khỏi runtime markup. Context vẫn gom derived data và callbacks nên cần đo rerender bằng React Profiler trước khi tách thêm persistence/mutations/permissions; không mặc định rewrite tiếp.
 - Tiếp tục defer modal/dialog/feature hiếm dùng; chỉ lazy-load một list/card khi profiling cho thấy chi phí mount lớn. Lazy import tự nó không chứng minh performance tốt hơn.
 - IndexedDB async là đúng hướng cho main-thread responsiveness, nhưng lọc/sort/memoization và số lượng task lớn vẫn cần benchmark thực tế. Không tuyên bố đạt performance budget nếu chưa có production trace.
 - Dùng `useDeferredValue`/memoization có mục tiêu cho derived search/filter; tránh lạm dụng vì cache/memoization cũng có chi phí và không thay thế data-structure/virtualization phù hợp.
 
 ## Áp dụng / không áp dụng — quyết định cho repo này
 
-| Guidance                                        | Áp dụng                                     | Không nên áp dụng máy móc                                          |
-| ----------------------------------------------- | ------------------------------------------- | ------------------------------------------------------------------ |
-| Colocation, private folders, thin route entries | Có; cấu trúc hiện tại phù hợp               | Không cần thêm nhiều route groups nếu URL/layout không cần         |
-| Server Components mặc định                      | Có cho shell, metadata, route entries       | Không ép IndexedDB/local state/cloud realtime vào server           |
-| Client boundary nhỏ                             | Có; giữ browser/runtime code sau boundary   | Không rải `'use client'` lên toàn bộ `app`                         |
-| Dynamic import                                  | Có cho coordinator và interaction hiếm dùng | Không lazy-load mọi component nhỏ                                  |
-| `loading.tsx`/`error.tsx`                       | Có; giữ skeleton geometry và recovery UI    | Không coi boundary là xử lý được mọi lỗi sync/domain               |
-| Server cache/revalidate                         | Chỉ cho public/static/server-owned data     | Không cache board per-device như dữ liệu dùng chung                |
-| Parallel fetch                                  | Có cho cloud reads độc lập                  | Không song song write queue/revision/conflict operations           |
-| Performance optimization                        | Đo bundle, hydration, rerender, long task   | Không kết luận từ static inspection hoặc một con số build duy nhất |
+| Guidance                                        | Áp dụng                                                  | Không nên áp dụng máy móc                                          |
+| ----------------------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------ |
+| Colocation, private folders, thin route entries | Có; route group workspace giữ layout/loading/error chung | Chỉ thêm route group khi có layout hoặc lifecycle chung            |
+| Server Components mặc định                      | Có cho shell, metadata, route entries                    | Không ép IndexedDB/local state/cloud realtime vào server           |
+| Client boundary nhỏ                             | Có; giữ browser/runtime code sau boundary                | Không rải `'use client'` lên toàn bộ `app`                         |
+| Dynamic import                                  | Có cho coordinator và interaction hiếm dùng              | Không lazy-load mọi component nhỏ                                  |
+| `loading.tsx`/`error.tsx`                       | Có; giữ skeleton geometry và recovery UI                 | Không coi boundary là xử lý được mọi lỗi sync/domain               |
+| Server cache/revalidate                         | Chỉ cho public/static/server-owned data                  | Không cache board per-device như dữ liệu dùng chung                |
+| Parallel fetch                                  | Có cho cloud reads độc lập                               | Không song song write queue/revision/conflict operations           |
+| Performance optimization                        | Đo bundle, hydration, rerender, long task                | Không kết luận từ static inspection hoặc một con số build duy nhất |
 
 ## Evidence và giới hạn
 

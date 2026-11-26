@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useWorkspaceRuntime } from "../../runtime/WorkspaceRuntimeContext";
+import { useWorkspaceRuntime } from "../../state/WorkspaceProvider";
 
 const TimelineView = dynamic(
   () => import("./TimelineView").then((module) => module.TimelineView),

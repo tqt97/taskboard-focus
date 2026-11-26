@@ -13,7 +13,7 @@ import {
   X,
 } from "lucide-react";
 import dynamic from "next/dynamic";
-import { useWorkspaceRuntime } from "../../runtime/WorkspaceRuntimeContext";
+import { useWorkspaceRuntime } from "../../state/WorkspaceProvider";
 
 const TaskBoardColumns = dynamic(
   () => import("./TaskBoardColumns").then((module) => module.TaskBoardColumns),

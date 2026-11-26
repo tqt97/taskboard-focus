@@ -39,6 +39,25 @@ test("mobile uses a right-side menu instead of a clipped sidebar control", async
   ).toBeVisible();
 });
 
+test("workspace shell stays mounted while changing views", async ({ page }) => {
+  await page.goto("/tasks");
+  await expect(page.locator(".topbar")).toBeVisible();
+
+  if (await page.locator(".sidebar").isVisible()) {
+    await page.locator(".sidebar").getByRole("button", { name: "Hôm nay" }).click();
+  } else {
+    await page.getByRole("button", { name: "Mở menu" }).click();
+    await page
+      .getByRole("navigation", { name: "Điều hướng mobile" })
+      .getByRole("button", { name: "Hôm nay" })
+      .click();
+  }
+  await expect(page).toHaveURL(/\/today$/);
+  await expect(page.locator(".topbar")).toBeVisible();
+  await expect(page.locator('[aria-label="Đang tải workspace"]')).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Hôm nay" })).toBeVisible();
+});
+
 test("new task modal groups fields and supports multiple dependencies", async ({
   page,
 }) => {
@@ -98,6 +117,7 @@ test("quick capture shortcut and inline task title edit work on the board", asyn
   page,
 }) => {
   await page.goto("/tasks");
+  await expect(page.getByRole("heading", { name: /Danh sách task/ })).toBeVisible();
   await page.keyboard.press("n");
   const quickCapture = page.getByRole("dialog", { name: "Ghi nhanh vào Inbox" });
   await expect(quickCapture).toBeVisible();
@@ -330,8 +350,8 @@ test("local workspace selector isolates task data between workspaces", async ({
   page,
 }) => {
   test.skip(
-    (page.viewportSize()?.width || 0) < 601,
-    "Workspace selector is hidden in the mobile topbar",
+    (page.viewportSize()?.width || 0) <= 1440,
+    "Workspace selector is hidden when the desktop sidebar collapses into mobile navigation",
   );
   await page.goto("/tasks");
   page.once("dialog", (dialog) => void dialog.accept("QA workspace"));
@@ -347,8 +367,8 @@ test("local workspace selector isolates task data between workspaces", async ({
 
 test("local workspace keeps templates isolated", async ({ page }) => {
   test.skip(
-    (page.viewportSize()?.width || 0) < 601,
-    "Workspace selector is hidden in the mobile topbar",
+    (page.viewportSize()?.width || 0) <= 1440,
+    "Workspace selector is hidden when the desktop sidebar collapses into mobile navigation",
   );
   await page.addInitScript(() => {
     localStorage.setItem(

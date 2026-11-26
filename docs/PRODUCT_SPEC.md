@@ -13,7 +13,7 @@ Một workspace cá nhân giúp ghi task nhanh, nhìn tình hình chung và khô
 
 ## Chức năng MVP
 
-1. Dashboard có ngày giờ hiện tại, số lượng task, mốc sắp tới, thành viên.
+1. Dashboard có greeting theo thời điểm trong ngày, số lượng task, mốc sắp tới và thành viên; header không chiếm không gian cho đồng hồ trạng thái.
 2. CRUD task với mã, mô tả, trạng thái, ưu tiên, độ nghiêm trọng, người phụ trách, bốn mốc ngày và link tài liệu.
 3. Tìm kiếm, lọc trạng thái/ưu tiên, đổi thứ tự bằng kéo thả.
 4. Chỉnh sửa danh sách thành viên trên UI, bật/tắt thành viên.

@@ -9,12 +9,12 @@
 - Web Push nền qua Service Worker cho owner cloud, subscription per-device, VAPID delivery và cron riêng; template có UI đổi tên/xóa; app nhắc tải JSON ngoài thiết bị mỗi tuần.
 - Chatwork test yêu cầu bearer Auth đúng owner, cố định room server-side và cooldown atomic 60 giây trong Supabase.
 - Nâng PostCSS lên bản vá bảo mật bằng npm override trong phạm vi Next 15; không ép nâng framework major.
-- Lazy-load Kanban, timeline, notification popover, import/conflict dialog theo nhu cầu; font có content hash và immutable cache một năm. Đồng hồ chỉ cập nhật mỗi phút, chart nhịp tạo task chỉ tính lại khi ngày hoặc task đổi. Build lần rà soát báo First Load JS 203 kB (mốc trước tối ưu 208 kB); phần Board dùng chung vẫn là bundle lớn nhất cần tách tiếp nếu muốn giảm thêm đáng kể.
+- Lazy-load Kanban, timeline, notification popover, import/conflict dialog theo nhu cầu; font có content hash và immutable cache một năm. Runtime vẫn cập nhật thời gian nội bộ mỗi phút để Today/deadline không stale, nhưng không render đồng hồ ở header. Build lần rà soát 2026-11-26 báo First Load JS khoảng 103 kB và route entry khoảng 1.52 kB; route entries giờ là page thật trong `(workspace)` thay vì `return null`. Bundle analyzer/production trace vẫn cần để xác nhận waterfall thực tế.
 - Tách UI page heading, quick capture, browser reminder và task card thành component/hook riêng để giảm trách nhiệm của Board.
 - Tách lịch sử và thảo luận task khỏi `TaskModal`; state của composer comment được đóng gói trong panel.
 - `/today` là workspace riêng cho task quá hạn, đến hạn hôm nay và task khẩn; task đã archive không xuất hiện.
 - Archive là soft-delete: giữ activity, có undo và restore từ filter `Đã lưu trữ`.
-- Local persistence có `boardSchemaVersion`, adapter `BoardStorage` và trạng thái autosave `Đang lưu` / `Đã lưu` / `Lỗi lưu`.
+- Local persistence có `boardSchemaVersion`, adapter `BoardStorage` và thông báo lỗi persistence rõ ràng; trạng thái lưu nội bộ không chiếm chỗ trong header.
 - Dependency readiness được tách thành selector `ready` / `waiting` / `blocked`; parser vẫn chặn missing dependency, self-dependency và cycle.
 - Recurrence (`daily`, `weekly`, `monthly`), template flow và utility tạo task kế tiếp; attachment hỗ trợ URL metadata và upload file tối đa 10 MB qua Supabase Storage.
 - Supabase Auth helper, `/login`, workspace catalog, cloud push/pull và snapshot repository có owner/RLS boundary; snapshot giữ nguyên local ID/dependency graph. Remote task CRUD có optimistic revision, offline retry queue và realtime subscription có guard timestamp.
@@ -25,7 +25,7 @@
 
 ## Giới hạn cần hiểu rõ
 
-- Board vẫn là UI orchestration lớn; selector, storage, repository, permission và domain utility đã được tách để tạo seam an toàn. Việc tách toàn bộ JSX thành nhiều component là refactor tiếp theo, không nên làm cùng lúc với migration remote.
+- `WorkspaceRuntime` vẫn là UI orchestration lớn; `WorkspaceLayout`, `WorkspaceProvider`, `WorkspaceSidebar`, `WorkspaceHeader`, selector, storage, repository, permission và domain utility đã được tách thành các seam an toàn. Bước tiếp theo là tách persistence/mutations/permissions sâu hơn khi có profiler evidence, không rewrite toàn bộ cùng lúc với migration remote.
 - Supabase sync được gọi chủ động bằng nút push/pull: cần cấu hình Auth, `NEXT_PUBLIC_SUPABASE_URL` và anon key. Không đưa service role key vào client.
 - Push reminder chỉ gửi task đã đồng bộ cloud và chỉ cho `TASKBOARD_OWNER_ID`; browser reminder cục bộ vẫn chạy khi tab mở.
 - Backup nudge nhắc người dùng tải JSON; việc lưu file ở nơi an toàn vẫn do người dùng thực hiện.

@@ -1,6 +1,6 @@
 # Kiến trúc
 
-Typography dùng Geist Sans self-host với Latin và Latin Extended subsets; giao diện không gọi dịch vụ font bên ngoài khi người dùng mở app. `layout/WorkspaceShell` là server route entry nhẹ; `layout/WorkspaceEntry` là client boundary để hiển thị loading shell có cấu trúc và tải `runtime/WorkspaceRuntime` bằng dynamic import. Runtime điều phối state/mutation; các feature overview, tasks, today, inbox và timeline nằm dưới `features/`, còn task modal, settings/dialogs, Kanban, dashboard analytics và notification popover được tách theo nhu cầu.
+Typography dùng Geist Sans self-host với Latin và Latin Extended subsets; giao diện không gọi dịch vụ font bên ngoài khi người dùng mở app. `layout/WorkspaceLayout` là client shell sống xuyên navigation; `layout/WorkspaceEntry` là client boundary để tải `runtime/WorkspaceRuntime` bằng dynamic import. `state/WorkspaceProvider` giữ context/state dùng chung, còn `layout/WorkspaceSidebar` và `layout/WorkspaceHeader` giữ vùng persistent. Runtime điều phối state/mutation; các feature overview, tasks, today, inbox và timeline nằm dưới `features/`, còn task modal, settings/dialogs, Kanban, dashboard analytics và notification popover được tách theo nhu cầu.
 
 Task details tách activity history và comments panel khỏi `TaskModal`; panel comments tự quản lý composer/reply state, còn mutation callback giữ đồng bộ form và workspace state.
 
@@ -9,9 +9,9 @@ Các view/dialog ít dùng được tải bằng dynamic import để giảm Jav
 ## Hiện trạng package
 
 - Next.js App Router 15 + React 19 + TypeScript.
-- Route entries giữ mỏng ở `app/page.tsx` và `app/tasks/page.tsx`; workspace UI nằm trong `app/_components/workspace/`.
+- Route entries giữ mỏng trong route group `app/(workspace)/`; mỗi `page.tsx` khai báo metadata và content controller của route, còn workspace UI nằm trong `app/_components/workspace/`.
 - Layout cross-route nằm trong `app/_components/layout/`; `app/layout.tsx`, `app/loading.tsx`, `app/error.tsx` và `app/manifest.ts` chỉ là thin entries cho App Router.
-- Các route workspace dùng `layout/WorkspaceShell.tsx` làm server entry và `layout/WorkspaceEntry.tsx` làm client boundary; `runtime/WorkspaceRuntime.tsx` được defer khỏi bundle khởi tạo. `features/` chứa controller và UI theo route; `dialogs/` chứa modal/popover; `hooks/` chứa side effect. Mỗi route có `loading.tsx` và `error.tsx` riêng nhưng dùng chung implementation để giữ layout ổn định khi chuyển trang và có retry khi segment lỗi. Runtime điều phối state/view; dashboard analytics, saved views, shortcuts, backup restore và push delivery đã tách module/hook riêng. `dialogs/task/TaskModal.tsx` phụ trách CRUD form và giới hạn dependency candidates theo search; `dialogs/WorkspaceDialogs.tsx` giữ settings/confirm/lock dialog; `dialogs/NotificationPopover.tsx` phụ trách notification UI. Design tokens và component styles dùng chung ở `app/globals.css`.
+- `app/layout.tsx` chỉ giữ RootDocument server-side; route group `app/(workspace)/layout.tsx` đặt `layout/WorkspaceLayout.tsx` làm shell persistent cho các route workspace. Pathname chỉ đổi view bên trong `WorkspaceEntry`, nên sidebar/header/provider không remount khi chuyển route. Các `page.tsx` thực sự trả content controller và giữ metadata/SEO. `layout/WorkspaceEntry.tsx` defer `runtime/WorkspaceRuntime.tsx` khỏi bundle khởi tạo; `state/WorkspaceProvider.tsx` là seam context cho feature content. `layout/WorkspaceSidebar.tsx` và `layout/WorkspaceHeader.tsx` chỉ nhận state/action cần cho shell. `features/` chứa controller và UI theo route; `dialogs/` chứa modal/popover; `hooks/` chứa side effect. Route group dùng một `loading.tsx` và `error.tsx` chung để giữ layout ổn định khi chuyển trang và có retry khi segment lỗi. Runtime điều phối state/view; dashboard analytics, saved views, shortcuts, backup restore và push delivery đã tách module/hook riêng. `dialogs/task/TaskModal.tsx` phụ trách CRUD form và giới hạn dependency candidates theo search; `dialogs/WorkspaceDialogs.tsx` giữ settings/confirm/lock dialog; `dialogs/NotificationPopover.tsx` phụ trách notification UI. Design tokens và component styles dùng chung ở `app/globals.css`.
 - `lib/data.ts` giữ demo seed và adapter dữ liệu; persistence local ưu tiên IndexedDB, localStorage được giữ làm fallback/migration cho môi trường không hỗ trợ IndexedDB.
 - `lib/supabase-config.ts` chỉ kiểm tra cấu hình cloud bằng biến môi trường; Auth, repository, realtime và Supabase SDK được tải qua `loadCloudModules()` khi cloud thực sự được dùng. Attachment storage cũng lazy-load theo thao tác upload/mở link.
 - `lib/types.ts` là hợp đồng dữ liệu.
@@ -45,13 +45,14 @@ Validation shape nằm ở `lib/data.ts`; validation relation nằm ở `lib/tas
 
 ## Performance budget hiện tại
 
-- Build production lần rà soát 2026-11-26 ghi First Load JS khoảng 105 kB cho các route workspace (`/`, `/tasks`, `/today`, `/inbox`, `/timeline`). Bảng summary của Next chưa phải waterfall đầy đủ; cần bundle analyzer hoặc production trace để xác nhận các deferred cloud chunks không bị tải sớm.
+- Build production lần rà soát 2026-11-26 ghi First Load JS khoảng 103 kB và route entry khoảng 1.52 kB cho các route workspace (`/`, `/tasks`, `/today`, `/inbox`, `/timeline`). Route entry tăng có chủ ý vì mỗi `page.tsx` giờ trả content controller thay vì `return null`; đây là trade-off để giữ route semantics/SEO đúng App Router. Bảng summary của Next chưa phải waterfall đầy đủ; cần bundle analyzer hoặc production trace để xác nhận các deferred cloud chunks không bị tải sớm.
 - Task modal được tải theo nhu cầu bằng dynamic import để initial render không phải tải form CRUD và attachment controls.
 - Settings/confirm/lock dialog cũng được tải theo nhu cầu; route metadata có title, description và canonical riêng cho `/tasks`, `/today`, `/login`.
 - Geist Sans được self-host với Latin/Latin Extended; file font có content hash và cache `public, max-age=31536000, immutable`. CSS vẫn có system fallback để xử lý khi font tải lỗi.
 - View Kanban, timeline, TaskCard và một số popover/dialog được tách dynamic chunk. Dữ liệu workspace cá nhân không dùng cache HTTP dùng chung.
 - Ghi workspace ưu tiên IndexedDB bất đồng bộ; chỉ ghi localStorage khi IndexedDB thất bại. localStorage vẫn được đọc để migrate/khôi phục fallback. Daily backup lưu tối đa 7 bản/workspace.
 - Locale hiện có `vi`, `en`, `ja`; language setting đã lưu lựa chọn, đổi `html lang` và định dạng ngày/giờ. Copy toàn bộ màn hình sẽ được migrate qua catalog theo từng feature, không dịch trực tiếp trong domain logic.
+- Workspace navigation có một shell persistent tại `app/(workspace)/layout.tsx`: `WorkspaceLayout` map pathname sang view, `WorkspaceProvider` giữ context và `WorkspaceSidebar`/`WorkspaceHeader` giữ UI điều hướng. Chuyển route không dựng lại skeleton/sidebar/header; e2e regression khóa hành vi này.
 - Search dùng `useDeferredValue`; query conditions được parse trong `lib/taskboard/search.ts`, derived task lists dùng `useMemo`. Mỗi Kanban column dùng lazy/windowed card rendering với overscan 720px, placeholder intrinsic size và `content-visibility: auto`; card height biến thiên vẫn cần benchmark trên dataset cực lớn.
 
 ## Luồng hiện tại

@@ -6,7 +6,7 @@
 
 ## Tính năng
 
-- Dashboard có ngày giờ hiện tại, thống kê task và mốc sắp đến.
+- Dashboard có thống kê task, next action và các mốc sắp đến.
 - Kanban ưu tiên theo thứ tự khẩn cấp → severity → deadline; hỗ trợ kéo thả trong cùng status và qua status khác.
 - Chart nhịp tạo task 14 ngày, notification center, export nhanh ở header và sidebar có thể thu gọn.
 - Tạo, xem, sửa, xóa task; dialog xác nhận khi xóa.
@@ -19,7 +19,7 @@
 - Bước tiếp theo, ghi chú review và activity history tối giản trên từng task.
 - Chỉnh sửa danh sách thành viên qua UI.
 - Dark mode, giao diện responsive.
-- Today workspace tại `/today`, archive/restore soft-delete và autosave status.
+- Today workspace tại `/today`, archive/restore soft-delete và thông báo lỗi persistence rõ ràng.
 - Dependency readiness, recurrence, attachment URL metadata và template storage utility.
 - Supabase Storage upload attachment tối đa 10 MB khi đã đăng nhập cloud.
 - Playwright responsive regression cho desktop/tablet/mobile.
@@ -27,6 +27,8 @@
 - Prefix task cấu hình được, link chính/link phụ, tên hiển thị và passcode lock-screen local.
 - Loading/error fallback, validation import/form, keyboard interaction và format code bằng Prettier.
 - SEO metadata đầy đủ, icon SVG, Apple icon và web manifest; workspace local vẫn `noindex`.
+- Workspace layout persistent: sidebar, header và provider không remount khi chuyển route; chỉ content route thay đổi.
+- Sidebar count được memo theo dữ liệu liên quan; feature content và dialog nặng được lazy-load theo route/tương tác.
 - Schema Supabase, hướng dẫn Vercel và tài liệu mở rộng.
 - GitHub Actions tự kiểm tra pull request và tự deploy production lên Vercel khi push vào `master`.
 
@@ -106,14 +108,25 @@ Lock screen trong MVP chỉ là giao diện tiện ích, không phải xác th�
 ```text
 app/
   _components/
-    layout/          Root document, SEO metadata, icons, manifest, loading/error states
-    workspace/       Runtime, route features, dialogs và workspace hooks
+    layout/          Root document, WorkspaceLayout, SEO metadata, shared loading/error states
+    workspace/
+      layout/        WorkspaceEntry, Header, Sidebar và route mapping
+      state/         WorkspaceProvider và context seam
+      runtime/       State orchestration và modal coordination
+      features/      Overview, tasks, today, inbox và timeline
+      dialogs/       Task/settings/import/conflict/notification dialogs
+      hooks/         Persistence, sync, reminders, saved views và shortcuts
   globals.css        Responsive UI và dark mode
   layout.tsx         Thin App Router root entry
   loading.tsx        Thin route loading entry
   error.tsx          Thin route error entry
-  page.tsx           Dashboard route entry
-  tasks/page.tsx     Task list route entry
+  (workspace)/       Route group giữ URL, layout/loading/error và page entry workspace
+    layout.tsx       Persistent workspace shell entry
+    page.tsx         Dashboard route entry
+    tasks/page.tsx   Task list metadata/content route entry
+    today/page.tsx   Today metadata/content route entry
+    inbox/page.tsx   Inbox metadata/content route entry
+    timeline/page.tsx Calendar/timeline metadata/content route entry
 lib/
   data.ts            Demo data, migration và validation
   storage/           IndexedDB/localStorage persistence và attachment storage

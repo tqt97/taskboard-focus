@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import type { WorkspaceView } from "../layout/WorkspaceShell";
+import type { WorkspaceView } from "../layout/workspace-routes";
 
 const OverviewController = dynamic(
   () =>
