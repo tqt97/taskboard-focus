@@ -4,6 +4,8 @@ Typography dùng Geist Sans self-host với Latin và Latin Extended subsets; gi
 
 Palette dùng semantic tokens trong `app/globals.css`: `--text`/`--muted` cho hierarchy đọc, `--surface-muted` cho panel phụ, `--accent` cho primary action, và các cặp `--danger-*`, `--warning-*`, `--info-*`, `--success-*` cho trạng thái. Dark mode đổi cả nền, border, focus ring, status color và status background; component không nên thêm mã màu hardcode nếu token semantic đã có.
 
+Workspace runtime prefetch các route chính sau khi shell mount để giảm thời gian chuyển view. Trạng thái `online`/`offline` được lắng nghe ở runtime và hiển thị trên header; local-first mutation vẫn được phép tiếp tục, còn remote sync chịu trách nhiệm queue/retry khi có mạng trở lại.
+
 Task details tách activity history và comments panel khỏi `TaskModal`; panel comments tự quản lý composer/reply state, còn mutation callback giữ đồng bộ form và workspace state.
 
 Các view/dialog ít dùng được tải bằng dynamic import để giảm JavaScript ban đầu. `WorkspaceOverview` chỉ tải ở route tổng quan; Timeline, Kanban, modal và dialog vẫn lazy-load theo nhu cầu. Saved views và phím tắt nằm trong hook riêng. Font public có content hash và cache immutable; dữ liệu task/workspace không cache phía server vì thay đổi theo thiết bị/tài khoản. Search compile điều kiện một lần cho query hiện tại rồi lọc task; selector và biểu đồ dùng memoization.

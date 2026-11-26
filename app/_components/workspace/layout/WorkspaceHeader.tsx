@@ -18,6 +18,7 @@ import {
   Plus,
   Settings2,
   Sun,
+  WifiOff,
   X,
 } from "lucide-react";
 import type { RefObject } from "react";
@@ -66,6 +67,7 @@ export function WorkspaceHeader({
   dark,
   onToggleDark,
   onOpenSettings,
+  isOnline,
 }: {
   view: WorkspaceView;
   counts: WorkspaceNavigationCounts;
@@ -97,6 +99,7 @@ export function WorkspaceHeader({
   dark: boolean;
   onToggleDark: () => void;
   onOpenSettings: () => void;
+  isOnline: boolean;
 }) {
   const viewLabel =
     view === "overview"
@@ -126,6 +129,11 @@ export function WorkspaceHeader({
       <div className="breadcrumbs">
         Workspace <span>/</span> {viewLabel}
       </div>
+      {!isOnline && (
+        <span className="offline-indicator" role="status">
+          <WifiOff size={14} /> Ngoại tuyến · thay đổi sẽ đồng bộ khi có mạng
+        </span>
+      )}
       <div className="top-actions">
         <button
           className="mobile-menu-button"

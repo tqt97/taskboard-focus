@@ -339,6 +339,7 @@ export default function WorkspaceRuntime({
     [cloudUserId, setCloudUserId] = useState(""),
     [cloudUserEmail, setCloudUserEmail] = useState(""),
     [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "error">("saved");
+  const [isOnline, setIsOnline] = useState(true);
   const { savedViews, setSavedViews } = useSavedViews(workspaceId, ready);
   useEffect(() => setSelectedSavedViewId(""), [workspaceId]);
   const {
@@ -373,6 +374,21 @@ export default function WorkspaceRuntime({
     !remoteWorkspaceIds.includes(workspaceId) ||
     can(currentWorkspaceRole, "manage_members");
   const openQuickCapture = useCallback(() => setModal("quick-capture"), []);
+  useEffect(() => {
+    const updateOnlineState = () => setIsOnline(navigator.onLine);
+    updateOnlineState();
+    window.addEventListener("online", updateOnlineState);
+    window.addEventListener("offline", updateOnlineState);
+    return () => {
+      window.removeEventListener("online", updateOnlineState);
+      window.removeEventListener("offline", updateOnlineState);
+    };
+  }, []);
+  useEffect(() => {
+    ["/", "/tasks", "/today", "/inbox", "/timeline"].forEach((path) => {
+      router.prefetch(path);
+    });
+  }, [router]);
   useWorkspaceShortcuts({
     canEdit: canEditWorkspace,
     modalOpen: Boolean(modal),
@@ -1876,6 +1892,7 @@ export default function WorkspaceRuntime({
             dark={dark}
             onToggleDark={() => setDark((value) => !value)}
             onOpenSettings={() => setModal("settings")}
+            isOnline={isOnline}
           />
           <div className="content">
             <div className="page-heading">
