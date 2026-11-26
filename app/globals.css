@@ -220,7 +220,7 @@ textarea:focus-visible {
 }
 .sidebar nav {
   display: grid;
-  gap: 6px;
+  gap: 2px;
 }
 .nav-item {
   height: 44px;
@@ -1854,6 +1854,10 @@ textarea:focus-visible {
   border-radius: 10px;
   background: var(--surface2);
   color: var(--text);
+}
+.local-backups + .danger-button {
+  align-self: flex-start;
+  margin-top: 10px;
 }
 .local-backups > div,
 .local-backups li {
@@ -3815,6 +3819,13 @@ textarea:focus-visible {
   scrollbar-width: thin;
   padding-right: 2px;
 }
+.sidebar nav .nav-divider {
+  display: block;
+  height: 1px;
+  margin: 2px 10px;
+  background: var(--line);
+  opacity: 0.7;
+}
 .sidebar-bottom {
   flex: none;
   background: var(--surface);
@@ -5161,7 +5172,7 @@ textarea:focus-visible {
     display: grid;
     align-content: start;
     width: min(320px, 86vw);
-    gap: 4px;
+    gap: 2px;
     padding: 12px;
     border-left: 1px solid var(--line);
     background: var(--surface);
@@ -5218,6 +5229,13 @@ textarea:focus-visible {
     background: var(--surface2);
     padding: 2px 7px;
     font-size: 11px;
+  }
+  .mobile-nav .nav-divider {
+    display: block;
+    height: 1px;
+    margin: 2px 12px;
+    background: var(--line);
+    opacity: 0.7;
   }
 }
 @keyframes mobile-nav-in {

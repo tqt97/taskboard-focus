@@ -12,6 +12,7 @@ import {
   Download,
   FilePenLine,
   Languages,
+  LayoutDashboard,
   ListTodo,
   LogIn,
   Menu,
@@ -167,26 +168,30 @@ export function WorkspaceHeader({
                 className={view === "overview" ? "active" : ""}
                 onClick={() => onNavigate("/")}
               >
-                <CalendarDays size={17} /> Tổng quan
+                <LayoutDashboard size={17} /> Tổng quan
               </button>
-              <button
-                className={view === "tasks" ? "active" : ""}
-                onClick={() => onNavigate("/tasks")}
-              >
-                <ListTodo size={17} /> Danh sách task <span>{counts.active}</span>
-              </button>
+              <span className="nav-divider" aria-hidden="true" />
               <button
                 className={view === "today" ? "active" : ""}
                 onClick={() => onNavigate("/today")}
               >
                 <CalendarDays size={17} /> Hôm nay <span>{counts.today}</span>
               </button>
+              <span className="nav-divider" aria-hidden="true" />
               <button
                 className={view === "drafts" ? "active" : ""}
                 onClick={() => onNavigate("/drafts")}
               >
                 <FilePenLine size={17} /> Bản nháp <span>{counts.drafts}</span>
               </button>
+              <span className="nav-divider" aria-hidden="true" />
+              <button
+                className={view === "tasks" ? "active" : ""}
+                onClick={() => onNavigate("/tasks")}
+              >
+                <ListTodo size={17} /> Danh sách task <span>{counts.active}</span>
+              </button>
+              <span className="nav-divider" aria-hidden="true" />
               <button
                 className={view === "timeline" ? "active" : ""}
                 onClick={() => onNavigate("/timeline")}

@@ -96,13 +96,7 @@ export function WorkspaceSidebar({
           <LayoutDashboard size={18} />
           Tổng quan
         </button>
-        <button
-          className={view === "tasks" ? "nav-item active" : "nav-item"}
-          onClick={() => onNavigate("/tasks")}
-        >
-          <ListTodo size={18} />
-          Danh sách task<span className="nav-count">{counts.active}</span>
-        </button>
+        <span className="nav-divider" aria-hidden="true" />
         <button
           className={view === "today" ? "nav-item active" : "nav-item"}
           onClick={() => onNavigate("/today")}
@@ -110,6 +104,7 @@ export function WorkspaceSidebar({
           <CalendarDays size={18} />
           Hôm nay<span className="nav-count">{counts.today}</span>
         </button>
+        <span className="nav-divider" aria-hidden="true" />
         <button
           className={view === "drafts" ? "nav-item active" : "nav-item"}
           onClick={() => onNavigate("/drafts")}
@@ -117,6 +112,15 @@ export function WorkspaceSidebar({
           <FilePenLine size={18} />
           Bản nháp<span className="nav-count">{counts.drafts}</span>
         </button>
+        <span className="nav-divider" aria-hidden="true" />
+        <button
+          className={view === "tasks" ? "nav-item active" : "nav-item"}
+          onClick={() => onNavigate("/tasks")}
+        >
+          <ListTodo size={18} />
+          Danh sách task<span className="nav-count">{counts.active}</span>
+        </button>
+        <span className="nav-divider" aria-hidden="true" />
         <button
           className={view === "timeline" ? "nav-item active" : "nav-item"}
           onClick={() => onNavigate("/timeline")}
