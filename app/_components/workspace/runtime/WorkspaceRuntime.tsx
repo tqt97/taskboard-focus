@@ -16,11 +16,13 @@ import {
   Check,
   CloudDownload,
   CloudUpload,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Download,
   LogIn,
   LayoutDashboard,
+  Languages,
   ListTodo,
   LockKeyhole,
   Moon,
@@ -50,7 +52,9 @@ import { toDateInputValue } from "@/lib/taskboard/dates";
 import {
   getUiCopy,
   intlLocale,
+  localeLabels,
   readStoredLocale,
+  supportedLocales,
   writeStoredLocale,
   type AppLocale,
 } from "@/lib/i18n";
@@ -338,7 +342,6 @@ export default function WorkspaceRuntime({
     [dark, setDark] = useState(false),
     [toast, setToast] = useState(""),
     [dragId, setDragId] = useState<string | null>(null),
-    [clock, setClock] = useState(""),
     [sortMode, setSortMode] = useState<SortMode>("smart"),
     [focusMode, setFocusMode] = useState(false),
     [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]),
@@ -382,6 +385,9 @@ export default function WorkspaceRuntime({
   const copy = getUiCopy(locale);
   const reminderDueText = useCallback((value: string) => dueText(value, copy), [copy]);
   const currentWorkspaceRole = remoteWorkspaceRoles[workspaceId] || "owner";
+  const currentWorkspaceName =
+    localWorkspaces.find((workspace) => workspace.id === workspaceId)?.name ||
+    (workspaceId === "default" ? "Workspace cá nhân" : "Workspace hiện tại");
   const canEditWorkspace =
     !remoteWorkspaceIds.includes(workspaceId) ||
     can(currentWorkspaceRole, "edit_tasks");
@@ -540,24 +546,11 @@ export default function WorkspaceRuntime({
     writeStoredLocale(locale);
   }, [locale]);
   useEffect(() => {
-    const tick = () => {
-      const current = new Date();
-      setNow(current);
-      setClock(
-        new Intl.DateTimeFormat(intlLocale[locale], {
-          weekday: "long",
-          day: "numeric",
-          month: "long",
-          year: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
-        }).format(current),
-      );
-    };
-    tick();
-    const timer = setInterval(tick, 60000);
+    const refreshNow = () => setNow(new Date());
+    refreshNow();
+    const timer = setInterval(refreshNow, 60000);
     return () => clearInterval(timer);
-  }, [locale]);
+  }, []);
   useEffect(() => {
     document.documentElement.dataset.theme = dark ? "dark" : "light";
     safeSetLocalStorage("taskboard-dark", dark ? "1" : "0");
@@ -1866,7 +1859,40 @@ export default function WorkspaceRuntime({
             </div>
             <div>
               <strong>Taskboard</strong>
-              <small>PERSONAL WORKSPACE</small>
+              <small title={currentWorkspaceName}>{currentWorkspaceName}</small>
+            </div>
+          </div>
+          <div className="sidebar-workspace">
+            <span className="sidebar-workspace-label">Workspace hiện tại</span>
+            <div className="workspace-switcher-wrap">
+              <div className="workspace-switcher-display" aria-hidden="true">
+                <span className="workspace-switcher-name">{currentWorkspaceName}</span>
+                <ChevronDown size={15} />
+              </div>
+              <select
+                className="workspace-switcher"
+                aria-label="Chọn workspace"
+                value={workspaceId}
+                onChange={(event) => void switchWorkspace(event.target.value)}
+              >
+                {!localWorkspaces.some((workspace) => workspace.id === "default") && (
+                  <option value="default">Workspace cá nhân</option>
+                )}
+                {localWorkspaces.map((workspace) => (
+                  <option value={workspace.id} key={workspace.id}>
+                    {workspace.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                className="icon-button mini"
+                type="button"
+                aria-label="Tạo workspace"
+                title="Tạo workspace mới"
+                onClick={() => void createWorkspace()}
+              >
+                <Plus size={14} />
+              </button>
             </div>
           </div>
           <nav>
@@ -2032,107 +2058,74 @@ export default function WorkspaceRuntime({
                   </nav>
                 </>
               )}
-              <div className="live-date">
-                <span className="live-dot" />
-                {clock}
-              </div>
-              <span className={`autosave-status ${saveStatus}`} aria-live="polite">
-                {saveStatus === "saving"
-                  ? "Đang lưu"
-                  : saveStatus === "error"
-                    ? "Lỗi lưu"
-                    : "Đã lưu"}
-              </span>
-              <div className="workspace-switcher-wrap">
+              <button
+                className="header-quick-capture primary-button"
+                disabled={!canEditWorkspace}
+                title="Ghi nhanh task (N)"
+                aria-label="Ghi nhanh task (N)"
+                onClick={() => setModal("quick-capture")}
+              >
+                <Plus size={16} /> <span>Ghi nhanh</span> <kbd>N</kbd>
+              </button>
+              <label className="header-locale" title="Đổi ngôn ngữ">
+                <Languages size={16} aria-hidden="true" />
+                <span className="sr-only">Ngôn ngữ</span>
                 <select
-                  className="workspace-switcher"
-                  aria-label="Chọn workspace"
-                  value={workspaceId}
-                  onChange={(event) => void switchWorkspace(event.target.value)}
+                  aria-label="Đổi ngôn ngữ"
+                  value={locale}
+                  onChange={(event) => {
+                    setLocale(event.target.value as AppLocale);
+                    event.currentTarget.blur();
+                  }}
                 >
-                  {!localWorkspaces.some((workspace) => workspace.id === "default") && (
-                    <option value="default">Workspace cá nhân</option>
-                  )}
-                  {localWorkspaces.map((workspace) => (
-                    <option value={workspace.id} key={workspace.id}>
-                      {workspace.name}
+                  {supportedLocales.map((supportedLocale) => (
+                    <option key={supportedLocale} value={supportedLocale}>
+                      {localeLabels[supportedLocale]}
                     </option>
                   ))}
                 </select>
-                <button
-                  className="icon-button mini"
-                  type="button"
-                  aria-label="Tạo workspace"
-                  title="Tạo workspace mới"
-                  onClick={() => void createWorkspace()}
-                >
-                  <Plus size={14} />
-                </button>
-              </div>
-              <span
-                className={`sync-status sync-${syncState.status}`}
-                title={
-                  syncState.status === "error"
-                    ? syncState.message
-                    : !cloudConfigured
-                      ? "Local mode: dữ liệu được lưu trong trình duyệt này"
-                      : cloudUserEmail
-                        ? `Cloud đã kết nối: ${cloudUserEmail}`
-                        : "Cloud đã cấu hình nhưng chưa đăng nhập"
-                }
-                aria-live="polite"
-              >
-                {!cloudConfigured
-                  ? "Local"
-                  : syncState.status === "syncing"
-                    ? "Đang sync"
-                    : syncState.status === "synced"
-                      ? "Cloud đã sync"
-                      : syncState.status === "error"
-                        ? "Sync lỗi"
-                        : cloudUserEmail
-                          ? "Cloud đã kết nối"
-                          : "Cloud cần đăng nhập"}
-              </span>
-              {cloudConfigured && cloudUserEmail ? (
-                <>
+              </label>
+              <div className="header-utility-actions" aria-label="Công cụ workspace">
+                {cloudConfigured && cloudUserEmail ? (
+                  <>
+                    <button
+                      className="icon-button"
+                      aria-label="Đẩy workspace lên cloud"
+                      title="Đẩy workspace lên cloud"
+                      onClick={() => void sync("push")}
+                      disabled={syncState.status === "syncing"}
+                    >
+                      <CloudUpload size={17} />
+                    </button>
+                    <button
+                      className="icon-button"
+                      aria-label="Tải workspace từ cloud"
+                      title="Tải workspace từ cloud"
+                      onClick={() => void sync("pull")}
+                      disabled={syncState.status === "syncing"}
+                    >
+                      <CloudDownload size={17} />
+                    </button>
+                  </>
+                ) : cloudConfigured ? (
                   <button
                     className="icon-button"
-                    aria-label="Đẩy workspace lên cloud"
-                    title="Đẩy workspace lên cloud"
-                    onClick={() => void sync("push")}
-                    disabled={syncState.status === "syncing"}
+                    aria-label="Đăng nhập cloud"
+                    title="Đăng nhập cloud để đồng bộ workspace"
+                    onClick={() => router.push("/login")}
                   >
-                    <CloudUpload size={17} />
+                    <LogIn size={17} />
                   </button>
-                  <button
-                    className="icon-button"
-                    aria-label="Tải workspace từ cloud"
-                    title="Tải workspace từ cloud"
-                    onClick={() => void sync("pull")}
-                    disabled={syncState.status === "syncing"}
-                  >
-                    <CloudDownload size={17} />
-                  </button>
-                </>
-              ) : cloudConfigured ? (
+                ) : null}
                 <button
                   className="icon-button"
-                  aria-label="Đăng nhập cloud"
-                  title="Đăng nhập cloud để đồng bộ workspace"
-                  onClick={() => router.push("/login")}
+                  aria-label="Tải dữ liệu"
+                  title="Tải dữ liệu"
+                  onClick={exportData}
                 >
-                  <LogIn size={17} />
+                  <Download size={18} />
                 </button>
-              ) : null}
-              <button
-                className="icon-button"
-                aria-label="Tải dữ liệu"
-                title="Tải dữ liệu"
-                onClick={exportData}
-              >
-                <Download size={18} />
-              </button>
+              </div>
               <div className="notification-wrap" ref={notificationRef}>
                 <button
                   className={
@@ -2188,16 +2181,6 @@ export default function WorkspaceRuntime({
                 displayName={displayName}
               />
               <div className="page-actions">
-                {view !== "overview" && (
-                  <button
-                    className="secondary-button quick-capture-trigger"
-                    disabled={!canEditWorkspace}
-                    title="Ghi nhanh task (N)"
-                    onClick={() => setModal("quick-capture")}
-                  >
-                    <Plus size={16} /> Ghi nhanh <kbd>N</kbd>
-                  </button>
-                )}
                 {(view === "tasks" || view === "today" || view === "inbox") && (
                   <>
                     {templates.length > 0 && (
@@ -2494,8 +2477,6 @@ export default function WorkspaceRuntime({
             onRequestBrowserNotifications={requestBrowserNotifications}
             onTogglePushNotifications={togglePushNotifications}
             onToast={setToast}
-            locale={locale}
-            onLocaleChange={setLocale}
             remoteMembers={remoteMembers}
             canManageRemoteMembers={
               remoteWorkspaceIds.includes(workspaceId) && canManageMembers

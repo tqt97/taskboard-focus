@@ -6,17 +6,18 @@ test("task workspace stays usable at tablet width", async ({ page }) => {
   await expect(page.locator(".tasks-layout")).toBeVisible();
   await expect(page.locator("body")).toHaveCSS("overflow-x", "visible");
   await expect(page.locator(".task-code-copy").first()).toBeVisible();
-  await expect(page.locator(".sync-status")).toBeAttached();
+  await expect(page.locator(".live-date, .autosave-status, .sync-status")).toHaveCount(
+    0,
+  );
   await expect(page.getByRole("button", { name: "Đổi giao diện" })).toHaveAttribute(
     "title",
   );
-  if ((await page.locator(".sync-status").textContent())?.trim() === "Local") {
-    await expect(
-      page.getByRole("button", { name: "Đẩy workspace lên cloud" }),
-    ).toHaveCount(0);
-    await expect(
-      page.getByRole("button", { name: "Tải workspace từ cloud" }),
-    ).toHaveCount(0);
+  const cloudPush = page.getByRole("button", { name: "Đẩy workspace lên cloud" });
+  const cloudPull = page.getByRole("button", { name: "Tải workspace từ cloud" });
+  if ((await cloudPush.count()) > 0) {
+    await expect(cloudPull).toHaveCount(1);
+  } else {
+    await expect(cloudPull).toHaveCount(0);
   }
 });
 

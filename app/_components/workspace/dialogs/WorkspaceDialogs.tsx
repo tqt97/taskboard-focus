@@ -23,7 +23,6 @@ import {
   type LocalBackupSummary,
 } from "@/lib/storage/indexed-db-board-storage";
 import type { RemoteWorkspaceMember } from "@/lib/repositories/task-repository";
-import { localeLabels, supportedLocales, type AppLocale } from "@/lib/i18n";
 import { getAccessToken } from "@/lib/auth";
 
 export type ReminderSettings = {
@@ -62,8 +61,6 @@ export function SettingsModal({
   onRequestBrowserNotifications,
   onTogglePushNotifications,
   onToast,
-  locale,
-  onLocaleChange,
   remoteMembers = [],
   canManageRemoteMembers = false,
   onRemoteMemberRole,
@@ -88,8 +85,6 @@ export function SettingsModal({
   onRequestBrowserNotifications: () => Promise<boolean>;
   onTogglePushNotifications: (enabled: boolean) => Promise<boolean>;
   onToast: (message: string) => void;
-  locale: AppLocale;
-  onLocaleChange: (locale: AppLocale) => void;
   remoteMembers?: RemoteWorkspaceMember[];
   canManageRemoteMembers?: boolean;
   onRemoteMemberRole?: (
@@ -708,24 +703,6 @@ export function SettingsModal({
                     </button>
                   </div>
                 </label>
-                <div className="setting-row">
-                  <span>
-                    <b>Ngôn ngữ</b>
-                    <small>Ngôn ngữ ứng dụng</small>
-                  </span>
-                  <select
-                    value={locale}
-                    onChange={(event) =>
-                      onLocaleChange(event.target.value as AppLocale)
-                    }
-                  >
-                    {supportedLocales.map((supportedLocale) => (
-                      <option key={supportedLocale} value={supportedLocale}>
-                        {localeLabels[supportedLocale]}
-                      </option>
-                    ))}
-                  </select>
-                </div>
                 <p className="muted-note">
                   Dark mode có thể bật nhanh bằng biểu tượng mặt trăng ở thanh trên
                   cùng.
