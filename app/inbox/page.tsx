@@ -7,5 +7,5 @@ export const metadata = {
 };
 
 export default function InboxPage() {
-  return <WorkspaceShell />;
+  return <WorkspaceShell view="inbox" />;
 }

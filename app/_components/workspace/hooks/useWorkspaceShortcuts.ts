@@ -1,4 +1,4 @@
-import { useEffect, type RefObject } from "react";
+import { useLayoutEffect, type RefObject } from "react";
 
 export function useWorkspaceShortcuts({
   canEdit,
@@ -11,7 +11,7 @@ export function useWorkspaceShortcuts({
   searchRef: RefObject<HTMLInputElement | null>;
   onQuickCapture: () => void;
 }) {
-  useEffect(() => {
+  useLayoutEffect(() => {
     const handleShortcut = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
       const typing =
@@ -29,7 +29,7 @@ export function useWorkspaceShortcuts({
         onQuickCapture();
       }
     };
-    window.addEventListener("keydown", handleShortcut);
-    return () => window.removeEventListener("keydown", handleShortcut);
+    document.addEventListener("keydown", handleShortcut);
+    return () => document.removeEventListener("keydown", handleShortcut);
   }, [canEdit, modalOpen, onQuickCapture, searchRef]);
 }

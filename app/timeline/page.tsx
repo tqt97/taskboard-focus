@@ -8,5 +8,5 @@ export const metadata = {
 };
 
 export default function TimelinePage() {
-  return <WorkspaceShell />;
+  return <WorkspaceShell view="timeline" />;
 }

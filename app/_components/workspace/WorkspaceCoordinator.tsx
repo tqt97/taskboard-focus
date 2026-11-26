@@ -7,7 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import {
   AlertTriangle,
@@ -108,6 +108,7 @@ import { WorkspacePageHeading } from "./WorkspacePageHeading";
 import { persistSavedViews, useSavedViews } from "./hooks/useSavedViews";
 import { useWorkspaceShortcuts } from "./hooks/useWorkspaceShortcuts";
 import { WorkspaceLoading } from "./WorkspaceLoading";
+import type { WorkspaceView } from "./WorkspaceShell";
 
 const StructuredTaskModal = dynamic(
   () => import("./TaskModal").then((module) => module.TaskModal),
@@ -325,18 +326,16 @@ function formatDate(s: string, locale: AppLocale) {
       }).format(new Date(s))
     : "—";
 }
-export default function Board() {
-  const router = useRouter(),
-    pathname = usePathname(),
-    view = pathname.startsWith("/tasks")
-      ? "tasks"
-      : pathname.startsWith("/inbox")
-        ? "inbox"
-        : pathname.startsWith("/today")
-          ? "today"
-          : pathname.startsWith("/timeline")
-            ? "timeline"
-            : "overview";
+export default function Board({
+  initialView = "overview",
+  quickCaptureRequest = 0,
+}: {
+  initialView?: WorkspaceView;
+  quickCaptureRequest?: number;
+}) {
+  const router = useRouter();
+  const view = initialView;
+  const isTaskListView = view === "tasks" || view === "today" || view === "inbox";
   const [data, setData] = useState<BoardData>(demoData),
     [now, setNow] = useState(new Date()),
     [ready, setReady] = useState(false),
@@ -393,6 +392,7 @@ export default function Board() {
     [cloudUserId, setCloudUserId] = useState(""),
     [cloudUserEmail, setCloudUserEmail] = useState(""),
     [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "error">("saved");
+  const lastQuickCaptureRequest = useRef(0);
   const { savedViews, setSavedViews } = useSavedViews(workspaceId, ready);
   useEffect(() => setSelectedSavedViewId(""), [workspaceId]);
   const {
@@ -430,6 +430,11 @@ export default function Board() {
     searchRef,
     onQuickCapture: openQuickCapture,
   });
+  useEffect(() => {
+    if (quickCaptureRequest <= lastQuickCaptureRequest.current) return;
+    lastQuickCaptureRequest.current = quickCaptureRequest;
+    if (!modal && canEditWorkspace) setModal("quick-capture");
+  }, [canEditWorkspace, modal, quickCaptureRequest]);
   const labels = copy.status;
   const priorityLabels = copy.priority;
   const greeting =
@@ -612,8 +617,11 @@ export default function Board() {
     return () => document.removeEventListener("pointerdown", closeOnOutsidePointer);
   }, [notificationsOpen]);
   const ordered = useMemo(
-    () => [...data.tasks].sort((a, b) => a.order_index - b.order_index),
-    [data.tasks],
+    () =>
+      isTaskListView
+        ? [...data.tasks].sort((a, b) => a.order_index - b.order_index)
+        : [],
+    [data.tasks, isTaskListView],
   );
   const smartCompare = (a: Task, b: Task) =>
     priorityRank[a.priority] - priorityRank[b.priority] ||
@@ -623,22 +631,25 @@ export default function Board() {
     a.order_index - b.order_index;
   const sorted = useMemo(
     () =>
-      sortMode === "manual"
-        ? ordered
-        : [...ordered].sort(
-            sortMode === "deadline"
-              ? (a, b) =>
-                  new Date(a.deadline || "9999-12-31").getTime() -
-                    new Date(b.deadline || "9999-12-31").getTime() || smartCompare(a, b)
-              : smartCompare,
-          ),
-    [ordered, sortMode],
+      !isTaskListView
+        ? []
+        : sortMode === "manual"
+          ? ordered
+          : [...ordered].sort(
+              sortMode === "deadline"
+                ? (a, b) =>
+                    new Date(a.deadline || "9999-12-31").getTime() -
+                      new Date(b.deadline || "9999-12-31").getTime() ||
+                    smartCompare(a, b)
+                : smartCompare,
+            ),
+    [isTaskListView, ordered, sortMode],
   );
   const nowMs = now.getTime();
   const deferredSearch = useDeferredValue(search);
   const taskSearchMatcher = useMemo(
-    () => createTaskSearchMatcher(deferredSearch, now),
-    [deferredSearch, now],
+    () => (isTaskListView ? createTaskSearchMatcher(deferredSearch, now) : () => true),
+    [deferredSearch, isTaskListView, now],
   );
   const filtered = useMemo(
     () =>
@@ -689,26 +700,46 @@ export default function Board() {
         : filtered,
     [filtered, focusMode],
   );
-  const active = useMemo(
+  const reminderTasks = useMemo(
     () => data.tasks.filter((t) => t.status !== "done" && !isArchived(t)),
     [data.tasks],
   );
+  const active = view === "timeline" ? reminderTasks : [];
   const inboxTasks = useMemo(
-    () => data.tasks.filter((task) => task.inbox === true && !isArchived(task)),
-    [data.tasks],
+    () =>
+      view === "inbox"
+        ? data.tasks.filter((task) => task.inbox === true && !isArchived(task))
+        : [],
+    [data.tasks, view],
   );
-  const todayTasks = useMemo(() => getTodayTasks(data.tasks, now), [data.tasks, now]);
+  const todayTasks = useMemo(
+    () => (view === "today" ? getTodayTasks(data.tasks, now) : []),
+    [data.tasks, now, view],
+  );
+  const navigationCounts = useMemo(() => {
+    let activeCount = 0;
+    let inboxCount = 0;
+    for (const task of data.tasks) {
+      if (task.status !== "done" && !isArchived(task)) activeCount += 1;
+      if (task.inbox === true && !isArchived(task)) inboxCount += 1;
+    }
+    return {
+      active: activeCount,
+      inbox: inboxCount,
+      today: getTodayTasks(data.tasks, now).length,
+    };
+  }, [data.tasks, now]);
   const isInReminderWindow = (date: string, label: ReminderLabel) => {
     const diff = new Date(date).getTime() - nowMs;
     return diff >= -86400000 && diff <= reminderSettings.leadDays[label] * 86400000;
   };
   const reminderItems = useMemo(
     () =>
-      active
+      reminderTasks
         .flatMap(taskMilestones)
         .filter(({ date, label }) => date && isInReminderWindow(date, label))
         .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
-    [active, nowMs, reminderSettings],
+    [reminderTasks, nowMs, reminderSettings],
   );
   const upcomingGroups = useMemo(
     () =>
@@ -1801,21 +1832,21 @@ export default function Board() {
             onClick={() => router.push("/tasks")}
           >
             <ListTodo size={18} />
-            Danh sách task<span className="nav-count">{active.length}</span>
+            Danh sách task<span className="nav-count">{navigationCounts.active}</span>
           </button>
           <button
             className={view === "today" ? "nav-item active" : "nav-item"}
             onClick={() => router.push("/today")}
           >
             <CalendarDays size={18} />
-            Hôm nay<span className="nav-count">{todayTasks.length}</span>
+            Hôm nay<span className="nav-count">{navigationCounts.today}</span>
           </button>
           <button
             className={view === "inbox" ? "nav-item active" : "nav-item"}
             onClick={() => router.push("/inbox")}
           >
             <ListTodo size={18} />
-            Inbox<span className="nav-count">{inboxTasks.length}</span>
+            Inbox<span className="nav-count">{navigationCounts.inbox}</span>
           </button>
           <button
             className={view === "timeline" ? "nav-item active" : "nav-item"}
@@ -1913,7 +1944,7 @@ export default function Board() {
                     }}
                   >
                     <ListTodo size={17} /> Danh sách task
-                    <span>{active.length}</span>
+                    <span>{navigationCounts.active}</span>
                   </button>
                   <button
                     className={view === "today" ? "active" : ""}
@@ -1923,7 +1954,7 @@ export default function Board() {
                     }}
                   >
                     <CalendarDays size={17} /> Hôm nay
-                    <span>{todayTasks.length}</span>
+                    <span>{navigationCounts.today}</span>
                   </button>
                   <button
                     className={view === "inbox" ? "active" : ""}
@@ -1933,7 +1964,7 @@ export default function Board() {
                     }}
                   >
                     <ListTodo size={17} /> Inbox
-                    <span>{inboxTasks.length}</span>
+                    <span>{navigationCounts.inbox}</span>
                   </button>
                   <button
                     className={view === "timeline" ? "active" : ""}

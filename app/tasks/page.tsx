@@ -7,5 +7,5 @@ export const metadata = {
 };
 
 export default function TasksPage() {
-  return <WorkspaceShell />;
+  return <WorkspaceShell view="tasks" />;
 }

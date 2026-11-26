@@ -7,5 +7,5 @@ export const metadata = {
 };
 
 export default function TodayPage() {
-  return <WorkspaceShell />;
+  return <WorkspaceShell view="today" />;
 }
