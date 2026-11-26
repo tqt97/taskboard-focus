@@ -5612,6 +5612,8 @@ textarea:focus-visible {
   min-width: 0;
   border-right: 1px solid var(--line);
   background: var(--surface);
+  flex-direction: column;
+  gap: 2px;
 }
 .release-day-cell:last-child,
 .release-day-heading:last-child {
