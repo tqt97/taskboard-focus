@@ -396,16 +396,21 @@ export function TaskModal({
           {activeTab === "details" ? (
             <fieldset className="task-form-fieldset" disabled={readOnly}>
               <div className="form-grid" id="task-details-panel" role="tabpanel">
-                <section
-                  className="form-block full"
+                <details
+                  className="form-block form-block-collapsible full"
                   aria-labelledby="task-core-heading"
+                  open
                 >
-                  <div className="form-block-heading">
+                  <summary className="form-block-heading form-block-summary">
                     <div>
                       <h3 id="task-core-heading">Thông tin chính</h3>
                       <p>Tên, mã và người phụ trách công việc.</p>
                     </div>
-                  </div>
+                    <span className="form-block-summary-control">
+                      <span>Thu gọn</span>
+                      <ChevronDown size={16} aria-hidden="true" />
+                    </span>
+                  </summary>
                   <label className="field full">
                     <span>
                       Tên task <b>*</b>
@@ -519,17 +524,22 @@ export function TaskModal({
                       )}
                     </div>
                   </div>
-                </section>
-                <section
-                  className="form-block full"
+                </details>
+                <details
+                  className="form-block form-block-collapsible full"
                   aria-labelledby="task-planning-heading"
+                  open
                 >
-                  <div className="form-block-heading">
+                  <summary className="form-block-heading form-block-summary">
                     <div>
                       <h3 id="task-planning-heading">Tiến độ và thời hạn</h3>
                       <p>Xác định mức độ ưu tiên và các mốc cần theo dõi.</p>
                     </div>
-                  </div>
+                    <span className="form-block-summary-control">
+                      <span>Thu gọn</span>
+                      <ChevronDown size={16} aria-hidden="true" />
+                    </span>
+                  </summary>
                   <div className="field-row field-row-3 full">
                     <label className="field">
                       <span>Trạng thái</span>
@@ -710,17 +720,21 @@ export function TaskModal({
                       )}
                     </div>
                   </div>
-                </section>
-                <section
-                  className="form-block full"
+                </details>
+                <details
+                  className="form-block form-block-collapsible full"
                   aria-labelledby="task-detail-heading"
                 >
-                  <div className="form-block-heading">
+                  <summary className="form-block-heading form-block-summary">
                     <div>
                       <h3 id="task-detail-heading">Nội dung công việc</h3>
                       <p>Bối cảnh, bước tiếp theo và ghi chú review.</p>
                     </div>
-                  </div>
+                    <span className="form-block-summary-control">
+                      <span>Mở rộng</span>
+                      <ChevronDown size={16} aria-hidden="true" />
+                    </span>
+                  </summary>
                   <label className="field full">
                     <span>Mô tả / ghi chú</span>
                     <textarea
@@ -815,17 +829,21 @@ export function TaskModal({
                       placeholder="Điều cần kiểm tra, phản hồi hoặc lý do đang review..."
                     />
                   </label>
-                </section>
-                <section
-                  className="form-block full"
+                </details>
+                <details
+                  className="form-block form-block-collapsible full"
                   aria-labelledby="task-relation-heading"
                 >
-                  <div className="form-block-heading">
+                  <summary className="form-block-heading form-block-summary">
                     <div>
                       <h3 id="task-relation-heading">Quan hệ và tài liệu</h3>
                       <p>Chọn các task cần hoàn tất trước và gắn tài liệu liên quan.</p>
                     </div>
-                  </div>
+                    <span className="form-block-summary-control">
+                      <span>Mở rộng</span>
+                      <ChevronDown size={16} aria-hidden="true" />
+                    </span>
+                  </summary>
                   <label className="field full">
                     <span>
                       Phụ thuộc task khác{" "}
@@ -1137,7 +1155,7 @@ export function TaskModal({
                       )}
                     </div>
                   </details>
-                </section>
+                </details>
               </div>
             </fieldset>
           ) : activeTab === "history" ? (

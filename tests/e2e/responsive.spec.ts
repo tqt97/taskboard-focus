@@ -79,6 +79,21 @@ test("new task modal groups fields and supports multiple dependencies", async ({
     dialog.getByText("Dùng khi công việc lặp lại đều đặn", { exact: false }),
   ).toBeVisible();
   await expect(
+    dialog.locator('details[aria-labelledby="task-detail-heading"]'),
+  ).not.toHaveAttribute("open", "");
+  await expect(
+    dialog.locator('details[aria-labelledby="task-relation-heading"]'),
+  ).not.toHaveAttribute("open", "");
+  const contentBlock = dialog.locator('details[aria-labelledby="task-detail-heading"]');
+  await contentBlock.locator("summary").click();
+  await expect(
+    dialog.locator('details[aria-labelledby="task-detail-heading"]'),
+  ).toHaveAttribute("open", "");
+  const relationBlock = dialog.locator(
+    'details[aria-labelledby="task-relation-heading"]',
+  );
+  await relationBlock.locator("summary").first().click();
+  await expect(
     dialog.getByText("Có thể chọn nhiều task", { exact: false }),
   ).toBeVisible();
   const snoozeInput = dialog.getByLabel("Hoãn đến");
@@ -86,17 +101,9 @@ test("new task modal groups fields and supports multiple dependencies", async ({
   await dialog.getByRole("button", { name: "1 tuần" }).click();
   await expect(snoozeInput).not.toHaveValue("");
   await expect(dialog.getByText("Chưa có tài liệu hoặc liên kết")).toBeVisible();
-  await dialog.getByText("Tài liệu & liên kết").click();
+  const resourcesBlock = relationBlock.locator("details.resource-details");
+  await resourcesBlock.locator("summary").click();
   await expect(dialog.getByText("Chưa có file đính kèm")).toBeVisible();
-
-  const modalBody = dialog.locator(".modal-body");
-  const detailsHeight = (await modalBody.boundingBox())?.height || 0;
-  await dialog.getByRole("tab", { name: /Lịch sử thay đổi/ }).click();
-  await expect(dialog.getByText("Chưa có lịch sử thay đổi")).toBeVisible();
-  const historyHeight = (await modalBody.boundingBox())?.height || 0;
-  expect(Math.abs(detailsHeight - historyHeight)).toBeLessThan(1);
-  await dialog.getByRole("tab", { name: "Thông tin task" }).click();
-  await expect(dialog.getByRole("heading", { name: "Thông tin chính" })).toBeVisible();
 
   await dialog.getByRole("button", { name: "Thêm liên kết" }).click();
   await dialog.getByLabel("Mục đích liên kết 1").selectOption("Redmine");
@@ -111,6 +118,21 @@ test("new task modal groups fields and supports multiple dependencies", async ({
   await dependencyOptions.nth(0).check();
   await dependencyOptions.nth(1).check();
   await expect(dialog.getByText("2 task đã chọn")).toBeVisible();
+
+  const modalBody = dialog.locator(".modal-body");
+  const modalFooter = dialog.locator(".modal-footer");
+  const footerBeforeScroll = (await modalFooter.boundingBox())?.y || 0;
+  await modalBody.evaluate((element) => {
+    element.scrollTo({ top: element.scrollHeight, behavior: "instant" });
+  });
+  expect(await modalBody.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+  const footerAfterScroll = (await modalFooter.boundingBox())?.y || 0;
+  expect(Math.abs(footerBeforeScroll - footerAfterScroll)).toBeLessThan(1);
+  const detailsHeight = (await modalBody.boundingBox())?.height || 0;
+  await dialog.getByRole("tab", { name: /Lịch sử thay đổi/ }).click();
+  await expect(dialog.getByText("Chưa có lịch sử thay đổi")).toBeVisible();
+  const historyHeight = (await modalBody.boundingBox())?.height || 0;
+  expect(Math.abs(detailsHeight - historyHeight)).toBeLessThan(1);
 });
 
 test("quick capture shortcut and inline task title edit work on the board", async ({

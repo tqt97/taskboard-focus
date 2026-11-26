@@ -1182,7 +1182,7 @@ textarea:focus-visible {
   height: min(90vh, 850px);
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
-  overflow: auto;
+  overflow: hidden;
 }
 .modal-header {
   padding: 20px 22px 15px;
@@ -1204,8 +1204,10 @@ textarea:focus-visible {
 }
 .task-modal .modal-body {
   height: auto;
-  flex: none;
-  overflow: visible;
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   box-sizing: border-box;
 }
 .form-grid {
@@ -1423,6 +1425,40 @@ textarea:focus-visible {
   gap: 12px;
   padding-bottom: 3px;
   border-bottom: 1px solid var(--line);
+}
+.task-modal .form-block-collapsible {
+  align-self: start;
+}
+.task-modal .form-block-summary {
+  cursor: pointer;
+  list-style: none;
+}
+.task-modal .form-block-summary::-webkit-details-marker {
+  display: none;
+}
+.task-modal .form-block-summary-control {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  gap: 4px;
+  margin-left: auto;
+  padding: 4px 6px;
+  border-radius: 6px;
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 700;
+}
+.task-modal .form-block-summary-control svg {
+  transition: transform 160ms ease;
+}
+.task-modal .form-block-collapsible:not([open]) .form-block-summary {
+  border-bottom-color: transparent;
+}
+.task-modal .form-block-collapsible[open] .form-block-summary-control svg {
+  transform: rotate(180deg);
+}
+.task-modal .form-block-summary:hover .form-block-summary-control {
+  background: color-mix(in srgb, var(--accent) 9%, var(--surface2));
 }
 .task-modal .form-block-heading h3 {
   margin: 0;
@@ -2233,7 +2269,10 @@ textarea:focus-visible {
   }
   .task-modal .modal-body {
     height: auto;
-    flex: none;
+    min-height: 0;
+    flex: 1 1 auto;
+    overflow-x: hidden;
+    overflow-y: auto;
   }
   .modal-footer {
     padding: 12px 16px;
@@ -2665,9 +2704,12 @@ textarea:focus-visible {
 }
 .resource-details {
   display: grid;
-  gap: 10px;
+  gap: 16px;
   border: 0;
   padding: 0;
+}
+.resource-details > .link-section {
+  margin-top: 5px;
 }
 .resource-summary {
   display: flex;
@@ -2681,6 +2723,7 @@ textarea:focus-visible {
   color: var(--text);
   cursor: pointer;
   list-style: none;
+  margin-top: 15px;
 }
 .resource-summary::-webkit-details-marker {
   display: none;
