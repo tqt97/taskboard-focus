@@ -3,6 +3,7 @@
 import {
   CalendarDays,
   CalendarRange,
+  FilePenLine,
   LayoutDashboard,
   ListTodo,
   LockKeyhole,
@@ -15,7 +16,7 @@ import type { WorkspaceView } from "./workspace-routes";
 export type WorkspaceNavigationCounts = {
   active: number;
   today: number;
-  inbox: number;
+  drafts: number;
 };
 
 export function WorkspaceSidebar({
@@ -110,11 +111,11 @@ export function WorkspaceSidebar({
           Hôm nay<span className="nav-count">{counts.today}</span>
         </button>
         <button
-          className={view === "inbox" ? "nav-item active" : "nav-item"}
-          onClick={() => onNavigate("/inbox")}
+          className={view === "drafts" ? "nav-item active" : "nav-item"}
+          onClick={() => onNavigate("/drafts")}
         >
-          <ListTodo size={18} />
-          Inbox<span className="nav-count">{counts.inbox}</span>
+          <FilePenLine size={18} />
+          Bản nháp<span className="nav-count">{counts.drafts}</span>
         </button>
         <button
           className={view === "timeline" ? "nav-item active" : "nav-item"}

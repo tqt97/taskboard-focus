@@ -122,7 +122,7 @@ export const taskToRemoteRow = (task: Task, ownerId: string, workspaceId?: strin
   template_id: task.template_id || null,
   attachments: task.attachments || [],
   checklist: task.checklist || [],
-  inbox: task.inbox === true,
+  is_draft: task.is_draft === true,
   snoozed_until: task.snoozed_until || null,
   created_at: task.created_at,
   updated_at: task.updated_at,
@@ -174,7 +174,7 @@ export const remoteRowToTask = (
           : undefined,
     recurrence:
       row.recurrence && typeof row.recurrence === "object" ? row.recurrence : undefined,
-    inbox: row.inbox === true,
+    is_draft: row.is_draft === true,
   }) as Task;
 
 export function createSupabaseTaskRepository(

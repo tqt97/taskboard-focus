@@ -104,7 +104,7 @@ function iso(offset: number) {
   return d.toISOString();
 }
 const key = "taskboard-focus-v1";
-export const boardSchemaVersion = 2;
+export const boardSchemaVersion = 3;
 const maxBackupBytes = 5 * 1024 * 1024;
 const colors = ["blue", "violet", "orange", "green"];
 const maxLengths = {
@@ -305,7 +305,7 @@ const isTask = (value: unknown): value is Task =>
     (Array.isArray(value.checklist) &&
       value.checklist.length <= 100 &&
       value.checklist.every(isChecklistItem))) &&
-  (value.inbox === undefined || typeof value.inbox === "boolean") &&
+  (value.is_draft === undefined || typeof value.is_draft === "boolean") &&
   (value.snoozed_until === undefined || isDateValue(value.snoozed_until));
 
 type ParseBoardResult = { data: BoardData | null; error?: string };
@@ -315,28 +315,35 @@ export function migrateBoardData(value: unknown): unknown {
   const tasks = Array.isArray(value.tasks)
     ? value.tasks.map((task) =>
         isRecord(task)
-          ? {
-              ...task,
-              blocked_by: task.blocked_by ?? [],
-              ...(task.status === "blocked"
-                ? {
-                    blocked_from: ["todo", "in_progress", "review"].includes(
-                      String(task.blocked_from),
-                    )
-                      ? task.blocked_from
-                      : "in_progress",
-                  }
-                : {}),
-              ...(task.status === "done" ? { snoozed_until: undefined } : {}),
-              attachments: task.attachments ?? [],
-              checklist: task.checklist ?? [],
-            }
+          ? (() => {
+              const { inbox: legacyInbox, ...taskWithoutLegacyInbox } = task;
+              return {
+                ...taskWithoutLegacyInbox,
+                is_draft:
+                  typeof task.is_draft === "boolean"
+                    ? task.is_draft
+                    : legacyInbox === true,
+                blocked_by: task.blocked_by ?? [],
+                ...(task.status === "blocked"
+                  ? {
+                      blocked_from: ["todo", "in_progress", "review"].includes(
+                        String(task.blocked_from),
+                      )
+                        ? task.blocked_from
+                        : "in_progress",
+                    }
+                  : {}),
+                ...(task.status === "done" ? { snoozed_until: undefined } : {}),
+                attachments: task.attachments ?? [],
+                checklist: task.checklist ?? [],
+              };
+            })()
           : task,
       )
     : value.tasks;
   return {
     ...value,
-    schema_version: value.schema_version ?? boardSchemaVersion,
+    schema_version: boardSchemaVersion,
     tasks,
   };
 }
@@ -347,6 +354,7 @@ export function parseBoardDataWithError(value: unknown): ParseBoardResult {
     if (
       schemaVersion !== undefined &&
       schemaVersion !== 1 &&
+      schemaVersion !== 2 &&
       schemaVersion !== boardSchemaVersion
     ) {
       return {

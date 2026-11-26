@@ -29,7 +29,7 @@ Một workspace cá nhân giúp ghi task nhanh, nhìn tình hình chung và khô
 
 ## Nâng cấp đã có trong MVP hiện tại
 
-- IndexedDB workspace, Inbox/Today action center, triage, checklist, Review/Blocked và quick actions.
+- IndexedDB workspace, Bản nháp/Today action center, triage, checklist, Review/Blocked và quick actions. Bản nháp dùng cờ `is_draft` và không thuộc trạng thái `todo` trong các view workflow.
 - Supabase Auth, CRUD đồng bộ từng task, conflict handling, realtime và RLS theo workspace.
 - Upload file vào Supabase Storage với giới hạn MIME/size khi cloud mode đã cấu hình; local MVP chỉ lưu URL metadata.
 - Gửi Chatwork digest qua server-side route và lịch cron; Gmail chưa tích hợp.

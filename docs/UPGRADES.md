@@ -3,7 +3,7 @@
 ## Đã triển khai
 
 - App self-host Geist Sans (Latin + Latin Extended/Vietnamese) cho typography nhất quán giữa thiết bị; page heading không lặp eyebrow workspace khi navigation đã có breadcrumb.
-- Quick capture qua phím `N` hoặc nút **Ghi nhanh** chỉ yêu cầu tiêu đề và tạo task vào Inbox.
+- Quick capture qua phím `N` hoặc nút **Ghi nhanh** chỉ yêu cầu tiêu đề và lưu công việc vào **Bản nháp**; bản nháp không bị tính vào trạng thái **Chưa làm** cho đến khi được triage. Trong form task, **Lưu nháp** và **Lưu task** là hai action riêng ở footer.
 - Local IndexedDB giữ 7 bản sao theo ngày/workspace, xem danh sách và khôi phục qua import preview; JSON export vẫn là bản sao độc lập để chuyển máy.
 - Browser reminder recheck permission khi tab quay lại, Notification Center mở task đích; Chatwork digest gồm đủ bốn mốc và chạy tối đa một lần/ngày theo timezone cấu hình.
 - Web Push nền qua Service Worker cho owner cloud, subscription per-device, VAPID delivery và cron riêng; template có UI đổi tên/xóa trong **Cài đặt → Template**; app nhắc tải JSON ngoài thiết bị mỗi tuần.

@@ -186,7 +186,24 @@ alter table public.tasks add column if not exists recurrence jsonb not null defa
 alter table public.tasks add column if not exists template_id text;
 alter table public.tasks add column if not exists attachments jsonb not null default '[]'::jsonb check (jsonb_typeof(attachments) = 'array');
 alter table public.tasks add column if not exists checklist jsonb not null default '[]'::jsonb check (jsonb_typeof(checklist) = 'array');
-alter table public.tasks add column if not exists inbox boolean not null default false;
+alter table public.tasks add column if not exists is_draft boolean not null default false;
+-- Migrate the pre-Draft Inbox flag before removing the old database contract.
+do $$
+begin
+  if exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'tasks'
+      and column_name = 'inbox'
+  ) then
+    update public.tasks
+    set is_draft = inbox
+    where inbox = true;
+    alter table public.tasks drop column inbox;
+  end if;
+end;
+$$;
 alter table public.tasks add column if not exists snoozed_until timestamptz;
 alter table public.tasks add column if not exists blocked_from text;
 alter table public.tasks add column if not exists comments jsonb not null default '[]'::jsonb check (jsonb_typeof(comments) = 'array');

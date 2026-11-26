@@ -25,7 +25,12 @@ import type {
   TaskTemplate,
 } from "@/lib/types";
 import type { ReminderSettings } from "../dialogs/WorkspaceDialogs";
-import { getTodayTasks, isArchived, isDueToday } from "@/lib/taskboard/selectors";
+import {
+  getTodayTasks,
+  isArchived,
+  isDraft,
+  isDueToday,
+} from "@/lib/taskboard/selectors";
 import { toDateInputValue } from "@/lib/taskboard/dates";
 import {
   getUiCopy,
@@ -225,7 +230,7 @@ const emptyTask = (prefix = "MENSQZIN-"): Task => ({
   links: [],
   primary_links: [],
   secondary_links: [],
-  inbox: true,
+  is_draft: false,
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
 });
@@ -283,7 +288,7 @@ export default function WorkspaceRuntime({
   const router = useRouter();
   const view = initialView;
   const routeContent = content || <WorkspaceRouteContent view={view} />;
-  const isTaskListView = view === "tasks" || view === "today" || view === "inbox";
+  const isTaskListView = view === "tasks" || view === "today" || view === "drafts";
   const [data, setData] = useState<BoardData>(demoData),
     [now, setNow] = useState(new Date()),
     [ready, setReady] = useState(false),
@@ -385,7 +390,7 @@ export default function WorkspaceRuntime({
     };
   }, []);
   useEffect(() => {
-    ["/", "/tasks", "/today", "/inbox", "/timeline"].forEach((path) => {
+    ["/", "/tasks", "/today", "/drafts", "/timeline"].forEach((path) => {
       router.prefetch(path);
     });
   }, [router]);
@@ -612,7 +617,7 @@ export default function WorkspaceRuntime({
       sorted.filter(
         (t) =>
           (archiveFilter === "active" ? !isArchived(t) : isArchived(t)) &&
-          (view !== "inbox" || t.inbox === true) &&
+          (view === "drafts" ? isDraft(t) : !isDraft(t)) &&
           (statusFilter === "all" || t.status === statusFilter) &&
           (priorityFilter === "all" || t.priority === priorityFilter) &&
           (assigneeFilter === "all" ||
@@ -657,31 +662,26 @@ export default function WorkspaceRuntime({
     [filtered, focusMode],
   );
   const reminderTasks = useMemo(
-    () => data.tasks.filter((t) => t.status !== "done" && !isArchived(t)),
+    () =>
+      data.tasks.filter((t) => t.status !== "done" && !isArchived(t) && !isDraft(t)),
     [data.tasks],
   );
   const active = view === "timeline" ? reminderTasks : [];
-  const inboxTasks = useMemo(
-    () =>
-      view === "inbox"
-        ? data.tasks.filter((task) => task.inbox === true && !isArchived(task))
-        : [],
-    [data.tasks, view],
-  );
   const todayTasks = useMemo(
     () => (view === "today" ? getTodayTasks(data.tasks, now) : []),
     [data.tasks, now, view],
   );
   const navigationTaskCounts = useMemo(() => {
     let activeCount = 0;
-    let inboxCount = 0;
+    let draftCount = 0;
     for (const task of data.tasks) {
-      if (task.status !== "done" && !isArchived(task)) activeCount += 1;
-      if (task.inbox === true && !isArchived(task)) inboxCount += 1;
+      if (task.status !== "done" && !isArchived(task) && !isDraft(task))
+        activeCount += 1;
+      if (isDraft(task) && !isArchived(task)) draftCount += 1;
     }
     return {
       active: activeCount,
-      inbox: inboxCount,
+      drafts: draftCount,
     };
   }, [data.tasks]);
   const todayNavigationCount = useMemo(
@@ -1372,7 +1372,7 @@ export default function WorkspaceRuntime({
     }
     const prefix = data.code_prefix || "MENSQZIN-";
     const task = createQuickCaptureTask(title, data.tasks, prefix);
-    rememberUndo("ghi nhanh task vào Inbox");
+    rememberUndo("lưu bản nháp");
     setData((current) => ({
       ...current,
       code_prefix: prefix,
@@ -1380,7 +1380,7 @@ export default function WorkspaceRuntime({
     }));
     syncRemoteTasks([task]);
     setModal(null);
-    setToast("Đã ghi vào Inbox; bạn có thể phân loại sau.");
+    setToast("Đã lưu bản nháp; bạn có thể phân loại sau.");
   };
   const updateTaskDeadline = (task: Task, date: Date) => {
     if (!canEditWorkspace) {
@@ -1902,7 +1902,7 @@ export default function WorkspaceRuntime({
                 displayName={displayName}
               />
               <div className="page-actions">
-                {(view === "tasks" || view === "today" || view === "inbox") && (
+                {(view === "tasks" || view === "today" || view === "drafts") && (
                   <>
                     {templates.length > 0 && (
                       <select
@@ -1952,7 +1952,7 @@ export default function WorkspaceRuntime({
             {(view === "overview" || view === "timeline") && routeContent}
             <div
               className={
-                view === "tasks" || view === "today" || view === "inbox"
+                view === "tasks" || view === "today" || view === "drafts"
                   ? "tasks-layout"
                   : "overview-layout"
               }

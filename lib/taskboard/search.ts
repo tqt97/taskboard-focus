@@ -5,10 +5,10 @@ type QueryFilters = {
   status?: string;
   priority?: string;
   due?: string;
-  inbox?: boolean;
+  draft?: boolean;
 };
 
-const tokenPattern = /(^|\s)(status|priority|due|inbox):([^\s]+)/gi;
+const tokenPattern = /(^|\s)(status|priority|due|draft):([^\s]+)/gi;
 
 export const parseTaskSearch = (query: string) => {
   const filters: QueryFilters = {};
@@ -19,7 +19,7 @@ export const parseTaskSearch = (query: string) => {
       if (key.toLowerCase() === "status") filters.status = normalizedValue;
       if (key.toLowerCase() === "priority") filters.priority = normalizedValue;
       if (key.toLowerCase() === "due") filters.due = normalizedValue;
-      if (key.toLowerCase() === "inbox") filters.inbox = normalizedValue === "true";
+      if (key.toLowerCase() === "draft") filters.draft = normalizedValue === "true";
       return prefix;
     },
   );
@@ -31,7 +31,7 @@ export const createTaskSearchMatcher = (query: string, now = new Date()) => {
   return (task: Task) => {
     if (filters.status && task.status !== filters.status) return false;
     if (filters.priority && task.priority !== filters.priority) return false;
-    if (filters.inbox !== undefined && task.inbox !== filters.inbox) return false;
+    if (filters.draft !== undefined && task.is_draft !== filters.draft) return false;
     if (filters.due === "today" && !isDueToday(task, now)) return false;
     if (filters.due === "overdue" && !isOverdue(task, now)) return false;
     if (

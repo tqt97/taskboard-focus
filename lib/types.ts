@@ -115,7 +115,8 @@ export type Task = {
   template_id?: string;
   attachments?: TaskAttachment[];
   checklist?: TaskChecklistItem[];
-  inbox?: boolean;
+  /** Drafts stay outside the task workflow until explicitly saved as a task. */
+  is_draft?: boolean;
   snoozed_until?: string;
   custom_code?: boolean;
   created_at: string;

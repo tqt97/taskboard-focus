@@ -5,6 +5,7 @@ import {
   getDependencyState,
   getTodayTasks,
   isArchived,
+  isDraft,
   isSnoozed,
 } from "../lib/taskboard/selectors.ts";
 import { getNextOccurrence } from "../lib/taskboard/recurrence.ts";
@@ -336,6 +337,22 @@ test("Today prioritizes overdue and urgent tasks", () => {
   assert.equal(today[0].id, data.tasks[1].id);
 });
 
+test("draft tasks stay out of the workflow and Today action center", () => {
+  const data = fixture();
+  const draft = data.tasks[0];
+  draft.is_draft = true;
+  draft.status = "todo";
+  draft.priority = "urgent";
+  draft.deadline = "2026-11-20T12:00:00.000Z";
+
+  assert.equal(isDraft(draft), true);
+  assert.ok(
+    !getTodayTasks(data.tasks, new Date("2026-11-20T15:00:00.000Z")).some(
+      (task) => task.id === draft.id,
+    ),
+  );
+});
+
 test("Today excludes a task while its snooze window is active", () => {
   const data = fixture();
   data.tasks[0].priority = "urgent";
@@ -358,15 +375,15 @@ test("advanced task search supports field conditions and free text", () => {
   const task = data.tasks[0];
   task.status = "review";
   task.priority = "urgent";
-  task.inbox = true;
+  task.is_draft = true;
   task.next_action = "Review API contract";
 
-  assert.deepEqual(parseTaskSearch("status:review priority:urgent inbox:true API"), {
-    filters: { status: "review", priority: "urgent", inbox: true },
+  assert.deepEqual(parseTaskSearch("status:review priority:urgent draft:true API"), {
+    filters: { status: "review", priority: "urgent", draft: true },
     text: "api",
   });
   assert.equal(
-    matchesTaskSearch(task, "status:review priority:urgent inbox:true API"),
+    matchesTaskSearch(task, "status:review priority:urgent draft:true API"),
     true,
   );
   assert.equal(matchesTaskSearch(task, "status:done"), false);
@@ -418,7 +435,7 @@ test("remote task mapping preserves checklist, relations and assignment shape", 
   const task = fixture().tasks[0];
   task.assignee_ids = ["m1", "m2"];
   task.checklist = [{ id: "step-1", title: "Verify", done: false }];
-  task.inbox = true;
+  task.is_draft = true;
   task.snoozed_until = "2026-11-26T10:00:00.000Z";
 
   const row = taskToRemoteRow(task, "owner-1");
@@ -432,7 +449,7 @@ test("remote task mapping preserves checklist, relations and assignment shape", 
   assert.equal(row.assignee_id, toRemoteEntityId("m1", "owner-1"));
   assert.deepEqual(restored.assignee_ids, ["m1", "m2"]);
   assert.deepEqual(restored.checklist, task.checklist);
-  assert.equal(restored.inbox, true);
+  assert.equal(restored.is_draft, true);
   assert.equal(restored.snoozed_until, task.snoozed_until);
 });
 
@@ -486,12 +503,24 @@ test("migration adds defaults without changing legacy task identity", () => {
     schema_version: number;
   };
 
-  assert.equal(migrated.schema_version, 2);
+  assert.equal(migrated.schema_version, 3);
   assert.deepEqual(migrated.tasks[0].blocked_by, []);
   assert.deepEqual(migrated.tasks[0].attachments, []);
   assert.deepEqual(migrated.tasks[0].checklist, []);
   assert.equal(migrated.tasks[0].id, payload.tasks[0].id);
   assert.ok(parseBoardDataWithError(migrated).data);
+});
+
+test("migration renames the legacy inbox flag to is_draft", () => {
+  const payload = fixture() as unknown as {
+    tasks: Array<Record<string, unknown>>;
+  };
+  payload.tasks[0].inbox = true;
+
+  const migrated = migrateBoardData(payload) as typeof payload;
+  assert.equal(migrated.tasks[0].is_draft, true);
+  assert.equal("inbox" in migrated.tasks[0], false);
+  assert.equal(parseBoardDataWithError(migrated).data?.tasks[0].is_draft, true);
 });
 
 test("migration clears snooze metadata from completed tasks", () => {

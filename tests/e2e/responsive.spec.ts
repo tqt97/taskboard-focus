@@ -141,11 +141,11 @@ test("quick capture shortcut and inline task title edit work on the board", asyn
   await page.goto("/tasks");
   await expect(page.getByRole("heading", { name: /Danh sách task/ })).toBeVisible();
   await page.keyboard.press("n");
-  const quickCapture = page.getByRole("dialog", { name: "Ghi nhanh vào Inbox" });
+  const quickCapture = page.getByRole("dialog", { name: "Lưu bản nháp" });
   await expect(quickCapture).toBeVisible();
   await quickCapture.getByLabel("Tên công việc").fill("Quick shortcut task");
-  await quickCapture.getByRole("button", { name: "Lưu vào Inbox" }).click();
-  await expect(page.getByRole("status")).toContainText("Đã ghi vào Inbox");
+  await quickCapture.getByRole("button", { name: "Lưu bản nháp" }).click();
+  await expect(page.getByRole("status")).toContainText("Đã lưu bản nháp");
 
   const inlineEdit = page.getByRole("button", { name: "Sửa nhanh MENSQZIN-248" });
   await inlineEdit.click();
@@ -240,16 +240,18 @@ test("replacing a backup can be undone to restore the prior workspace", async ({
   await expect(page.getByText("Replacement workspace task")).toHaveCount(0);
 });
 
-test("inbox shows triage state and checklist controls", async ({ page }) => {
-  await page.goto("/inbox");
-  await expect(page.getByRole("heading", { name: "Inbox cần triage" })).toBeVisible();
+test("drafts show triage state and checklist controls", async ({ page }) => {
+  await page.goto("/drafts");
+  await expect(page.getByRole("heading", { name: "Bản nháp" })).toBeVisible();
   await page
     .getByRole("button", { name: /Tạo task/i })
     .first()
     .click();
 
   const dialog = page.getByRole("dialog", { name: "Thêm task mới" });
-  await expect(dialog.getByText("Inbox cần triage")).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Lưu nháp" })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Lưu task" })).toBeVisible();
+  await dialog.getByText("Nội dung công việc").click();
   await expect(
     dialog.getByText("Chia task thành các bước nhỏ", { exact: false }),
   ).toBeVisible();

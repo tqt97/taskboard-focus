@@ -6,6 +6,7 @@ import {
   ChevronDown,
   Copy,
   ExternalLink,
+  FilePenLine,
   FileText,
   Link2,
   ListChecks,
@@ -201,7 +202,7 @@ export function TaskModal({
     );
   const setSnooze = (days: number) =>
     field("snoozed_until", new Date(Date.now() + days * 86400000).toISOString());
-  const save = () => {
+  const save = (draft: boolean) => {
     const filledLinks = links.filter((link) => link.url.trim());
     const title = form.title.trim();
     const description = form.description.trim();
@@ -306,7 +307,7 @@ export function TaskModal({
       custom_code: !usePrefix,
       primary_links: normalizeLinks(links),
       secondary_links: [],
-      inbox: form.inbox === true,
+      is_draft: draft,
       snoozed_until: form.status === "done" ? undefined : form.snoozed_until,
       attachments: attachments.map((attachment) => ({
         ...attachment,
@@ -421,17 +422,6 @@ export function TaskModal({
                       aria-invalid={Boolean(error && !form.title.trim())}
                       onChange={(e) => field("title", e.target.value)}
                       placeholder="Ví dụ: Hoàn thiện luồng thanh toán"
-                    />
-                  </label>
-                  <label className="inbox-toggle field full">
-                    <span>
-                      <b>Inbox cần triage</b>
-                      <small>Giữ task ở Inbox cho đến khi bạn phân loại xong.</small>
-                    </span>
-                    <input
-                      type="checkbox"
-                      checked={form.inbox === true}
-                      onChange={(event) => field("inbox", event.target.checked)}
                     />
                   </label>
                   <div className="field full">
@@ -1216,9 +1206,19 @@ export function TaskModal({
             Hủy
           </button>
           <button
-            className="primary-button"
+            className="secondary-button"
+            type="button"
             disabled={readOnly || !form.title.trim()}
-            onClick={save}
+            onClick={() => save(true)}
+          >
+            <FilePenLine size={15} />
+            Lưu nháp
+          </button>
+          <button
+            className="primary-button"
+            type="button"
+            disabled={readOnly || !form.title.trim()}
+            onClick={() => save(false)}
           >
             <Check size={15} />
             Lưu task

@@ -2,6 +2,8 @@ import type { DependencyState, Task } from "../types";
 
 export const isArchived = (task: Task) => Boolean(task.archived_at);
 
+export const isDraft = (task: Task) => task.is_draft === true;
+
 export const getActiveTasks = (tasks: Task[]) =>
   tasks.filter((task) => !isArchived(task));
 
@@ -43,6 +45,7 @@ export const getTodayTasks = (tasks: Task[], now = new Date()) => {
   const active = getActiveTasks(tasks).filter(
     (task) =>
       task.status !== "done" &&
+      !isDraft(task) &&
       !isSnoozed(task, now) &&
       (isDueToday(task, now) || isOverdue(task, now) || task.priority === "urgent"),
   );

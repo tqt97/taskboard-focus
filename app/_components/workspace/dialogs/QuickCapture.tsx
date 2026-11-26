@@ -29,7 +29,7 @@ export function QuickCapture({
       >
         <header className="modal-header">
           <div>
-            <h2 id="quick-capture-title">Ghi nhanh vào Inbox</h2>
+            <h2 id="quick-capture-title">Lưu bản nháp</h2>
             <small>Chỉ cần tiêu đề; bạn có thể phân loại và bổ sung sau.</small>
           </div>
           <button
@@ -59,7 +59,7 @@ export function QuickCapture({
             Hủy
           </button>
           <button type="submit" className="primary-button" disabled={!title.trim()}>
-            <CornerDownLeft size={15} /> Lưu vào Inbox
+            <CornerDownLeft size={15} /> Lưu bản nháp
           </button>
         </footer>
       </form>

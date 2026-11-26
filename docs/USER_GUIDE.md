@@ -14,7 +14,7 @@
 - Lọc thêm theo người phụ trách, task chưa giao và deadline quá hạn/hôm nay/7 ngày tới.
 - Kéo thẻ task để thay đổi thứ tự hiển thị. Thứ tự này không tự đổi priority.
 - Nhấn `N` để tạo task nhanh; nhấn `Ctrl/Cmd + K` để focus ô tìm kiếm.
-- `N` hoặc nút **Ghi nhanh** mở ô nhập tiêu đề tối giản và lưu task thẳng vào Inbox. Nhấn Enter để lưu; phân loại, giao người và đặt hạn sau.
+- `N` hoặc nút **Ghi nhanh** mở ô nhập tiêu đề tối giản và lưu vào **Bản nháp**. Bản nháp chưa xuất hiện trong trạng thái **Chưa làm**; mở Bản nháp để phân loại, giao người và đặt hạn trước khi đưa vào workflow.
 - Chọn **Focus** để chỉ xem task urgent/high, chờ review, chưa giao hoặc gần/quá hạn.
 - Chọn **Lịch & timeline** để xem các mốc Dev up, Staging up, Release và Deadline. **Lịch tuần** phù hợp để xem mốc theo từng ngày; **Timeline release** phù hợp để nhìn toàn bộ task và dependency trên cùng trục thời gian.
 - Dùng bộ lọc **Người phụ trách** hoặc **Mốc hiển thị** để thu hẹp thông tin. Kéo mốc **Deadline** sang ngày khác để cập nhật deadline; thay đổi vẫn được lưu vào activity và đồng bộ cloud khi workspace đã đăng nhập.

@@ -1,6 +1,6 @@
 # Kiến trúc
 
-Typography dùng Geist Sans self-host với Latin và Latin Extended subsets; giao diện không gọi dịch vụ font bên ngoài khi người dùng mở app. `layout/WorkspaceLayout` là client shell sống xuyên navigation; `layout/WorkspaceEntry` là client boundary để tải `runtime/WorkspaceRuntime` bằng dynamic import. `state/WorkspaceProvider` giữ context/state dùng chung, còn `layout/WorkspaceSidebar` và `layout/WorkspaceHeader` giữ vùng persistent. Runtime điều phối state/mutation; các feature overview, tasks, today, inbox và timeline nằm dưới `features/`, còn task modal, settings/dialogs, Kanban, dashboard analytics và notification popover được tách theo nhu cầu.
+Typography dùng Geist Sans self-host với Latin và Latin Extended subsets; giao diện không gọi dịch vụ font bên ngoài khi người dùng mở app. `layout/WorkspaceLayout` là client shell sống xuyên navigation; `layout/WorkspaceEntry` là client boundary để tải `runtime/WorkspaceRuntime` bằng dynamic import. `state/WorkspaceProvider` giữ context/state dùng chung, còn `layout/WorkspaceSidebar` và `layout/WorkspaceHeader` giữ vùng persistent. Runtime điều phối state/mutation; các feature overview, tasks, today, drafts và timeline nằm dưới `features/`, còn task modal, settings/dialogs, Kanban, dashboard analytics và notification popover được tách theo nhu cầu.
 
 Palette dùng semantic tokens trong `app/globals.css`: `--text`/`--muted` cho hierarchy đọc, `--surface-muted` cho panel phụ, `--accent` cho primary action, và các cặp `--danger-*`, `--warning-*`, `--info-*`, `--success-*` cho trạng thái. Dark mode đổi cả nền, border, focus ring, status color và status background; component không nên thêm mã màu hardcode nếu token semantic đã có.
 
@@ -49,7 +49,7 @@ Validation shape nằm ở `lib/data.ts`; validation relation nằm ở `lib/tas
 
 ## Performance budget hiện tại
 
-- Build production lần rà soát 2026-11-26 ghi First Load JS khoảng 103 kB và route entry khoảng 1.52 kB cho các route workspace (`/`, `/tasks`, `/today`, `/inbox`, `/timeline`). Route entry tăng có chủ ý vì mỗi `page.tsx` giờ trả content controller thay vì `return null`; đây là trade-off để giữ route semantics/SEO đúng App Router. Bảng summary của Next chưa phải waterfall đầy đủ; cần bundle analyzer hoặc production trace để xác nhận các deferred cloud chunks không bị tải sớm.
+- Build production lần rà soát 2026-11-26 ghi First Load JS khoảng 103 kB và route entry khoảng 1.52 kB cho các route workspace (`/`, `/tasks`, `/today`, `/drafts`, `/timeline`). Route entry tăng có chủ ý vì mỗi `page.tsx` giờ trả content controller thay vì `return null`; đây là trade-off để giữ route semantics/SEO đúng App Router. Bảng summary của Next chưa phải waterfall đầy đủ; cần bundle analyzer hoặc production trace để xác nhận các deferred cloud chunks không bị tải sớm.
 - Task modal được tải theo nhu cầu bằng dynamic import để initial render không phải tải form CRUD và attachment controls.
 - Settings/confirm/lock dialog cũng được tải theo nhu cầu; route metadata có title, description và canonical riêng cho `/tasks`, `/today`, `/login`.
 - Geist Sans được self-host với Latin/Latin Extended; file font có content hash và cache `public, max-age=31536000, immutable`. CSS vẫn có system fallback để xử lý khi font tải lỗi.
@@ -76,7 +76,7 @@ MVP hiện tại là local-first. Mỗi trình duyệt/máy có vùng lưu riên
 ## Mô hình dữ liệu
 
 - `members`: id, name, role, color, active.
-- `tasks`: id, code, title, description, status (`todo`, `in_progress`, `review`, `blocked`, `done`), optional `blocked_from`, priority, severity, next action, review note, dependency IDs, checklist, inbox/triage state, snooze window, activity diff, primary/secondary links, legacy `assignee_id`, dev_up, staging_up, release_at, deadline, order_index, links, attachments, timestamps.
+- `tasks`: id, code, title, description, status (`todo`, `in_progress`, `review`, `blocked`, `done`), optional `blocked_from`, priority, severity, next action, review note, dependency IDs, checklist, `is_draft`, snooze window, activity diff, primary/secondary links, legacy `assignee_id`, dev_up, staging_up, release_at, deadline, order_index, links, attachments, timestamps. Draft tasks are excluded from workflow and Today selectors until triaged.
 - `task_assignees`: bảng nối nhiều-nhiều giữa task và member; đây là nguồn quan hệ assignment chuẩn cho task có một hoặc nhiều người phụ trách.
 - `workspaces` và `workspace_members`: multi-workspace và role (`owner`, `admin`, `member`, `viewer`); local UI vẫn giữ backward compatibility với workspace mặc định, còn cloud user có thể tải/tạo workspace remote. `viewer` được đưa vào Board read-only và không thể mutate task/member data.
 - Các query task/member theo workspace có index `workspace_id`; task list cloud có thêm composite index `(workspace_id, order_index)` để giữ thứ tự ổn định khi workspace lớn.

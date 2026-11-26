@@ -2,6 +2,6 @@
 
 import { TaskListController } from "./TaskListController";
 
-export function InboxController() {
+export function DraftsController() {
   return <TaskListController />;
 }

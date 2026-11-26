@@ -9,7 +9,7 @@ Tài liệu này tách rõ phần đã có bằng chứng local/browser khỏi p
 | Hạng mục                     | Trạng thái                  | Bằng chứng                                     |
 | ---------------------------- | --------------------------- | ---------------------------------------------- |
 | Review và Blocked tách riêng | Đã kiểm chứng local         | `lib/types.ts`, selectors, Board; domain tests |
-| Inbox + triage               | Đã kiểm chứng browser       | `/inbox`, E2E Inbox/checklist                  |
+| Draft + triage               | Đã kiểm chứng browser       | `/drafts`, E2E Draft/checklist                 |
 | Today action center          | Đã kiểm chứng local/browser | selectors, `/today`, E2E responsive            |
 | Checklist/subtask            | Đã kiểm chứng local/browser | `TaskModal`, parser tests, E2E modal           |
 | Quick actions                | Đã kiểm chứng local/browser | Board actions, E2E task flows                  |
@@ -60,4 +60,4 @@ npm run test:supabase         not run: test credentials absent
 CI                            now runs unit tests before production build/deploy
 ```
 
-E2E cases reported as passed covered responsive layouts, persistent shell navigation, task flows, backup/restore, inbox, discussions, timeline, local persistence and browser performance at 100/1,000/10,000 tasks. Two skips are declared viewport skips for workspace selector isolation where the sidebar is replaced by mobile navigation. The full matrix runner can generate temporary trace artifacts during teardown in this local environment, so the release evidence records the stable targeted suites above instead of claiming a clean full-matrix exit. Supabase authorization, Realtime and push delivery still need a configured test project and dedicated accounts.
+E2E cases reported as passed covered responsive layouts, persistent shell navigation, task flows, backup/restore, drafts, discussions, timeline, local persistence and browser performance at 100/1,000/10,000 tasks. Two skips are declared viewport skips for workspace selector isolation where the sidebar is replaced by mobile navigation. The full matrix runner can generate temporary trace artifacts during teardown in this local environment, so the release evidence records the stable targeted suites above instead of claiming a clean full-matrix exit. Supabase authorization, Realtime and push delivery still need a configured test project and dedicated accounts.

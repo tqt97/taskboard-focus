@@ -1,4 +1,4 @@
-export type WorkspaceView = "overview" | "tasks" | "today" | "inbox" | "timeline";
+export type WorkspaceView = "overview" | "tasks" | "today" | "drafts" | "timeline";
 
 export function WorkspacePageHeading({
   view,
@@ -16,8 +16,8 @@ export function WorkspacePageHeading({
       </>
     ) : view === "today" ? (
       "Hôm nay"
-    ) : view === "inbox" ? (
-      "Inbox cần triage"
+    ) : view === "drafts" ? (
+      "Bản nháp"
     ) : view === "timeline" ? (
       "Lịch & timeline"
     ) : (
@@ -28,8 +28,8 @@ export function WorkspacePageHeading({
       ? "Một cái nhìn nhanh về tiến độ, rủi ro và các mốc sắp tới."
       : view === "today"
         ? "Các việc quá hạn, đến hạn hôm nay và ưu tiên khẩn cần được xử lý trước."
-        : view === "inbox"
-          ? "Các task mới cần được phân loại, giao người và đặt bước tiếp theo."
+        : view === "drafts"
+          ? "Các công việc mới chỉ có tiêu đề, chờ được phân loại thành task chính thức."
           : view === "timeline"
             ? "Nhìn toàn bộ mốc Dev, Staging, Release và Deadline trên trục thời gian."
             : "Tìm, lọc, tạo và cập nhật mọi task trong workspace.";

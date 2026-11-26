@@ -32,7 +32,7 @@ export function createQuickCaptureTask(
     links: [],
     primary_links: [],
     secondary_links: [],
-    inbox: true,
+    is_draft: true,
     created_at: timestamp,
     updated_at: timestamp,
     activity: [
@@ -40,7 +40,7 @@ export function createQuickCaptureTask(
         id: crypto.randomUUID(),
         type: "created",
         at: timestamp,
-        summary: "Đã ghi nhanh vào Inbox",
+        summary: "Đã lưu bản nháp",
       },
     ],
   };

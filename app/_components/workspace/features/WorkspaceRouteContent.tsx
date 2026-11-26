@@ -22,8 +22,8 @@ const TodayController = dynamic(
   () => import("./tasks/TodayController").then((module) => module.TodayController),
   { ssr: false, loading: () => <div className="board-loading" aria-busy="true" /> },
 );
-const InboxController = dynamic(
-  () => import("./tasks/InboxController").then((module) => module.InboxController),
+const DraftsController = dynamic(
+  () => import("./tasks/DraftsController").then((module) => module.DraftsController),
   { ssr: false, loading: () => <div className="board-loading" aria-busy="true" /> },
 );
 
@@ -31,6 +31,6 @@ export function WorkspaceRouteContent({ view }: { view: WorkspaceView }) {
   if (view === "overview") return <OverviewController />;
   if (view === "timeline") return <TimelineController />;
   if (view === "today") return <TodayController />;
-  if (view === "inbox") return <InboxController />;
+  if (view === "drafts") return <DraftsController />;
   return <TaskListController />;
 }

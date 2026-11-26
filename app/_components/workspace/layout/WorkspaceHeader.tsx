@@ -10,6 +10,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Download,
+  FilePenLine,
   Languages,
   ListTodo,
   LogIn,
@@ -181,10 +182,10 @@ export function WorkspaceHeader({
                 <CalendarDays size={17} /> Hôm nay <span>{counts.today}</span>
               </button>
               <button
-                className={view === "inbox" ? "active" : ""}
-                onClick={() => onNavigate("/inbox")}
+                className={view === "drafts" ? "active" : ""}
+                onClick={() => onNavigate("/drafts")}
               >
-                <ListTodo size={17} /> Inbox <span>{counts.inbox}</span>
+                <FilePenLine size={17} /> Bản nháp <span>{counts.drafts}</span>
               </button>
               <button
                 className={view === "timeline" ? "active" : ""}
