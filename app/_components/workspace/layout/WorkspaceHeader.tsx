@@ -5,6 +5,8 @@ import {
   Bell,
   CalendarDays,
   CalendarRange,
+  Check,
+  ChevronDown,
   CloudDownload,
   CloudUpload,
   ChevronLeft,
@@ -23,7 +25,7 @@ import {
   WifiOff,
   X,
 } from "lucide-react";
-import type { RefObject } from "react";
+import { useEffect, useRef, useState, type FocusEvent, type RefObject } from "react";
 import type { AppLocale } from "@/lib/i18n";
 import type { SyncState } from "@/lib/repositories/task-repository";
 import type { BoardNotification } from "../dialogs/NotificationPopover";
@@ -103,6 +105,19 @@ export function WorkspaceHeader({
   onOpenSettings: () => void;
   isOnline: boolean;
 }) {
+  const [localeMenuOpen, setLocaleMenuOpen] = useState(false);
+  const localeMenuRef = useRef<HTMLDivElement>(null);
+  const localeTriggerRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!localeMenuOpen) return;
+    const closeOnOutsideClick = (event: PointerEvent) => {
+      if (!localeMenuRef.current?.contains(event.target as Node)) {
+        setLocaleMenuOpen(false);
+      }
+    };
+    document.addEventListener("pointerdown", closeOnOutsideClick);
+    return () => document.removeEventListener("pointerdown", closeOnOutsideClick);
+  }, [localeMenuOpen]);
   const viewLabel =
     view === "overview"
       ? "Tổng quan"
@@ -210,24 +225,100 @@ export function WorkspaceHeader({
         >
           <Plus size={16} /> <span>Ghi nhanh</span> <kbd>N</kbd>
         </button>
-        <label className="header-locale" title="Đổi ngôn ngữ">
-          <Languages size={16} aria-hidden="true" />
-          <span className="sr-only">Ngôn ngữ</span>
-          <select
-            aria-label="Đổi ngôn ngữ"
-            value={locale}
-            onChange={(event) => {
-              onLocaleChange(event.target.value as AppLocale);
-              event.currentTarget.blur();
+        <div
+          ref={localeMenuRef}
+          className={`header-locale-wrap${localeMenuOpen ? " open" : ""}`}
+          onBlur={(event: FocusEvent<HTMLDivElement>) => {
+            if (!event.currentTarget.contains(event.relatedTarget)) {
+              setLocaleMenuOpen(false);
+            }
+          }}
+        >
+          <button
+            ref={localeTriggerRef}
+            className="header-locale"
+            type="button"
+            title="Đổi ngôn ngữ"
+            aria-label={`Ngôn ngữ: ${localeLabels[locale]}`}
+            aria-haspopup="menu"
+            aria-expanded={localeMenuOpen}
+            aria-controls="locale-options"
+            onClick={() => setLocaleMenuOpen((open) => !open)}
+            onKeyDown={(event) => {
+              if (event.key === "ArrowDown") {
+                event.preventDefault();
+                setLocaleMenuOpen(true);
+                requestAnimationFrame(() =>
+                  document
+                    .querySelector<HTMLButtonElement>("#locale-options button")
+                    ?.focus(),
+                );
+              }
             }}
           >
-            {supportedLocales.map((supportedLocale) => (
-              <option key={supportedLocale} value={supportedLocale}>
-                {localeLabels[supportedLocale]}
-              </option>
-            ))}
-          </select>
-        </label>
+            <Languages size={16} aria-hidden="true" />
+            <span>{localeLabels[locale]}</span>
+            <ChevronDown
+              className="header-locale-chevron"
+              size={13}
+              aria-hidden="true"
+            />
+          </button>
+          {localeMenuOpen && (
+            <div
+              className="header-locale-menu"
+              id="locale-options"
+              role="menu"
+              aria-label="Chọn ngôn ngữ"
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  setLocaleMenuOpen(false);
+                  localeTriggerRef.current?.focus();
+                  return;
+                }
+                if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                  event.preventDefault();
+                  const options = Array.from(
+                    event.currentTarget.querySelectorAll<HTMLButtonElement>("button"),
+                  );
+                  const currentIndex = options.indexOf(
+                    document.activeElement as HTMLButtonElement,
+                  );
+                  const step = event.key === "ArrowDown" ? 1 : -1;
+                  options[
+                    (currentIndex + step + options.length) % options.length
+                  ]?.focus();
+                } else if (event.key === "Home" || event.key === "End") {
+                  event.preventDefault();
+                  const options =
+                    event.currentTarget.querySelectorAll<HTMLButtonElement>("button");
+                  (event.key === "Home"
+                    ? options[0]
+                    : options[options.length - 1]
+                  )?.focus();
+                }
+              }}
+            >
+              {supportedLocales.map((supportedLocale) => (
+                <button
+                  key={supportedLocale}
+                  className={`header-locale-option${locale === supportedLocale ? " selected" : ""}`}
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={locale === supportedLocale}
+                  onClick={() => {
+                    onLocaleChange(supportedLocale as AppLocale);
+                    setLocaleMenuOpen(false);
+                    localeTriggerRef.current?.focus();
+                  }}
+                >
+                  <span>{localeLabels[supportedLocale]}</span>
+                  {locale === supportedLocale && <Check size={15} aria-hidden="true" />}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         <div className="header-utility-actions" aria-label="Công cụ workspace">
           {cloudConfigured && cloudUserEmail ? (
             <>
