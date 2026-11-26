@@ -73,6 +73,16 @@ import { createQuickCaptureTask } from "@/lib/taskboard/quick-capture";
 import { updateTaskTitleInline } from "@/lib/taskboard/inline-edit";
 import { parseBoardBackupText, restoreBoardSnapshot } from "@/lib/taskboard/backup";
 import { WorkspacePageHeading } from "../layout/WorkspacePageHeading";
+import { ScreenLockGate } from "../dialogs/ScreenLockGate";
+import {
+  clearUnlockSession,
+  createScreenLockConfig,
+  readScreenLockConfig,
+  readUnlockDeadline,
+  saveScreenLockConfig,
+  setUnlockDeadline,
+  type ScreenLockConfig,
+} from "@/lib/taskboard/screen-lock";
 import { persistSavedViews, useSavedViews } from "../hooks/useSavedViews";
 import { useWorkspaceShortcuts } from "../hooks/useWorkspaceShortcuts";
 import { WorkspaceLoading } from "../layout/WorkspaceLoading";
@@ -102,10 +112,6 @@ const SettingsModal = dynamic(
 );
 const ConfirmDialog = dynamic(
   () => import("../dialogs/WorkspaceDialogs").then((module) => module.ConfirmDialog),
-  { ssr: false },
-);
-const LockModal = dynamic(
-  () => import("../dialogs/WorkspaceDialogs").then((module) => module.LockModal),
   { ssr: false },
 );
 const LazyTaskCard = dynamic(
@@ -241,6 +247,7 @@ const taskAssigneeIds = (task: Task) =>
       ? [task.assignee_id]
       : [];
 const displayNameStorageKey = "taskboard-display-name-v1";
+const legacyLockPasscodeStorageKey = "taskboard-lock-passcode-v1";
 const readDisplayName = () => {
   try {
     return (
@@ -306,9 +313,7 @@ export default function WorkspaceRuntime({
     [assigneeFilter, setAssigneeFilter] = useState("all"),
     [dueFilter, setDueFilter] = useState("all"),
     [archiveFilter, setArchiveFilter] = useState<"active" | "archived">("active"),
-    [modal, setModal] = useState<"task" | "settings" | "lock" | "quick-capture" | null>(
-      null,
-    ),
+    [modal, setModal] = useState<"task" | "settings" | "quick-capture" | null>(null),
     [edit, setEdit] = useState<Task | null>(null),
     [confirm, setConfirm] = useState<string | null>(null),
     [importPreview, setImportPreview] = useState<BoardData | null>(null),
@@ -345,6 +350,12 @@ export default function WorkspaceRuntime({
     [cloudUserEmail, setCloudUserEmail] = useState(""),
     [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "error">("saved");
   const [isOnline, setIsOnline] = useState(true);
+  const [screenLockConfig, setScreenLockConfig] = useState<ScreenLockConfig | null>(
+    null,
+  );
+  const [screenLockReady, setScreenLockReady] = useState(false);
+  const [screenUnlocked, setScreenUnlocked] = useState(false);
+  const [lastActivityAt, setLastActivityAt] = useState(Date.now());
   const { savedViews, setSavedViews } = useSavedViews(workspaceId, ready);
   useEffect(() => setSelectedSavedViewId(""), [workspaceId]);
   const {
@@ -436,12 +447,19 @@ export default function WorkspaceRuntime({
     }
     setAdvancedFiltersOpen(window.innerWidth > wideWorkspaceBreakpoint);
     setReady(true);
+    // The previous implementation kept the passcode in plaintext. Remove it
+    // once when this client upgrades to the salted Web Crypto format.
+    safeRemoveLocalStorage(legacyLockPasscodeStorageKey);
+    const storedLock = readScreenLockConfig();
+    setScreenLockConfig(storedLock);
+    setScreenUnlocked(Boolean(storedLock && readUnlockDeadline() > Date.now()));
+    setScreenLockReady(true);
     let storedDark = false;
     try {
       storedDark = localStorage.getItem("taskboard-dark") === "1";
     } catch {}
     setDark(storedDark);
-    setDisplayName(readDisplayName());
+    setDisplayName(storedLock?.displayName || readDisplayName());
     setLocale(readStoredLocale());
     if (cloudConfigured) {
       void loadCloudModules().then(({ auth, repository }) =>
@@ -479,21 +497,62 @@ export default function WorkspaceRuntime({
     if ("Notification" in window) setBrowserPermission(Notification.permission);
     else setBrowserPermission("unsupported");
     const syncDisplayName = () => setDisplayName(readDisplayName());
+    const syncScreenLock = () => {
+      const nextLock = readScreenLockConfig();
+      setScreenLockConfig(nextLock);
+      if (!nextLock || readUnlockDeadline() <= Date.now()) {
+        clearUnlockSession();
+        setScreenUnlocked(false);
+        return;
+      }
+      setScreenUnlocked(true);
+    };
     const syncBrowserPermission = () => {
       if ("Notification" in window) setBrowserPermission(Notification.permission);
       else setBrowserPermission("unsupported");
     };
     window.addEventListener("storage", syncDisplayName);
+    window.addEventListener("storage", syncScreenLock);
     window.addEventListener("focus", syncDisplayName);
+    window.addEventListener("focus", syncScreenLock);
     window.addEventListener("focus", syncBrowserPermission);
+    document.addEventListener("visibilitychange", syncScreenLock);
     document.addEventListener("visibilitychange", syncBrowserPermission);
     return () => {
       window.removeEventListener("storage", syncDisplayName);
+      window.removeEventListener("storage", syncScreenLock);
       window.removeEventListener("focus", syncDisplayName);
+      window.removeEventListener("focus", syncScreenLock);
       window.removeEventListener("focus", syncBrowserPermission);
+      document.removeEventListener("visibilitychange", syncScreenLock);
       document.removeEventListener("visibilitychange", syncBrowserPermission);
     };
   }, [cloudConfigured]);
+  useEffect(() => {
+    if (!screenLockReady || !screenLockConfig || !screenUnlocked) return;
+    const activity = () => setLastActivityAt(Date.now());
+    const lockIfExpired = () => {
+      if (
+        screenLockConfig.autoLockMinutes > 0 &&
+        Date.now() - lastActivityAt >= screenLockConfig.autoLockMinutes * 60000
+      ) {
+        clearUnlockSession();
+        setScreenUnlocked(false);
+        setModal(null);
+        setToast("Màn hình đã tự khóa do không hoạt động.");
+      }
+    };
+    window.addEventListener("pointerdown", activity, true);
+    window.addEventListener("keydown", activity, true);
+    window.addEventListener("touchstart", activity, true);
+    const timer = window.setInterval(lockIfExpired, 10000);
+    return () => {
+      window.removeEventListener("pointerdown", activity, true);
+      window.removeEventListener("keydown", activity, true);
+      window.removeEventListener("touchstart", activity, true);
+      window.clearInterval(timer);
+    };
+  }, [lastActivityAt, screenLockConfig, screenLockReady, screenUnlocked]);
   useEffect(() => {
     if (!ready) return;
     try {
@@ -1855,7 +1914,15 @@ export default function WorkspaceRuntime({
           onCreateWorkspace={createWorkspace}
           onNavigate={(path) => router.push(path)}
           displayName={displayName}
-          onLock={() => setModal("lock")}
+          onLock={() => {
+            // Let the click finish before mounting the full-screen gate; otherwise
+            // the new overlay can intercept the button's mouseup/click sequence.
+            window.setTimeout(() => {
+              clearUnlockSession();
+              setScreenUnlocked(false);
+              setModal(null);
+            }, 0);
+          }}
         />
         <section className="main-area">
           <WorkspaceHeader
@@ -2165,14 +2232,47 @@ export default function WorkspaceRuntime({
               setToast("Đã mở bản sao tự động để xem trước khi khôi phục.");
             }}
             displayName={displayName}
+            screenLockConfig={screenLockConfig}
+            onUpdateScreenLock={async (nextPasscode, autoLockMinutes) => {
+              if (!screenLockConfig && !nextPasscode) {
+                setToast("Hãy nhập passcode mới trước khi lưu.");
+                return;
+              }
+              const nextConfig = nextPasscode
+                ? await createScreenLockConfig(
+                    displayName,
+                    nextPasscode,
+                    autoLockMinutes,
+                  )
+                : { ...screenLockConfig!, autoLockMinutes };
+              if (!saveScreenLockConfig(nextConfig)) {
+                setToast("Không thể lưu thiết lập bảo mật; hãy kiểm tra quyền lưu.");
+                return;
+              }
+              setScreenLockConfig(nextConfig);
+              setUnlockDeadline(
+                autoLockMinutes > 0
+                  ? Date.now() + autoLockMinutes * 60000
+                  : Number.MAX_SAFE_INTEGER,
+              );
+              setLastActivityAt(Date.now());
+              setToast("Đã cập nhật bảo mật màn hình.");
+            }}
             onDisplayName={(name) => {
               const nextName = name.trim();
-              setDisplayName(nextName || "Tuấn");
+              setDisplayName(nextName || screenLockConfig?.displayName || "Anonymous");
               const saved = nextName
                 ? safeSetLocalStorage(displayNameStorageKey, nextName)
                 : safeRemoveLocalStorage(displayNameStorageKey);
               if (!saved) {
                 setToast("Không thể lưu tên hiển thị; hãy kiểm tra quyền lưu.");
+              }
+              if (screenLockConfig) {
+                const nextConfig = {
+                  ...screenLockConfig,
+                  displayName: nextName || "Anonymous",
+                };
+                if (saveScreenLockConfig(nextConfig)) setScreenLockConfig(nextConfig);
               }
             }}
             reminderSettings={reminderSettings}
@@ -2194,8 +2294,38 @@ export default function WorkspaceRuntime({
             onDeleteTemplate={deleteTemplate}
           />
         )}
-        {modal === "lock" && (
-          <LockModal onClose={() => setModal(null)} onToast={setToast} />
+        {screenLockReady && !screenUnlocked && (
+          <ScreenLockGate
+            config={screenLockConfig}
+            onConfigured={async (config) => {
+              if (!saveScreenLockConfig(config)) {
+                setToast("Không thể lưu thiết lập màn hình; hãy kiểm tra quyền lưu.");
+                return;
+              }
+              setScreenLockConfig(config);
+              setDisplayName(config.displayName);
+              safeSetLocalStorage(displayNameStorageKey, config.displayName);
+              setUnlockDeadline(
+                config.autoLockMinutes > 0
+                  ? Date.now() + config.autoLockMinutes * 60000
+                  : Number.MAX_SAFE_INTEGER,
+              );
+              setLastActivityAt(Date.now());
+              setScreenUnlocked(true);
+              setToast("Đã thiết lập màn hình khóa.");
+            }}
+            onUnlocked={() => {
+              if (!screenLockConfig) return;
+              setUnlockDeadline(
+                screenLockConfig.autoLockMinutes > 0
+                  ? Date.now() + screenLockConfig.autoLockMinutes * 60000
+                  : Number.MAX_SAFE_INTEGER,
+              );
+              setLastActivityAt(Date.now());
+              setScreenUnlocked(true);
+              setToast("Đã mở khóa workspace.");
+            }}
+          />
         )}
         {confirm && (
           <ConfirmDialog

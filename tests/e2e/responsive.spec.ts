@@ -1,5 +1,75 @@
 import { expect, test } from "@playwright/test";
 
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      "taskboard-screen-lock-v2",
+      JSON.stringify({
+        displayName: "E2E User",
+        salt: "taskboard-e2e-salt",
+        passcodeHash: "cn/fF2gOX8OQyIFYO8xBPpNmP0fsZQQgud2d/g8gTaE=",
+        autoLockMinutes: 0,
+      }),
+    );
+    sessionStorage.setItem(
+      "taskboard-screen-unlocked-until-v2",
+      String(Date.now() + 24 * 60 * 60 * 1000),
+    );
+  });
+});
+
+test("first launch asks for screen lock setup and accepts the safe defaults", async ({
+  browser,
+}) => {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await page.goto("/tasks");
+
+  const gate = page.getByRole("dialog");
+  await expect(gate.getByRole("heading", { name: "Thiết lập màn hình" })).toBeVisible();
+  await expect(gate.getByText(/Anonymous/)).toBeVisible();
+  await expect(gate.getByText(/1234/)).toBeVisible();
+  await gate.getByRole("button", { name: "Bắt đầu sử dụng" }).click();
+  await expect(gate).toHaveCount(0);
+  await expect(page.locator(".topbar")).toBeVisible();
+  await context.close();
+});
+
+test("manual lock blocks the workspace until the correct passcode is entered", async ({
+  page,
+}) => {
+  await page.goto("/tasks");
+  await page.getByRole("button", { name: "Khóa màn hình" }).click({ force: true });
+
+  const gate = page.getByRole("dialog");
+  await expect(
+    gate.getByRole("heading", { name: "Workspace đang khóa" }),
+  ).toBeVisible();
+  for (const [index, digit] of Array.from("0000").entries()) {
+    await gate.getByLabel(`Passcode số ${index + 1}`).fill(digit);
+  }
+  await gate.getByRole("button", { name: "Mở khóa" }).click({ force: true });
+  await expect(gate.getByRole("alert")).toContainText("chưa đúng");
+  for (const [index, digit] of Array.from("1234").entries()) {
+    await gate.getByLabel(`Passcode số ${index + 1}`).fill(digit);
+  }
+  await gate.getByRole("button", { name: "Mở khóa" }).click({ force: true });
+  await expect(gate).toHaveCount(0);
+});
+
+test("deleting the local screen-lock config re-enters setup instead of leaving a stale unlock", async ({
+  page,
+}) => {
+  await page.goto("/tasks");
+  await page.evaluate(() => {
+    localStorage.removeItem("taskboard-screen-lock-v2");
+    sessionStorage.removeItem("taskboard-screen-unlocked-until-v2");
+    window.dispatchEvent(new Event("focus"));
+  });
+  await expect(page.getByRole("heading", { name: "Thiết lập màn hình" })).toBeVisible();
+  await expect(page.getByText(/Anonymous/)).toBeVisible();
+});
+
 test("task workspace stays usable at tablet width", async ({ page }) => {
   await page.goto("/tasks");
   await expect(page.getByRole("heading", { name: /Danh sách task/ })).toBeVisible();

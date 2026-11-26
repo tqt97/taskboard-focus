@@ -9,7 +9,7 @@ Một workspace cá nhân giúp ghi task nhanh, nhìn tình hình chung và khô
 - Một workspace có owner, admin, member và viewer; thành viên cloud là tài khoản Supabase có thể được mời qua email hoặc gán bằng user ID. Danh mục member local vẫn được giữ để backward compatibility và để gán người phụ trách.
 - MVP chạy local-first bằng IndexedDB; localStorage là migration/fallback khi IndexedDB không dùng được. Không cần cấu hình dịch vụ ngoài.
 - Supabase là đích lưu dữ liệu lâu dài khi được cấu hình; workspace cloud có snapshot, remote CRUD từng task, realtime subscription, optimistic revision và RLS theo role.
-- Không cung cấp xác thực thật bằng passcode client; lock-screen UI chỉ mang tính tiện lợi.
+- Màn hình khóa local yêu cầu thiết lập tên hiển thị, passcode và auto-lock lần đầu; passcode được băm bằng Web Crypto. Đây là lớp khóa thao tác trên thiết bị, không thay thế Supabase Auth/RLS.
 
 ## Chức năng MVP
 

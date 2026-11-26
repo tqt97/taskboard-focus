@@ -1934,6 +1934,241 @@ textarea:focus-visible {
 .confirm-overlay {
   z-index: 20;
 }
+.screen-lock-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  overflow: hidden;
+  isolation: isolate;
+  background:
+    radial-gradient(
+      circle at 50% 0%,
+      color-mix(in srgb, var(--accent) 20%, transparent),
+      transparent 38%
+    ),
+    radial-gradient(
+      circle at 10% 90%,
+      color-mix(in srgb, #182230 20%, transparent),
+      transparent 34%
+    ),
+    linear-gradient(135deg, color-mix(in srgb, var(--bg) 94%, #182230 6%), var(--bg));
+}
+.screen-lock-gate::before {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background-image:
+    linear-gradient(
+      color-mix(in srgb, var(--line) 35%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--line) 35%, transparent) 1px,
+      transparent 1px
+    );
+  background-size: 42px 42px;
+  content: "";
+  mask-image: linear-gradient(to bottom, black, transparent 82%);
+  opacity: 0.45;
+}
+.screen-lock-gate::after {
+  position: absolute;
+  top: 12%;
+  left: 50%;
+  z-index: -1;
+  width: 420px;
+  height: 420px;
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, transparent);
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 34px color-mix(in srgb, var(--accent) 5%, transparent),
+    0 0 100px color-mix(in srgb, var(--accent) 14%, transparent);
+  content: "";
+  transform: translateX(-50%);
+}
+.screen-lock-card {
+  position: relative;
+  width: min(410px, 100%);
+  display: grid;
+  gap: 14px;
+  padding: 30px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 24px 70px rgb(24 34 48 / 18%);
+}
+.screen-lock-icon {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border-radius: 15px;
+  background: var(--accent-tint);
+  color: var(--accent);
+}
+.screen-lock-card .eyebrow {
+  margin: 4px 0 -8px;
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1.4px;
+}
+.screen-lock-card h1 {
+  margin: 0;
+  color: var(--text);
+  font-size: 24px;
+}
+.screen-lock-description,
+.screen-lock-default-note,
+.screen-lock-error {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.screen-lock-description,
+.screen-lock-default-note {
+  color: var(--muted);
+}
+.screen-lock-default-note {
+  display: grid;
+  gap: 8px;
+  padding: 13px 14px;
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--line));
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--accent-tint) 70%, var(--surface));
+}
+.screen-lock-default-note strong {
+  color: var(--text);
+  font-size: 12px;
+}
+.screen-lock-default-note small {
+  color: var(--muted);
+  font-size: 11px;
+}
+.screen-lock-default-values {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.screen-lock-default-values > span {
+  display: grid;
+  gap: 3px;
+}
+.screen-lock-default-values small {
+  color: var(--muted);
+  font-size: 10px;
+}
+.screen-lock-default-values b {
+  padding: 5px 9px;
+  border: 1px solid color-mix(in srgb, var(--accent) 32%, var(--line));
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  letter-spacing: 0.03em;
+}
+.screen-lock-field {
+  display: grid;
+  gap: 7px;
+}
+.screen-lock-field > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+}
+.screen-lock-field-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.screen-lock-field-heading > span {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+}
+.screen-lock-field input,
+.screen-lock-field select {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 15px;
+}
+.screen-lock-field.has-error input,
+.screen-lock-field.has-error .screen-lock-otp-input {
+  border-color: var(--danger-text);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger-text) 12%, transparent);
+}
+.screen-lock-field-error {
+  color: var(--danger-text);
+  font-size: 11px;
+  line-height: 1.4;
+}
+.screen-lock-otp-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.screen-lock-otp-input {
+  width: 58px !important;
+  height: 58px;
+  min-width: 0;
+  padding: 8px 4px !important;
+  text-align: center;
+  font-size: 21px !important;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+.screen-lock-show-passcode {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 7px;
+  min-height: 24px;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  border-radius: 999px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 11px;
+  font-family: inherit;
+  transition:
+    background 140ms ease,
+    color 140ms ease;
+}
+.screen-lock-show-passcode:hover {
+  background: transparent;
+  color: var(--text);
+}
+@media (max-width: 480px) {
+  .screen-lock-otp-row {
+    gap: 6px;
+  }
+  .screen-lock-otp-input {
+    width: 54px !important;
+    height: 54px;
+  }
+}
+.screen-lock-submit {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 4px;
+}
 .confirm-dialog {
   width: min(380px, 100%);
   background: var(--surface);
@@ -3920,6 +4155,13 @@ textarea:focus-visible {
 .passcode-row .secondary-button {
   padding: 9px 11px;
   font-size: 10px;
+}
+.field-error {
+  display: block;
+  margin-top: 5px;
+  color: var(--danger-text);
+  font-size: 11px;
+  line-height: 1.4;
 }
 .dashboard-grid .panel-heading h2,
 .overview-grid .panel-heading h2 {

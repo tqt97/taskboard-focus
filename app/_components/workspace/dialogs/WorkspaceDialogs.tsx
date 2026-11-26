@@ -7,9 +7,10 @@ import {
   Check,
   Database,
   Download,
+  Eye,
+  EyeOff,
   FileUp,
   FileText,
-  LockKeyhole,
   Plus,
   Palette,
   Plug,
@@ -27,6 +28,7 @@ import type { RemoteWorkspaceMember } from "@/lib/repositories/task-repository";
 import { getAccessToken } from "@/lib/auth";
 import type { TaskTemplate } from "@/lib/types";
 import { TemplateManagerPanel } from "./TemplateManagerPanel";
+import type { ScreenLockConfig } from "@/lib/taskboard/screen-lock";
 
 export type ReminderSettings = {
   browserEnabled: boolean;
@@ -58,6 +60,8 @@ export function SettingsModal({
   onRestoreBackup,
   displayName,
   onDisplayName,
+  screenLockConfig,
+  onUpdateScreenLock,
   reminderSettings,
   browserPermission,
   onReminderSettings,
@@ -86,6 +90,8 @@ export function SettingsModal({
   onRestoreBackup: (data: BoardData) => void;
   displayName: string;
   onDisplayName: (name: string) => void;
+  screenLockConfig: ScreenLockConfig | null;
+  onUpdateScreenLock: (passcode: string, autoLockMinutes: number) => Promise<void>;
   reminderSettings: ReminderSettings;
   browserPermission: NotificationPermission | "unsupported";
   onReminderSettings: (settings: ReminderSettings) => void;
@@ -127,13 +133,16 @@ export function SettingsModal({
     [passcode, setPasscode] = useState(() =>
       (() => {
         try {
-          return typeof window === "undefined"
-            ? ""
-            : localStorage.getItem("taskboard-lock-passcode-v1") || "";
+          return "";
         } catch {
           return "";
         }
       })(),
+    ),
+    [showPasscode, setShowPasscode] = useState(false),
+    [passcodeError, setPasscodeError] = useState(""),
+    [autoLockMinutes, setAutoLockMinutes] = useState(
+      screenLockConfig?.autoLockMinutes ?? 15,
     ),
     [remoteUserId, setRemoteUserId] = useState(""),
     [inviteEmail, setInviteEmail] = useState(""),
@@ -717,31 +726,62 @@ export function SettingsModal({
                 <label className="field settings-passcode">
                   <span>
                     Passcode khóa màn hình{" "}
-                    <small>Để trống để không yêu cầu mật khẩu</small>
+                    <small>Để trống nếu giữ passcode hiện tại · 4 chữ số</small>
                   </span>
                   <div className="passcode-row">
                     <input
-                      type="password"
+                      type={showPasscode ? "text" : "password"}
+                      inputMode="numeric"
                       value={passcode}
-                      onChange={(e) => setPasscode(e.target.value)}
-                      placeholder="Để trống"
+                      maxLength={4}
+                      onChange={(e) => {
+                        setPasscode(e.target.value.replace(/\D/g, "").slice(0, 4));
+                        setPasscodeError("");
+                      }}
+                      placeholder="1234"
                     />
+                    <button
+                      className="icon-button"
+                      type="button"
+                      aria-label={
+                        showPasscode ? "Ẩn passcode mới" : "Hiện passcode mới"
+                      }
+                      title={showPasscode ? "Ẩn passcode mới" : "Hiện passcode mới"}
+                      onClick={() => setShowPasscode((value) => !value)}
+                    >
+                      {showPasscode ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
                     <button
                       className="secondary-button"
                       onClick={() => {
-                        if (
-                          safeSetLocalStorage("taskboard-lock-passcode-v1", passcode)
-                        ) {
-                          onClose();
-                        } else {
-                          onToast("Không thể lưu passcode; hãy kiểm tra quyền lưu.");
+                        if (passcode && passcode.length !== 4) {
+                          setPasscodeError("Passcode mới phải gồm đúng 4 chữ số.");
+                          return;
                         }
+                        void onUpdateScreenLock(passcode, autoLockMinutes);
                       }}
                     >
                       <Check size={15} />
-                      Lưu passcode
+                      Lưu bảo mật
                     </button>
                   </div>
+                  {passcodeError && (
+                    <small className="field-error">{passcodeError}</small>
+                  )}
+                </label>
+                <label className="field">
+                  <span>Thời gian tự khóa</span>
+                  <select
+                    value={autoLockMinutes}
+                    onChange={(event) => setAutoLockMinutes(Number(event.target.value))}
+                  >
+                    <option value={0}>Không tự khóa</option>
+                    <option value={1}>Sau 1 phút không hoạt động</option>
+                    <option value={5}>Sau 5 phút không hoạt động</option>
+                    <option value={15}>Sau 15 phút không hoạt động</option>
+                    <option value={30}>Sau 30 phút không hoạt động</option>
+                    <option value={60}>Sau 60 phút không hoạt động</option>
+                  </select>
                 </label>
                 <p className="muted-note">
                   Dark mode có thể bật nhanh bằng biểu tượng mặt trăng ở thanh trên
@@ -845,67 +885,6 @@ export function ConfirmDialog({
           <button className="danger-button" onClick={onConfirm}>
             <Trash2 size={15} />
             Xác nhận
-          </button>
-        </footer>
-      </section>
-    </div>
-  );
-}
-export function LockModal({
-  onClose,
-  onToast,
-}: {
-  onClose: () => void;
-  onToast: (s: string) => void;
-}) {
-  const [pass, setPass] = useState("");
-  return (
-    <div className="overlay">
-      <section
-        className="confirm-dialog lock-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="lock-dialog-title"
-      >
-        <div className="confirm-icon">
-          <LockKeyhole size={22} />
-        </div>
-        <h3 id="lock-dialog-title">Khóa màn hình</h3>
-        <p>
-          Màn hình khóa tiện lợi phía client. Không thay thế đăng nhập và không bảo vệ
-          dữ liệu API.
-        </p>
-        <input
-          type="password"
-          placeholder="Nhập passcode để mở"
-          value={pass}
-          onChange={(e) => setPass(e.target.value)}
-        />
-        <footer>
-          <button className="secondary-button" onClick={onClose}>
-            <X size={15} />
-            Đóng
-          </button>
-          <button
-            className="primary-button"
-            onClick={() => {
-              const expected = localStorage.getItem("taskboard-lock-passcode-v1") || "";
-              if (!expected || pass === expected) {
-                sessionStorage.setItem(
-                  "taskboard-unlocked-until",
-                  String(Date.now() + 3600000),
-                );
-                onToast(
-                  expected
-                    ? "Đã mở khóa trong 1 giờ"
-                    : "Đã mở khóa; passcode đang để trống",
-                );
-                onClose();
-              } else onToast("Passcode chưa đúng");
-            }}
-          >
-            <Check size={15} />
-            Mở khóa
           </button>
         </footer>
       </section>
