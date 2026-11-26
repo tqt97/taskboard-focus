@@ -8,6 +8,7 @@ import {
   Database,
   Download,
   FileUp,
+  FileText,
   LockKeyhole,
   Plus,
   Palette,
@@ -24,6 +25,8 @@ import {
 } from "@/lib/storage/indexed-db-board-storage";
 import type { RemoteWorkspaceMember } from "@/lib/repositories/task-repository";
 import { getAccessToken } from "@/lib/auth";
+import type { TaskTemplate } from "@/lib/types";
+import { TemplateManagerPanel } from "./TemplateManagerPanel";
 
 export type ReminderSettings = {
   browserEnabled: boolean;
@@ -66,6 +69,10 @@ export function SettingsModal({
   onRemoteMemberRole,
   onRemoveRemoteMember,
   onInviteRemoteMember,
+  templates = [],
+  canManageTemplates = false,
+  onRenameTemplate,
+  onDeleteTemplate,
 }: {
   data: BoardData;
   tab: string;
@@ -96,6 +103,10 @@ export function SettingsModal({
     email: string,
     role: RemoteWorkspaceMember["role"],
   ) => Promise<void>;
+  templates?: TaskTemplate[];
+  canManageTemplates?: boolean;
+  onRenameTemplate?: (id: string, name: string) => boolean;
+  onDeleteTemplate?: (id: string) => boolean;
 }) {
   const [newName, setNewName] = useState(""),
     [newRole, setNewRole] = useState("Developer"),
@@ -190,9 +201,38 @@ export function SettingsModal({
               >
                 <Database size={15} /> Dữ liệu
               </button>
+              <button
+                className={tab === "templates" ? "selected" : ""}
+                onClick={() => setTab("templates")}
+              >
+                <FileText size={15} /> Template
+              </button>
             </div>
           </nav>
           <div className="settings-content">
+            {tab === "templates" && (
+              <>
+                <div className="setting-intro">
+                  <h3>Template công việc</h3>
+                  <p>
+                    Quản lý các mẫu task dùng lại trong workspace. Khi tạo task, bạn vẫn
+                    có thể chọn template ngay cạnh luồng tạo mới.
+                  </p>
+                </div>
+                {!canManageTemplates && (
+                  <div className="empty-small">
+                    Bạn chỉ có quyền xem workspace này; các template không thể chỉnh
+                    sửa.
+                  </div>
+                )}
+                <TemplateManagerPanel
+                  templates={templates}
+                  onRename={onRenameTemplate ?? (() => false)}
+                  onDelete={onDeleteTemplate ?? (() => false)}
+                  readOnly={!canManageTemplates}
+                />
+              </>
+            )}
             {tab === "members" && (
               <>
                 <div className="setting-intro">

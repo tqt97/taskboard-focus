@@ -20,7 +20,7 @@
 - Chỉnh sửa danh sách thành viên qua UI.
 - Dark mode, giao diện responsive.
 - Today workspace tại `/today`, archive/restore soft-delete và thông báo lỗi persistence rõ ràng.
-- Dependency readiness, recurrence, attachment URL metadata và template storage utility.
+- Dependency readiness, recurrence, attachment URL metadata và thư viện template quản lý trong **Cài đặt → Template**.
 - Supabase Storage upload attachment tối đa 10 MB khi đã đăng nhập cloud.
 - Playwright responsive regression cho desktop/tablet/mobile.
 - Export/import backup JSON schema v1.

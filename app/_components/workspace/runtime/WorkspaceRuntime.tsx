@@ -115,13 +115,6 @@ const ConflictDialog = dynamic(
   () => import("../dialogs/ConflictDialog").then((module) => module.ConflictDialog),
   { ssr: false },
 );
-const TemplateManagerDialog = dynamic(
-  () =>
-    import("../dialogs/TemplateManagerDialog").then(
-      (module) => module.TemplateManagerDialog,
-    ),
-  { ssr: false },
-);
 
 const priorityRank: Record<Priority, number> = {
   urgent: 0,
@@ -308,9 +301,9 @@ export default function WorkspaceRuntime({
     [assigneeFilter, setAssigneeFilter] = useState("all"),
     [dueFilter, setDueFilter] = useState("all"),
     [archiveFilter, setArchiveFilter] = useState<"active" | "archived">("active"),
-    [modal, setModal] = useState<
-      "task" | "settings" | "lock" | "quick-capture" | "templates" | null
-    >(null),
+    [modal, setModal] = useState<"task" | "settings" | "lock" | "quick-capture" | null>(
+      null,
+    ),
     [edit, setEdit] = useState<Task | null>(null),
     [confirm, setConfirm] = useState<string | null>(null),
     [importPreview, setImportPreview] = useState<BoardData | null>(null),
@@ -1925,13 +1918,6 @@ export default function WorkspaceRuntime({
                       </select>
                     )}
                     <button
-                      className="text-button template-manage-trigger"
-                      disabled={!canEditWorkspace}
-                      onClick={() => setModal("templates")}
-                    >
-                      Quản lý template
-                    </button>
-                    <button
                       className="primary-button"
                       disabled={!canEditWorkspace}
                       onClick={() => {
@@ -2134,14 +2120,6 @@ export default function WorkspaceRuntime({
         {modal === "quick-capture" && (
           <QuickCapture onClose={() => setModal(null)} onSave={saveQuickCapture} />
         )}
-        {modal === "templates" && (
-          <TemplateManagerDialog
-            templates={templates}
-            onRename={renameTemplate}
-            onDelete={deleteTemplate}
-            onClose={() => setModal(null)}
-          />
-        )}
         {modal === "settings" && (
           <SettingsModal
             data={data}
@@ -2193,6 +2171,10 @@ export default function WorkspaceRuntime({
             onRemoteMemberRole={updateRemoteMemberRole}
             onRemoveRemoteMember={removeRemoteMember}
             onInviteRemoteMember={inviteRemoteMember}
+            templates={templates}
+            canManageTemplates={canEditWorkspace}
+            onRenameTemplate={renameTemplate}
+            onDeleteTemplate={deleteTemplate}
           />
         )}
         {modal === "lock" && (

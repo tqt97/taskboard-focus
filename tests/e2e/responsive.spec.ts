@@ -149,6 +149,20 @@ test("saved filters can be selected and removed", async ({ page }) => {
   );
 });
 
+test("template management lives in workspace settings", async ({ page }) => {
+  await page.goto("/tasks");
+  await expect(page.getByRole("heading", { name: /Danh sách task/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Quản lý template" })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Cài đặt" }).click({ force: true });
+  const settings = page.getByRole("dialog", { name: "Cài đặt" });
+  await settings.getByRole("button", { name: "Template" }).click();
+  await expect(
+    settings.getByRole("heading", { name: "Template công việc" }),
+  ).toBeVisible();
+  await expect(settings.getByText(/Chưa có template/)).toBeVisible();
+});
+
 test("replacing a backup can be undone to restore the prior workspace", async ({
   page,
 }, testInfo) => {

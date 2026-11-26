@@ -20,7 +20,7 @@
 - Dùng bộ lọc **Người phụ trách** hoặc **Mốc hiển thị** để thu hẹp thông tin. Kéo mốc **Deadline** sang ngày khác để cập nhật deadline; thay đổi vẫn được lưu vào activity và đồng bộ cloud khi workspace đã đăng nhập.
 - Action chính của task đi theo flow: **Bắt đầu** → **Gửi review** → **Hoàn tất**. Task bị chặn sẽ quay lại trạng thái trước đó sau khi **Gỡ chặn**; nếu muốn hoàn tất, cần đi qua bước review.
 - Bấm **Chọn nhiều** rồi tick các task để dùng bulk action chuyển sang **Đang làm** hoặc đặt **Ưu tiên cao**; tắt chế độ này để giao diện gọn hơn.
-- Chọn **Quản lý template** để đổi tên hoặc xóa template trong workspace hiện tại. Template được lưu trên trình duyệt này và có thể tạo lại từ task chi tiết.
+- Mở **Cài đặt → Template** để đổi tên hoặc xóa template trong workspace hiện tại. Khi tạo task, vẫn có thể chọn template từ tùy chọn **Tạo task từ template**. Template được lưu trên trình duyệt này và có thể tạo lại từ task chi tiết.
 - Trong **Cài đặt → Thông báo**, bật **Nhắc nền khi đóng app** trên thiết bị đã cấp quyền. Cần đăng nhập owner cloud, cài PWA/cho phép push và đồng bộ task; lịch gửi dùng timezone/quiet hours cấu hình server.
 - Trên màn hình hẹp, assignee/deadline nằm trong **Bộ lọc nâng cao**. Mã task dùng monospace và có nút copy để dán vào ô tìm kiếm.
 
