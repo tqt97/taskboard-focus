@@ -1,18 +1,38 @@
 "use client";
 
 import {
-  Activity,
   AlertTriangle,
-  ArrowDownUp,
+  ArrowRight,
+  Ban,
+  CalendarCheck,
   CheckCheck,
-  ChevronDown,
+  CirclePlay,
   Clock3,
+  Eye,
+  Flame,
+  ListChecks,
   Users,
 } from "lucide-react";
 import { useMemo } from "react";
+import type { ReactNode } from "react";
+import type { AppLocale, UiCopy } from "@/lib/i18n";
+import { intlLocale } from "@/lib/i18n";
 import type { Member, Status, Task } from "@/lib/types";
-import type { UiCopy } from "@/lib/i18n";
-import { isArchived } from "@/lib/taskboard/selectors";
+import {
+  getActiveTasks,
+  getDependencyState,
+  isDueToday,
+  isOverdue,
+  isSnoozed,
+} from "@/lib/taskboard/selectors";
+import { getNextAction } from "@/lib/taskboard/next-action";
+
+const priorityRank: Record<Task["priority"], number> = {
+  urgent: 0,
+  high: 1,
+  medium: 2,
+  low: 3,
+};
 
 const taskAssigneeIds = (task: Task) =>
   task.assignee_ids?.length
@@ -21,38 +41,183 @@ const taskAssigneeIds = (task: Task) =>
       ? [task.assignee_id]
       : [];
 
+function localizeNextAction(
+  task: Task,
+  key: ReturnType<typeof getNextAction>["key"],
+  copy: UiCopy,
+) {
+  const action = copy.overview.action;
+  const labels = {
+    done: { label: action.complete, reason: copy.overview.done },
+    snoozed: { label: action.continue, reason: copy.due.remaining(0) },
+    resolve_dependency: {
+      label: task.status === "blocked" ? action.unblock : action.resolveDependency,
+      reason: action.blockedReason,
+    },
+    follow_dependency: {
+      label: action.followDependency,
+      reason: action.dependencyReason,
+    },
+    review: { label: action.review, reason: action.reviewReason },
+    overdue: { label: action.continue, reason: action.overdueReason },
+    start: { label: action.start, reason: action.todoReason },
+    continue: {
+      label: task.next_action?.trim() || action.continue,
+      reason: action.inProgressReason,
+    },
+  } satisfies Record<string, { label: string; reason: string }>;
+  return labels[key];
+}
+
+function ActionLane({
+  title,
+  description,
+  icon,
+  tone,
+  tasks,
+  copy,
+  dueText,
+  onOpenTask,
+}: {
+  title: string;
+  description: string;
+  icon: ReactNode;
+  tone: "review" | "blocked" | "overdue";
+  tasks: Task[];
+  copy: UiCopy;
+  dueText: (value: string, copy: UiCopy) => string;
+  onOpenTask: (task: Task) => void;
+}) {
+  return (
+    <section className={`overview-action-lane ${tone}`}>
+      <div className="overview-action-lane-heading">
+        <span className="overview-action-icon">{icon}</span>
+        <div>
+          <h3>{title}</h3>
+          <p>{description}</p>
+        </div>
+        <strong>{tasks.length}</strong>
+      </div>
+      {tasks.length ? (
+        <div className="overview-action-list">
+          {tasks.slice(0, 3).map((task) => (
+            <button
+              className="overview-action-row"
+              key={task.id}
+              onClick={() => onOpenTask(task)}
+              type="button"
+            >
+              <span>
+                <b>{task.code || "TASK"}</b>
+                <small>{task.title}</small>
+              </span>
+              <em>{task.deadline ? dueText(task.deadline, copy) : "—"}</em>
+              <ArrowRight size={15} />
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="overview-action-empty">{copy.overview.emptyLane}</div>
+      )}
+    </section>
+  );
+}
+
 export function WorkspaceOverview({
   tasks,
   members,
   now,
+  locale,
   copy,
   dueText,
   onOpenTask,
+  onQuickUpdate,
   onBrowseTasks,
 }: {
   tasks: Task[];
   members: Member[];
   now: Date;
+  locale: AppLocale;
   copy: UiCopy;
   dueText: (value: string, copy: UiCopy) => string;
   onOpenTask: (task: Task) => void;
+  onQuickUpdate: (task: Task) => void;
   onBrowseTasks: () => void;
 }) {
-  const active = useMemo(
-    () => tasks.filter((task) => task.status !== "done" && !isArchived(task)),
-    [tasks],
+  const active = useMemo(() => getActiveTasks(tasks), [tasks]);
+  const taskMap = useMemo(() => new Map(tasks.map((task) => [task.id, task])), [tasks]);
+  const openTasks = useMemo(
+    () => active.filter((task) => task.status !== "done"),
+    [active],
   );
+  const todayTasks = useMemo(
+    () =>
+      active.filter(
+        (task) =>
+          !isSnoozed(task, now) &&
+          task.status !== "done" &&
+          (isDueToday(task, now) || isOverdue(task, now) || task.priority === "urgent"),
+      ),
+    [active, now],
+  );
+  const actionableTasks = useMemo(
+    () => active.filter((task) => task.status !== "done" && !isSnoozed(task, now)),
+    [active, now],
+  );
+  const reviewTasks = useMemo(
+    () => actionableTasks.filter((task) => task.status === "review"),
+    [actionableTasks],
+  );
+  const blockedTasks = useMemo(
+    () =>
+      actionableTasks.filter(
+        (task) =>
+          task.status !== "done" &&
+          (task.status === "blocked" ||
+            getDependencyState(task, taskMap) === "blocked"),
+      ),
+    [actionableTasks, taskMap],
+  );
+  const overdueTasks = useMemo(
+    () => actionableTasks.filter((task) => isOverdue(task, now)),
+    [actionableTasks, now],
+  );
+  const nextTask = useMemo(() => {
+    const candidates = actionableTasks;
+    return [...candidates].sort((a, b) => {
+      const aDependency = getDependencyState(a, taskMap);
+      const bDependency = getDependencyState(b, taskMap);
+      const aBlocked = a.status === "blocked" || aDependency === "blocked";
+      const bBlocked = b.status === "blocked" || bDependency === "blocked";
+      return (
+        Number(aBlocked) - Number(bBlocked) ||
+        Number(b.status === "review") - Number(a.status === "review") ||
+        Number(isOverdue(b, now)) - Number(isOverdue(a, now)) ||
+        priorityRank[a.priority] - priorityRank[b.priority] ||
+        getNextAction(b, tasks, now).score - getNextAction(a, tasks, now).score ||
+        new Date(a.deadline || "9999-12-31").getTime() -
+          new Date(b.deadline || "9999-12-31").getTime()
+      );
+    })[0];
+  }, [actionableTasks, now, taskMap, tasks]);
   const statusSummary = useMemo(
     () =>
       Object.entries(copy.status).map(([status, label]) => ({
         status: status as Status,
         label,
-        count: tasks.filter((task) => task.status === status).length,
+        count: active.filter((task) => task.status === status).length,
       })),
-    [copy.status, tasks],
+    [active, copy.status],
   );
   const creationActivity = useMemo(() => {
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const formatter = new Intl.DateTimeFormat(intlLocale[locale], {
+      weekday: "short",
+    });
+    const dateFormatter = new Intl.DateTimeFormat(intlLocale[locale], {
+      day: "2-digit",
+      month: "2-digit",
+    });
     return Array.from({ length: 14 }, (_, index) => {
       const day = new Date(today);
       day.setDate(day.getDate() - (13 - index));
@@ -60,132 +225,211 @@ export function WorkspaceOverview({
       next.setDate(next.getDate() + 1);
       return {
         key: day.toISOString(),
-        label: new Intl.DateTimeFormat("vi-VN", { weekday: "short" })
-          .format(day)
-          .replace(".", ""),
-        date: new Intl.DateTimeFormat("vi-VN", {
-          day: "2-digit",
-          month: "2-digit",
-        }).format(day),
+        label: formatter.format(day).replace(".", ""),
+        date: dateFormatter.format(day),
         count: tasks.filter((task) => {
           const created = new Date(task.created_at).getTime();
           return created >= day.getTime() && created < next.getTime();
         }).length,
       };
     });
-  }, [now, tasks]);
+  }, [locale, now, tasks]);
   const maxCreated = Math.max(...creationActivity.map((item) => item.count), 1);
-  const attentionTasks = useMemo(
-    () =>
-      [...active]
-        .sort(
-          (a, b) =>
-            ({ urgent: 0, high: 1, medium: 2, low: 3 })[a.priority] -
-              { urgent: 0, high: 1, medium: 2, low: 3 }[b.priority] ||
-            new Date(a.deadline || "9999-12-31").getTime() -
-              new Date(b.deadline || "9999-12-31").getTime(),
-        )
-        .slice(0, 4),
-    [active],
-  );
   const workload = useMemo(
     () =>
       members
         .map((member) => {
-          const assigned = active.filter((task) =>
+          const assigned = openTasks.filter((task) =>
             taskAssigneeIds(task).includes(member.id),
           );
           return {
             member,
             total: assigned.length,
             urgent: assigned.filter((task) => task.priority === "urgent").length,
-            overdue: assigned.filter(
-              (task) =>
-                task.deadline && new Date(task.deadline).getTime() < now.getTime(),
-            ).length,
+            overdue: assigned.filter((task) => isOverdue(task, now)).length,
           };
         })
         .filter((item) => item.total > 0)
         .sort((a, b) => b.total - a.total || b.overdue - a.overdue),
-    [active, members, now],
+    [members, now, openTasks],
   );
-  const attentionCount = active.filter(
-    (task) =>
-      task.priority === "urgent" ||
-      task.severity === "critical" ||
-      taskAssigneeIds(task).length === 0 ||
-      (task.deadline && new Date(task.deadline).getTime() < now.getTime()),
-  ).length;
-  const dueSoonCount = active.filter(
-    (task) =>
-      task.deadline && new Date(task.deadline).getTime() - now.getTime() < 4 * 86400000,
-  ).length;
+  const nextAction = nextTask ? getNextAction(nextTask, tasks, now) : null;
+  const nextActionCopy =
+    nextTask && nextAction ? localizeNextAction(nextTask, nextAction.key, copy) : null;
+  const visibleTasks = active;
+  const completedCount = visibleTasks.filter((task) => task.status === "done").length;
+  const progress = visibleTasks.length
+    ? Math.round((completedCount / visibleTasks.length) * 100)
+    : 0;
 
   return (
     <>
-      <div className="stats-grid">
+      <section className="overview-next-action panel">
+        <div className="overview-next-action-copy">
+          <span className="eyebrow">
+            <Flame size={14} /> {copy.overview.nextAction}
+          </span>
+          {nextTask && nextAction && nextActionCopy ? (
+            <>
+              <h2>{nextTask.title}</h2>
+              <p>
+                <b>{nextTask.code || "TASK"}</b> · {nextActionCopy.reason}
+              </p>
+              <div className="overview-next-action-meta">
+                <span className={`pill priority-${nextTask.priority}`}>
+                  {copy.priority[nextTask.priority]}
+                </span>
+                <span className={`status status-${nextTask.status}`}>
+                  <i /> {copy.status[nextTask.status]}
+                </span>
+                {nextTask.deadline && (
+                  <span className="overview-deadline">
+                    <Clock3 size={14} /> {dueText(nextTask.deadline, copy)}
+                  </span>
+                )}
+              </div>
+              <div className="overview-next-action-buttons">
+                <button
+                  className="primary-button"
+                  onClick={() => onQuickUpdate(nextTask)}
+                  type="button"
+                >
+                  <CirclePlay size={16} /> {nextActionCopy.label}
+                </button>
+                <button
+                  className="secondary-button"
+                  onClick={() => onOpenTask(nextTask)}
+                  type="button"
+                >
+                  Xem chi tiết <ArrowRight size={15} />
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <h2>{copy.overview.noWorkTitle}</h2>
+              <p>{copy.overview.noWorkDescription}</p>
+              <button
+                className="secondary-button"
+                onClick={onBrowseTasks}
+                type="button"
+              >
+                <ListChecks size={16} /> {copy.overview.browseTasks}
+              </button>
+            </>
+          )}
+        </div>
+        <div className="overview-next-action-score">
+          <span>{copy.overview.progress}</span>
+          <strong>{progress}%</strong>
+          <div className="progress-track">
+            <i style={{ width: `${progress}%` }} />
+          </div>
+          <small>
+            {completedCount} / {visibleTasks.length} task
+          </small>
+        </div>
+      </section>
+
+      <div className="overview-stats-grid">
         <div className="stat-card">
           <div className="stat-label">
-            Đang thực hiện{" "}
+            {copy.overview.today}{" "}
             <span className="stat-icon blue-bg">
-              <Activity size={17} />
+              <CalendarCheck size={17} />
             </span>
           </div>
           <strong>
-            {active.filter((task) => task.status === "in_progress").length}
+            {todayTasks.length}
             <small> task</small>
           </strong>
-          <span className="stat-foot">trên {tasks.length} công việc</span>
+          <span className="stat-foot">{copy.overview.todayFoot}</span>
         </div>
         <div className="stat-card">
           <div className="stat-label">
-            Cần chú ý{" "}
-            <span className="stat-icon orange-bg">
-              <AlertTriangle size={17} />
-            </span>
-          </div>
-          <strong>
-            {attentionCount}
-            <small> task</small>
-          </strong>
-          <span className="stat-foot">khẩn, quá hạn hoặc chưa giao</span>
-        </div>
-        <div className="stat-card">
-          <div className="stat-label">
-            Sắp đến hạn{" "}
+            {copy.overview.review}{" "}
             <span className="stat-icon purple-bg">
-              <Clock3 size={17} />
+              <Eye size={17} />
             </span>
           </div>
           <strong>
-            {dueSoonCount}
+            {reviewTasks.length}
             <small> task</small>
           </strong>
-          <span className="stat-foot">trong 3 ngày tới hoặc quá hạn</span>
+          <span className="stat-foot">{copy.overview.reviewFoot}</span>
         </div>
         <div className="stat-card">
           <div className="stat-label">
-            Đã hoàn tất{" "}
+            {copy.overview.blocked}{" "}
+            <span className="stat-icon orange-bg">
+              <Ban size={17} />
+            </span>
+          </div>
+          <strong>
+            {blockedTasks.length}
+            <small> task</small>
+          </strong>
+          <span className="stat-foot">{copy.overview.blockedFoot}</span>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">
+            {copy.overview.done}{" "}
             <span className="stat-icon green-bg">
               <CheckCheck size={17} />
             </span>
           </div>
           <strong>
-            {tasks.filter((task) => task.status === "done").length}
+            {completedCount}
             <small> task</small>
           </strong>
-          <span className="stat-foot">hoàn thành tổng thể</span>
+          <span className="stat-foot">
+            {copy.overview.doneFoot(completedCount, visibleTasks.length)}
+          </span>
         </div>
       </div>
-      <div className="overview-grid">
+
+      <div className="overview-action-grid">
+        <ActionLane
+          title={copy.overview.reviewLane}
+          description={copy.overview.reviewLaneDescription}
+          icon={<Eye size={17} />}
+          tone="review"
+          tasks={reviewTasks}
+          copy={copy}
+          dueText={dueText}
+          onOpenTask={onOpenTask}
+        />
+        <ActionLane
+          title={copy.overview.blockedLane}
+          description={copy.overview.blockedLaneDescription}
+          icon={<Ban size={17} />}
+          tone="blocked"
+          tasks={blockedTasks}
+          copy={copy}
+          dueText={dueText}
+          onOpenTask={onOpenTask}
+        />
+        <ActionLane
+          title={copy.overview.overdueLane}
+          description={copy.overview.overdueLaneDescription}
+          icon={<AlertTriangle size={17} />}
+          tone="overdue"
+          tasks={overdueTasks}
+          copy={copy}
+          dueText={dueText}
+          onOpenTask={onOpenTask}
+        />
+      </div>
+
+      <div className="overview-grid overview-secondary-grid">
         <section className="panel status-chart">
           <div className="panel-heading">
             <div>
-              <h2>Tiến độ công việc</h2>
-              <p>Phân bổ task theo trạng thái</p>
+              <h2>{copy.overview.flowTitle}</h2>
+              <p>{copy.overview.flowDescription}</p>
             </div>
             <span className="round-icon">
-              <Activity size={17} />
+              <ListChecks size={17} />
             </span>
           </div>
           <div className="chart-bars">
@@ -202,7 +446,7 @@ export function WorkspaceOverview({
                   <span
                     className={`chart-fill fill-${item.status}`}
                     style={{
-                      width: `${tasks.length ? Math.max((item.count / tasks.length) * 100, item.count ? 8 : 0) : 0}%`,
+                      width: `${active.length ? Math.max((item.count / active.length) * 100, item.count ? 8 : 0) : 0}%`,
                     }}
                   />
                 </div>
@@ -213,11 +457,11 @@ export function WorkspaceOverview({
         <section className="panel creation-chart">
           <div className="panel-heading">
             <div>
-              <h2>Nhịp tạo task</h2>
-              <p>Số task được tạo trong 14 ngày gần nhất</p>
+              <h2>{copy.overview.activityTitle}</h2>
+              <p>{copy.overview.activityDescription}</p>
             </div>
             <span className="round-icon">
-              <Activity size={17} />
+              <Clock3 size={17} />
             </span>
           </div>
           <div className="creation-chart-grid">
@@ -240,58 +484,22 @@ export function WorkspaceOverview({
           </div>
           <div className="creation-chart-foot">
             <span>
-              <b>{creationActivity.reduce((sum, item) => sum + item.count, 0)}</b> task
-              mới trong 14 ngày
+              {copy.overview.activityTotal(
+                creationActivity.reduce((sum, item) => sum + item.count, 0),
+              )}
             </span>
             <span>
-              Ngày cao nhất:{" "}
-              <b>{Math.max(...creationActivity.map((item) => item.count))}</b>
+              {copy.overview.peakDay(
+                Math.max(...creationActivity.map((item) => item.count)),
+              )}
             </span>
           </div>
-        </section>
-        <section className="panel attention-panel">
-          <div className="panel-heading">
-            <div>
-              <h2>Cần xử lý trước</h2>
-              <p>Ưu tiên cao và task đang mở</p>
-            </div>
-            <button className="text-button" onClick={onBrowseTasks}>
-              <ArrowDownUp size={15} /> Mở danh sách
-            </button>
-          </div>
-          {attentionTasks.length ? (
-            <div className="attention-list">
-              {attentionTasks.map((task) => (
-                <button
-                  className="attention-row"
-                  key={task.id}
-                  onClick={() => onOpenTask(task)}
-                >
-                  <span className={`pill priority-${task.priority}`}>
-                    {copy.priority[task.priority]}
-                  </span>
-                  <span>
-                    <b>
-                      {task.code || "TASK"} · {task.title}
-                    </b>
-                    <small>
-                      {copy.status[task.status]} ·{" "}
-                      {task.deadline ? dueText(task.deadline, copy) : copy.due.unset}
-                    </small>
-                  </span>
-                  <ChevronDown size={15} />
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className="empty-small">Không có task cần xử lý.</div>
-          )}
         </section>
         <section className="panel workload-panel">
           <div className="panel-heading">
             <div>
-              <h2>Tải công việc</h2>
-              <p>Task đang mở theo người phụ trách</p>
+              <h2>{copy.overview.teamTitle}</h2>
+              <p>{copy.overview.teamDescription}</p>
             </div>
             <span className="round-icon">
               <Users size={17} />
@@ -318,7 +526,7 @@ export function WorkspaceOverview({
               ))}
             </div>
           ) : (
-            <div className="empty-small">Chưa có task đang mở theo người.</div>
+            <div className="empty-small">{copy.overview.noOpenByMember}</div>
           )}
         </section>
       </div>

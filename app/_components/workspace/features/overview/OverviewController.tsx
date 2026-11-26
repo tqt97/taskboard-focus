@@ -9,16 +9,19 @@ const WorkspaceOverview = dynamic(
 );
 
 export function OverviewController() {
-  const { data, now, copy, dueText, onOpenTask, onBrowseTasks } = useWorkspaceRuntime();
+  const { data, now, locale, copy, dueText, onOpenTask, onQuickUpdate, onBrowseTasks } =
+    useWorkspaceRuntime();
 
   return (
     <WorkspaceOverview
       tasks={data.tasks}
       members={data.members}
       now={now}
+      locale={locale}
       copy={copy}
       dueText={dueText}
       onOpenTask={onOpenTask}
+      onQuickUpdate={onQuickUpdate}
       onBrowseTasks={onBrowseTasks}
     />
   );

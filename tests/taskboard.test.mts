@@ -269,8 +269,12 @@ test("next action engine prioritizes dependency and review decisions", () => {
     status: "in_progress" as const,
     blocked_by: [],
   };
-  assert.equal(getNextAction(task, [task, dependency]).label, "Theo dõi dependency");
-  assert.equal(getNextAction({ ...task, blocked_by: [] }, [task]).label, "Review task");
+  assert.equal(getNextAction(task, [task, dependency]).key, "follow_dependency");
+  assert.equal(getNextAction({ ...task, blocked_by: [] }, [task]).key, "review");
+  assert.equal(
+    getNextAction({ ...task, status: "blocked", blocked_by: [] }, [task]).key,
+    "resolve_dependency",
+  );
 });
 
 test("activity diff and import merge preserve local choices", () => {

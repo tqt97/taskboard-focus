@@ -53,6 +53,7 @@ export type WorkspaceRuntimeValue = {
   dueFilter: string;
   setDueFilter: (value: string) => void;
   onOpenTask: (task: Task) => void;
+  onQuickUpdate: (task: Task) => void;
   onBrowseTasks: () => void;
   onUpdateDeadline: (task: Task, deadline: Date) => void;
   dueText: (value: string, copy: UiCopy) => string;

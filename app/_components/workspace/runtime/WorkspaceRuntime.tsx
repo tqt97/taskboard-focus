@@ -1844,6 +1844,7 @@ export default function WorkspaceRuntime({
       setEdit(task);
       setModal("task");
     },
+    onQuickUpdate: quickUpdateStatus,
     onBrowseTasks: () => router.push("/tasks"),
     onUpdateDeadline: updateTaskDeadline,
     dueText,
@@ -2187,14 +2188,16 @@ export default function WorkspaceRuntime({
                 displayName={displayName}
               />
               <div className="page-actions">
-                <button
-                  className="secondary-button quick-capture-trigger"
-                  disabled={!canEditWorkspace}
-                  title="Ghi nhanh task (N)"
-                  onClick={() => setModal("quick-capture")}
-                >
-                  <Plus size={16} /> Ghi nhanh <kbd>N</kbd>
-                </button>
+                {view !== "overview" && (
+                  <button
+                    className="secondary-button quick-capture-trigger"
+                    disabled={!canEditWorkspace}
+                    title="Ghi nhanh task (N)"
+                    onClick={() => setModal("quick-capture")}
+                  >
+                    <Plus size={16} /> Ghi nhanh <kbd>N</kbd>
+                  </button>
+                )}
                 {(view === "tasks" || view === "today" || view === "inbox") && (
                   <>
                     {templates.length > 0 && (
