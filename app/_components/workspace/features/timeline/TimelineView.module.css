@@ -1,0 +1,346 @@
+.timelineScope {
+  display: contents;
+}
+
+.timelineScope :global(.timeline-view) {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.timelineScope :global(.timeline-toolbar),
+.timelineScope :global(.timeline-period-bar),
+.timelineScope :global(.timeline-legend) {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.timelineScope :global(.timeline-toolbar) {
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+.timelineScope :global(.timeline-mode-switch) {
+  display: inline-flex;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface2);
+}
+.timelineScope :global(.timeline-mode-switch button) {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  border-radius: 7px;
+  padding: 8px 10px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+.timelineScope :global(.timeline-mode-switch button.selected) {
+  background: var(--surface);
+  color: var(--accent);
+  box-shadow: 0 1px 3px rgb(31 42 68 / 8%);
+}
+.timelineScope :global(.timeline-filters) {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.timelineScope :global(.timeline-filters label) {
+  display: grid;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+}
+.timelineScope :global(.timeline-filters .ui-select) {
+  min-width: 130px;
+}
+.timelineScope :global(.timeline-filters .ui-select-trigger) {
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--text);
+  padding: 8px 10px;
+  font-size: 12px;
+}
+.timelineScope :global(.timeline-period-bar) {
+  min-height: 38px;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.timelineScope :global(.timeline-period-bar strong) {
+  min-width: 170px;
+  color: var(--text);
+  font-size: 13px;
+  text-align: center;
+}
+.timelineScope :global(.timeline-today) {
+  padding: 7px 10px;
+  font-size: 11px;
+}
+.timelineScope :global(.timeline-drag-hint) {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-left: auto;
+  min-height: 30px;
+  padding: 3px 9px 3px 5px;
+  border-left: 3px solid var(--accent);
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--accent) 5%, var(--surface));
+  font-size: 10px;
+}
+.timelineScope :global(.timeline-drag-icon) {
+  display: inline-grid;
+  width: 23px;
+  height: 23px;
+  place-items: center;
+  border-radius: 5px;
+  background: var(--accent-tint);
+  color: var(--accent);
+}
+.timelineScope :global(.timeline-drag-copy) {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  min-width: 0;
+}
+.timelineScope :global(.timeline-drag-copy strong) {
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 800;
+}
+.timelineScope :global(.timeline-drag-copy > span) {
+  color: var(--muted);
+}
+.timelineScope :global(.calendar-grid) {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(110px, 1fr));
+  min-width: 770px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.timelineScope :global(.calendar-day) {
+  min-height: 310px;
+  background: var(--surface);
+  border-right: 1px solid var(--line);
+}
+.timelineScope :global(.calendar-day:last-child) {
+  border-right: 0;
+}
+.timelineScope :global(.calendar-day.today),
+.timelineScope :global(.release-day-heading.today),
+.timelineScope :global(.release-day-cell.today) {
+  background: color-mix(in srgb, var(--accent) 6%, var(--surface));
+}
+.timelineScope :global(.calendar-day-heading) {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+.timelineScope :global(.calendar-day-heading b) {
+  color: var(--text);
+  font-size: 18px;
+}
+.timelineScope :global(.calendar-events) {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  padding: 8px;
+}
+.timelineScope :global(.calendar-event),
+.timelineScope :global(.release-milestone) {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  min-width: 0;
+  border: 1px solid color-mix(in srgb, var(--milestone-color) 25%, var(--line));
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--milestone-color) 8%, var(--surface));
+  color: var(--text);
+  padding: 7px;
+  text-align: left;
+}
+.timelineScope :global(.calendar-event[draggable="true"]),
+.timelineScope :global(.release-milestone[draggable="true"]) {
+  cursor: grab;
+}
+.timelineScope :global(.calendar-event.milestone-not-draggable),
+.timelineScope :global(.release-milestone.milestone-not-draggable) {
+  cursor: not-allowed;
+  opacity: 0.78;
+}
+.timelineScope :global(.calendar-event:active),
+.timelineScope :global(.release-milestone:active) {
+  cursor: grabbing;
+}
+.timelineScope :global(.calendar-event i),
+.timelineScope :global(.release-milestone i),
+.timelineScope :global(.milestone-dot) {
+  display: block;
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--milestone-color);
+}
+.timelineScope :global(.calendar-event span) {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+.timelineScope :global(.calendar-event b),
+.timelineScope :global(.calendar-event small) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.timelineScope :global(.calendar-event b) {
+  font-size: 10px;
+}
+.timelineScope :global(.calendar-event small) {
+  color: var(--milestone-color);
+  font-size: 9px;
+  font-weight: 800;
+}
+.timelineScope :global(.calendar-empty) {
+  padding: 8px 4px;
+  color: #b4bcc8;
+  font-size: 11px;
+  text-align: center;
+}
+.timelineScope :global(.release-timeline) {
+  min-width: 980px;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.timelineScope :global(.release-timeline-header),
+.timelineScope :global(.release-timeline-row) {
+  display: grid;
+  grid-template-columns: 240px repeat(var(--timeline-days), minmax(48px, 1fr));
+}
+.timelineScope :global(.release-timeline-header) {
+  border-bottom: 1px solid var(--line);
+  background: var(--surface2);
+}
+.timelineScope :global(.release-task-heading),
+.timelineScope :global(.release-day-heading) {
+  padding: 10px 8px;
+  border-right: 1px solid var(--line);
+}
+.timelineScope :global(.release-task-heading) {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+.timelineScope :global(.release-day-heading) {
+  display: grid;
+  gap: 3px;
+  color: var(--muted);
+  font-size: 9px;
+  text-align: center;
+  text-transform: uppercase;
+}
+.timelineScope :global(.release-day-heading b) {
+  color: var(--text);
+  font-size: 13px;
+}
+.timelineScope :global(.release-timeline-row) {
+  min-height: 66px;
+  border-bottom: 1px solid var(--line);
+}
+.timelineScope :global(.release-timeline-row:last-child) {
+  border-bottom: 0;
+}
+.timelineScope :global(.release-task-name) {
+  display: grid;
+  align-content: center;
+  gap: 5px;
+  min-width: 0;
+  border: 0;
+  border-right: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+  padding: 8px 10px;
+  text-align: left;
+}
+.timelineScope :global(.release-task-name > span) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+}
+.timelineScope :global(.release-task-name b) {
+  color: var(--accent);
+}
+.timelineScope :global(.release-task-name small) {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.timelineScope :global(.release-day-cell) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  border-right: 1px solid var(--line);
+  background: var(--surface);
+  flex-direction: column;
+  gap: 2px;
+}
+.timelineScope :global(.release-day-cell:last-child),
+.timelineScope :global(.release-day-heading:last-child) {
+  border-right: 0;
+}
+.timelineScope :global(.release-milestone) {
+  justify-content: center;
+  width: calc(100% - 8px);
+  padding: 5px 3px;
+}
+.timelineScope :global(.release-milestone span) {
+  overflow: hidden;
+  color: var(--milestone-color);
+  font-size: 8px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.timelineScope :global(.timeline-empty) {
+  padding: 35px;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+.timelineScope :global(.timeline-legend) {
+  flex-wrap: wrap;
+  color: var(--muted);
+  font-size: 10px;
+}
+.timelineScope :global(.timeline-legend > span) {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.timelineScope :global(.timeline-result-count) {
+  margin-left: auto;
+  font-weight: 700;
+}

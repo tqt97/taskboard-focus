@@ -1,5 +1,6 @@
 "use client";
 
+import styles from "./TimelineView.module.css";
 import { Button } from "@/app/_components/ui/Button";
 import { useMemo, useRef, useState } from "react";
 import {
@@ -228,255 +229,268 @@ export function TimelineView({
   };
 
   return (
-    <section className="timeline-view panel" aria-label={labels.aria}>
-      <div className="timeline-toolbar">
-        <div className="timeline-mode-switch" role="tablist" aria-label="Kiểu hiển thị">
-          <Button
-            className={mode === "calendar" ? "selected" : ""}
-            role="tab"
-            id="timeline-tab-calendar"
-            aria-controls="timeline-panel-calendar"
-            aria-selected={mode === "calendar"}
-            tabIndex={mode === "calendar" ? 0 : -1}
-            ref={(element) => {
-              modeTabRefs.current[0] = element;
-            }}
-            onKeyDown={handleModeTabKeyDown}
-            onClick={() => setMode("calendar")}
+    <div className={styles.timelineScope}>
+      <section className="timeline-view panel" aria-label={labels.aria}>
+        <div className="timeline-toolbar">
+          <div
+            className="timeline-mode-switch"
+            role="tablist"
+            aria-label="Kiểu hiển thị"
           >
-            <CalendarRange size={15} /> {labels.calendar}
-          </Button>
-          <Button
-            className={mode === "timeline" ? "selected" : ""}
-            role="tab"
-            id="timeline-tab-timeline"
-            aria-controls="timeline-panel-timeline"
-            aria-selected={mode === "timeline"}
-            tabIndex={mode === "timeline" ? 0 : -1}
-            ref={(element) => {
-              modeTabRefs.current[1] = element;
-            }}
-            onKeyDown={handleModeTabKeyDown}
-            onClick={() => setMode("timeline")}
-          >
-            <GitBranch size={15} /> {labels.timeline}
-          </Button>
-        </div>
-        <div className="timeline-filters">
-          <label>
-            <span>{labels.assignee}</span>
-            <Select
-              aria-label={labels.assignee}
-              value={assignee}
-              options={[
-                { value: "all", label: labels.all },
-                ...members
-                  .filter((member) => member.active)
-                  .map((member) => ({ value: member.id, label: member.name })),
-              ]}
-              onValueChange={setAssignee}
-            />
-          </label>
-          <label>
-            <span>{labels.milestone}</span>
-            <Select
-              aria-label={labels.milestone}
-              value={milestoneFilter}
-              options={[
-                { value: "all", label: labels.allMilestones },
-                ...milestones.map((milestone) => ({
-                  value: milestone.key,
-                  label: milestone.label,
-                })),
-              ]}
-              onValueChange={(value) => setMilestoneFilter(value as MilestoneFilter)}
-            />
-          </label>
-        </div>
-      </div>
-      <div className="timeline-period-bar">
-        <Button
-          variant="icon"
-          className="mini"
-          title={labels.previous}
-          aria-label={labels.previous}
-          onClick={() => moveCursor(-1)}
-        >
-          <ChevronLeft size={16} />
-        </Button>
-        <strong>
-          {formatDate(days[0], { day: "2-digit", month: "short" }, locale)} —{" "}
-          {formatDate(
-            days[days.length - 1],
-            {
-              day: "2-digit",
-              month: "short",
-              year: "numeric",
-            },
-            locale,
-          )}
-        </strong>
-        <Button
-          variant="icon"
-          className="mini"
-          title={labels.next}
-          aria-label={labels.next}
-          onClick={() => moveCursor(1)}
-        >
-          <ChevronRight size={16} />
-        </Button>
-        <Button
-          variant="secondary"
-          className="timeline-today"
-          onClick={() => setCursor(startOfWeek(new Date()))}
-        >
-          {labels.today}
-        </Button>
-        <span className="timeline-drag-hint">
-          <span className="timeline-drag-icon" aria-hidden="true">
-            <Move size={13} />
-          </span>
-          <span className="timeline-drag-copy">
-            <strong>
-              {(readOnly ? labels.readOnlyDragHint : labels.dragHint).lead}
-            </strong>
-            <span>{(readOnly ? labels.readOnlyDragHint : labels.dragHint).body}</span>
-          </span>
-        </span>
-      </div>
-      {mode === "calendar" ? (
-        <div
-          className="calendar-grid"
-          role="tabpanel"
-          id="timeline-panel-calendar"
-          aria-labelledby="timeline-tab-calendar"
-          tabIndex={0}
-        >
-          {days.map((day) => (
-            <div
-              className={`calendar-day${dateKey(day) === dateKey(new Date()) ? " today" : ""}`}
-              key={dateKey(day)}
-              onDragOver={(event) => {
-                if (draggedTaskId) event.preventDefault();
+            <Button
+              className={mode === "calendar" ? "selected" : ""}
+              role="tab"
+              id="timeline-tab-calendar"
+              aria-controls="timeline-panel-calendar"
+              aria-selected={mode === "calendar"}
+              tabIndex={mode === "calendar" ? 0 : -1}
+              ref={(element) => {
+                modeTabRefs.current[0] = element;
               }}
-              onDrop={() => dropDeadline(day)}
+              onKeyDown={handleModeTabKeyDown}
+              onClick={() => setMode("calendar")}
             >
-              <div className="calendar-day-heading">
-                <span>{formatDate(day, { weekday: "short" }, locale)}</span>
-                <b>{formatDate(day, { day: "2-digit" }, locale)}</b>
-              </div>
-              <div className="calendar-events">
-                {visibleTasks.flatMap((task) =>
-                  eventsForDay(task, day).map((milestone) => (
-                    <Button
-                      className={`calendar-event milestone-${milestone.key}${milestone.key === "deadline" && !readOnly ? "" : " milestone-not-draggable"}`}
-                      key={`${task.id}-${milestone.key}`}
-                      draggable={milestone.key === "deadline" && !readOnly}
-                      onDragStart={(event) => handleDragStart(task, event)}
-                      onClick={() => onOpenTask(task)}
-                      title={`${task.code || "TASK"} · ${milestone.label}${milestone.key === "deadline" ? "" : ` · ${labels.openDetails}`}`}
-                      aria-label={`${task.code || "TASK"} ${milestone.label}${milestone.key === "deadline" ? "" : `, ${labels.openDetails}`}`}
-                    >
-                      <i />
-                      <span>
-                        <b>{task.code || "TASK"}</b>
-                        <small>{milestone.short}</small>
-                      </span>
-                    </Button>
-                  )),
-                )}
-                {!visibleTasks.some((task) => eventsForDay(task, day).length) && (
-                  <span className="calendar-empty">—</span>
-                )}
-              </div>
-            </div>
-          ))}
+              <CalendarRange size={15} /> {labels.calendar}
+            </Button>
+            <Button
+              className={mode === "timeline" ? "selected" : ""}
+              role="tab"
+              id="timeline-tab-timeline"
+              aria-controls="timeline-panel-timeline"
+              aria-selected={mode === "timeline"}
+              tabIndex={mode === "timeline" ? 0 : -1}
+              ref={(element) => {
+                modeTabRefs.current[1] = element;
+              }}
+              onKeyDown={handleModeTabKeyDown}
+              onClick={() => setMode("timeline")}
+            >
+              <GitBranch size={15} /> {labels.timeline}
+            </Button>
+          </div>
+          <div className="timeline-filters">
+            <label>
+              <span>{labels.assignee}</span>
+              <Select
+                aria-label={labels.assignee}
+                value={assignee}
+                options={[
+                  { value: "all", label: labels.all },
+                  ...members
+                    .filter((member) => member.active)
+                    .map((member) => ({ value: member.id, label: member.name })),
+                ]}
+                onValueChange={setAssignee}
+              />
+            </label>
+            <label>
+              <span>{labels.milestone}</span>
+              <Select
+                aria-label={labels.milestone}
+                value={milestoneFilter}
+                options={[
+                  { value: "all", label: labels.allMilestones },
+                  ...milestones.map((milestone) => ({
+                    value: milestone.key,
+                    label: milestone.label,
+                  })),
+                ]}
+                onValueChange={(value) => setMilestoneFilter(value as MilestoneFilter)}
+              />
+            </label>
+          </div>
         </div>
-      ) : (
-        <div
-          className="release-timeline"
-          role="tabpanel"
-          id="timeline-panel-timeline"
-          aria-labelledby="timeline-tab-timeline"
-          tabIndex={0}
-          style={{ "--timeline-days": rangeLength } as React.CSSProperties}
-        >
-          <div className="release-timeline-header">
-            <div className="release-task-heading">{labels.taskDependency}</div>
+        <div className="timeline-period-bar">
+          <Button
+            variant="icon"
+            className="mini"
+            title={labels.previous}
+            aria-label={labels.previous}
+            onClick={() => moveCursor(-1)}
+          >
+            <ChevronLeft size={16} />
+          </Button>
+          <strong>
+            {formatDate(days[0], { day: "2-digit", month: "short" }, locale)} —{" "}
+            {formatDate(
+              days[days.length - 1],
+              {
+                day: "2-digit",
+                month: "short",
+                year: "numeric",
+              },
+              locale,
+            )}
+          </strong>
+          <Button
+            variant="icon"
+            className="mini"
+            title={labels.next}
+            aria-label={labels.next}
+            onClick={() => moveCursor(1)}
+          >
+            <ChevronRight size={16} />
+          </Button>
+          <Button
+            variant="secondary"
+            className="timeline-today"
+            onClick={() => setCursor(startOfWeek(new Date()))}
+          >
+            {labels.today}
+          </Button>
+          <span className="timeline-drag-hint">
+            <span className="timeline-drag-icon" aria-hidden="true">
+              <Move size={13} />
+            </span>
+            <span className="timeline-drag-copy">
+              <strong>
+                {(readOnly ? labels.readOnlyDragHint : labels.dragHint).lead}
+              </strong>
+              <span>{(readOnly ? labels.readOnlyDragHint : labels.dragHint).body}</span>
+            </span>
+          </span>
+        </div>
+        {mode === "calendar" ? (
+          <div
+            className="calendar-grid"
+            role="tabpanel"
+            id="timeline-panel-calendar"
+            aria-labelledby="timeline-tab-calendar"
+            tabIndex={0}
+          >
             {days.map((day) => (
               <div
-                className={`release-day-heading${dateKey(day) === dateKey(new Date()) ? " today" : ""}`}
+                className={`calendar-day${dateKey(day) === dateKey(new Date()) ? " today" : ""}`}
                 key={dateKey(day)}
+                onDragOver={(event) => {
+                  if (draggedTaskId) event.preventDefault();
+                }}
+                onDrop={() => dropDeadline(day)}
               >
-                <span>{formatDate(day, { weekday: "short" }, locale)}</span>
-                <b>{formatDate(day, { day: "2-digit" }, locale)}</b>
-              </div>
-            ))}
-          </div>
-          {visibleTasks.map((task) => {
-            const dependencies = (task.blocked_by || [])
-              .map((id) => tasks.find((item) => item.id === id))
-              .filter((item): item is Task => Boolean(item));
-            return (
-              <div className="release-timeline-row" key={task.id}>
-                <Button className="release-task-name" onClick={() => onOpenTask(task)}>
-                  <span>
-                    <b>{task.code || "TASK"}</b> · {task.title}
-                  </span>
-                  <small>
-                    {dependencies.length ? (
-                      <>
-                        <GitBranch size={11} /> {labels.dependency}:{" "}
-                        {dependencies.map((item) => item.code || item.title).join(", ")}
-                      </>
-                    ) : (
-                      <>
-                        <span className={`status-dot status-dot-${task.status}`} />{" "}
-                        {labels.noDependency}
-                      </>
-                    )}
-                  </small>
-                </Button>
-                {days.map((day) => (
-                  <div
-                    className={`release-day-cell${dateKey(day) === dateKey(new Date()) ? " today" : ""}`}
-                    key={dateKey(day)}
-                    onDragOver={(event) => {
-                      if (draggedTaskId) event.preventDefault();
-                    }}
-                    onDrop={() => dropDeadline(day)}
-                  >
-                    {eventsForDay(task, day).map((milestone) => (
+                <div className="calendar-day-heading">
+                  <span>{formatDate(day, { weekday: "short" }, locale)}</span>
+                  <b>{formatDate(day, { day: "2-digit" }, locale)}</b>
+                </div>
+                <div className="calendar-events">
+                  {visibleTasks.flatMap((task) =>
+                    eventsForDay(task, day).map((milestone) => (
                       <Button
-                        className={`release-milestone milestone-${milestone.key}${milestone.key === "deadline" && !readOnly ? "" : " milestone-not-draggable"}`}
+                        className={`calendar-event milestone-${milestone.key}${milestone.key === "deadline" && !readOnly ? "" : " milestone-not-draggable"}`}
                         key={`${task.id}-${milestone.key}`}
                         draggable={milestone.key === "deadline" && !readOnly}
                         onDragStart={(event) => handleDragStart(task, event)}
                         onClick={() => onOpenTask(task)}
-                        title={`${milestone.label}: ${task.title}${milestone.key === "deadline" ? "" : ` · ${labels.openDetails}`}`}
-                        aria-label={`${milestone.label}: ${task.title}${milestone.key === "deadline" ? "" : `, ${labels.openDetails}`}`}
+                        title={`${task.code || "TASK"} · ${milestone.label}${milestone.key === "deadline" ? "" : ` · ${labels.openDetails}`}`}
+                        aria-label={`${task.code || "TASK"} ${milestone.label}${milestone.key === "deadline" ? "" : `, ${labels.openDetails}`}`}
                       >
                         <i />
-                        <span>{milestone.short}</span>
+                        <span>
+                          <b>{task.code || "TASK"}</b>
+                          <small>{milestone.short}</small>
+                        </span>
                       </Button>
-                    ))}
-                  </div>
-                ))}
+                    )),
+                  )}
+                  {!visibleTasks.some((task) => eventsForDay(task, day).length) && (
+                    <span className="calendar-empty">—</span>
+                  )}
+                </div>
               </div>
-            );
-          })}
-          {!visibleTasks.length && <div className="timeline-empty">{labels.empty}</div>}
+            ))}
+          </div>
+        ) : (
+          <div
+            className="release-timeline"
+            role="tabpanel"
+            id="timeline-panel-timeline"
+            aria-labelledby="timeline-tab-timeline"
+            tabIndex={0}
+            style={{ "--timeline-days": rangeLength } as React.CSSProperties}
+          >
+            <div className="release-timeline-header">
+              <div className="release-task-heading">{labels.taskDependency}</div>
+              {days.map((day) => (
+                <div
+                  className={`release-day-heading${dateKey(day) === dateKey(new Date()) ? " today" : ""}`}
+                  key={dateKey(day)}
+                >
+                  <span>{formatDate(day, { weekday: "short" }, locale)}</span>
+                  <b>{formatDate(day, { day: "2-digit" }, locale)}</b>
+                </div>
+              ))}
+            </div>
+            {visibleTasks.map((task) => {
+              const dependencies = (task.blocked_by || [])
+                .map((id) => tasks.find((item) => item.id === id))
+                .filter((item): item is Task => Boolean(item));
+              return (
+                <div className="release-timeline-row" key={task.id}>
+                  <Button
+                    className="release-task-name"
+                    onClick={() => onOpenTask(task)}
+                  >
+                    <span>
+                      <b>{task.code || "TASK"}</b> · {task.title}
+                    </span>
+                    <small>
+                      {dependencies.length ? (
+                        <>
+                          <GitBranch size={11} /> {labels.dependency}:{" "}
+                          {dependencies
+                            .map((item) => item.code || item.title)
+                            .join(", ")}
+                        </>
+                      ) : (
+                        <>
+                          <span className={`status-dot status-dot-${task.status}`} />{" "}
+                          {labels.noDependency}
+                        </>
+                      )}
+                    </small>
+                  </Button>
+                  {days.map((day) => (
+                    <div
+                      className={`release-day-cell${dateKey(day) === dateKey(new Date()) ? " today" : ""}`}
+                      key={dateKey(day)}
+                      onDragOver={(event) => {
+                        if (draggedTaskId) event.preventDefault();
+                      }}
+                      onDrop={() => dropDeadline(day)}
+                    >
+                      {eventsForDay(task, day).map((milestone) => (
+                        <Button
+                          className={`release-milestone milestone-${milestone.key}${milestone.key === "deadline" && !readOnly ? "" : " milestone-not-draggable"}`}
+                          key={`${task.id}-${milestone.key}`}
+                          draggable={milestone.key === "deadline" && !readOnly}
+                          onDragStart={(event) => handleDragStart(task, event)}
+                          onClick={() => onOpenTask(task)}
+                          title={`${milestone.label}: ${task.title}${milestone.key === "deadline" ? "" : ` · ${labels.openDetails}`}`}
+                          aria-label={`${milestone.label}: ${task.title}${milestone.key === "deadline" ? "" : `, ${labels.openDetails}`}`}
+                        >
+                          <i />
+                          <span>{milestone.short}</span>
+                        </Button>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+            {!visibleTasks.length && (
+              <div className="timeline-empty">{labels.empty}</div>
+            )}
+          </div>
+        )}
+        <div className="timeline-legend" aria-label={labels.milestone}>
+          {milestones.map((milestone) => (
+            <span key={milestone.key}>
+              <i className={`milestone-dot milestone-${milestone.key}`} />{" "}
+              {milestone.label}
+            </span>
+          ))}
+          <span className="timeline-result-count">{visibleTasks.length} task</span>
         </div>
-      )}
-      <div className="timeline-legend" aria-label={labels.milestone}>
-        {milestones.map((milestone) => (
-          <span key={milestone.key}>
-            <i className={`milestone-dot milestone-${milestone.key}`} />{" "}
-            {milestone.label}
-          </span>
-        ))}
-        <span className="timeline-result-count">{visibleTasks.length} task</span>
-      </div>
-    </section>
+      </section>
+    </div>
   );
 }

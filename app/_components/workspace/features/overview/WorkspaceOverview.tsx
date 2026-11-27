@@ -1,5 +1,6 @@
 "use client";
 
+import styles from "./WorkspaceOverview.module.css";
 import { Button } from "@/app/_components/ui/Button";
 import {
   AlertTriangle,
@@ -264,7 +265,7 @@ export function WorkspaceOverview({
     : 0;
 
   return (
-    <>
+    <div className={styles.overviewScope}>
       <section className="overview-next-action panel">
         <div className="overview-next-action-copy">
           <span className="eyebrow">
@@ -527,6 +528,6 @@ export function WorkspaceOverview({
           )}
         </section>
       </div>
-    </>
+    </div>
   );
 }
