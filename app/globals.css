@@ -1565,7 +1565,7 @@
     font-size: 11px;
   }
   .settings-modal {
-    width: min(650px, 100%);
+    width: min(720px, 100%);
     height: min(620px, 90vh);
   }
   .settings-layout {
@@ -1675,6 +1675,22 @@
   .tiny-toggle.on {
     background: #e7f6ef;
     color: #31966d;
+  }
+  .member-status-toggle {
+    flex: 0 0 34px;
+    width: 34px;
+    height: 34px;
+    border-color: var(--line);
+  }
+  .member-status-toggle.active {
+    border-color: color-mix(in srgb, #31966d 35%, var(--line));
+    background: #e7f6ef;
+    color: #31966d;
+  }
+  .member-status-toggle:not(.active) {
+    border-color: color-mix(in srgb, var(--danger-text) 28%, var(--line));
+    background: var(--danger-bg);
+    color: var(--danger-text);
   }
   .add-member {
     display: flex;

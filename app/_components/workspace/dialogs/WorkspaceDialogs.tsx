@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import {
   AlertTriangle,
   Check,
+  CircleCheck,
+  CircleX,
   Download,
   Eye,
   EyeOff,
@@ -347,12 +349,22 @@ export function SettingsModal({
                     }
                   />
                   <Button
-                    className={m.active ? "tiny-toggle on" : "tiny-toggle"}
+                    variant="icon"
+                    className={
+                      m.active
+                        ? "mini member-status-toggle active"
+                        : "mini member-status-toggle"
+                    }
                     type="button"
+                    aria-label={
+                      m.active ? `Ẩn thành viên ${m.name}` : `Hiện thành viên ${m.name}`
+                    }
+                    aria-pressed={m.active}
+                    title={m.active ? "Ẩn thành viên" : "Hiện thành viên"}
                     disabled={!canManageMembers}
                     onClick={() => onMember({ ...m, active: !m.active })}
                   >
-                    {m.active ? "Đang hoạt động" : "Đã ẩn"}
+                    {m.active ? <CircleCheck size={16} /> : <CircleX size={16} />}
                   </Button>
                   {memberToDelete === m.id ? (
                     <>
