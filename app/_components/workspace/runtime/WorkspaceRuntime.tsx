@@ -402,7 +402,7 @@ export default function WorkspaceRuntime({
     dismissConflict,
   } = useBoardSync(data, setData, workspaceId);
   const cloudConfigured = isSupabaseConfigured;
-  const copy = getUiCopy(locale);
+  const copy = useMemo(() => getUiCopy(locale), [locale]);
   const reminderDueText = useCallback((value: string) => dueText(value, copy), [copy]);
   const currentWorkspaceRole = remoteWorkspaceRoles[workspaceId] || "owner";
   const currentWorkspaceName =
@@ -1108,26 +1108,26 @@ export default function WorkspaceRuntime({
       setToast(error instanceof Error ? error.message : "Không thể gửi lời mời.");
     }
   };
-  const toggleTaskSelection = (id: string) => {
+  const toggleTaskSelection = useCallback((id: string) => {
     setSelectedTaskIds((ids) =>
       ids.includes(id) ? ids.filter((item) => item !== id) : [...ids, id],
     );
-  };
-  const toggleSelectionMode = () => {
+  }, []);
+  const toggleSelectionMode = useCallback(() => {
     setSelectionMode((enabled) => {
       if (enabled) setSelectedTaskIds([]);
       return !enabled;
     });
-  };
-  const copyTaskCode = async (code: string) => {
+  }, []);
+  const copyTaskCode = useCallback(async (code: string) => {
     try {
       await navigator.clipboard.writeText(code);
       setToast(`Đã copy mã ${code}`);
     } catch {
       setToast("Không thể copy mã task; hãy thử lại trên HTTPS.");
     }
-  };
-  const saveCurrentView = () => {
+  }, []);
+  const saveCurrentView = useCallback(() => {
     const name = window.prompt("Tên view cần lưu", focusMode ? "Focus" : "Kanban");
     if (!name?.trim()) return;
     const view: SavedView = {
@@ -1149,21 +1149,34 @@ export default function WorkspaceRuntime({
     } else {
       setToast(`Đã lưu view “${view.name}”`);
     }
-  };
-  const applySavedView = (id: string) => {
-    setSelectedSavedViewId(id);
-    const view = savedViews.find((item) => item.id === id);
-    if (!view) return;
-    setSearch(view.search);
-    setStatusFilter(view.status);
-    setPriorityFilter(view.priority);
-    setAssigneeFilter(view.assignee);
-    setDueFilter(view.due);
-    setArchiveFilter(view.archive || "active");
-    setFocusMode(view.focus);
-    setAdvancedFiltersOpen(view.assignee !== "all" || view.due !== "all");
-  };
-  const deleteSavedView = () => {
+  }, [
+    archiveFilter,
+    assigneeFilter,
+    dueFilter,
+    focusMode,
+    priorityFilter,
+    savedViews,
+    search,
+    statusFilter,
+    workspaceId,
+  ]);
+  const applySavedView = useCallback(
+    (id: string) => {
+      setSelectedSavedViewId(id);
+      const view = savedViews.find((item) => item.id === id);
+      if (!view) return;
+      setSearch(view.search);
+      setStatusFilter(view.status);
+      setPriorityFilter(view.priority);
+      setAssigneeFilter(view.assignee);
+      setDueFilter(view.due);
+      setArchiveFilter(view.archive || "active");
+      setFocusMode(view.focus);
+      setAdvancedFiltersOpen(view.assignee !== "all" || view.due !== "all");
+    },
+    [savedViews],
+  );
+  const deleteSavedView = useCallback(() => {
     if (!selectedSavedViewId) return;
     const nextViews = savedViews.filter((item) => item.id !== selectedSavedViewId);
     setSavedViews(nextViews);
@@ -1175,8 +1188,11 @@ export default function WorkspaceRuntime({
       return;
     }
     setToast("Đã xóa bộ lọc đã lưu");
-  };
-  const rememberUndo = (message: string) => setUndoState({ data, message });
+  }, [savedViews, selectedSavedViewId, workspaceId]);
+  const rememberUndo = useCallback(
+    (message: string) => setUndoState({ data, message }),
+    [data],
+  );
   const undoLast = () => {
     if (!undoState) return;
     const timestamp = new Date().toISOString();
@@ -1189,42 +1205,48 @@ export default function WorkspaceRuntime({
     setUndoState(null);
     setToast(`Đã hoàn tác: ${undoState.message}`);
   };
-  const syncRemoteTasks = (tasks: Task[], members = data.members) => {
-    if (!cloudConfigured || !cloudUserEmail) return;
-    tasks.forEach((task) => void syncTask(task, "upsert", members));
-  };
-  const bulkUpdateTasks = (patch: Partial<Task>, message: string) => {
-    if (!canEditWorkspace) {
-      setToast("Bạn chỉ có quyền xem workspace này.");
-      return;
-    }
-    if (!selectedTaskIds.length) return;
-    rememberUndo(message);
-    const selected = new Set(selectedTaskIds);
-    const timestamp = new Date().toISOString();
-    const updatedTasks = data.tasks.map((task) =>
-      selected.has(task.id)
-        ? {
-            ...task,
-            ...patch,
-            updated_at: timestamp,
-            activity: [
-              ...(task.activity || []),
-              {
-                id: crypto.randomUUID(),
-                type: "updated" as const,
-                at: timestamp,
-                summary: message,
-              },
-            ].slice(-200),
-          }
-        : task,
-    );
-    setData((d) => ({ ...d, tasks: updatedTasks }));
-    syncRemoteTasks(updatedTasks.filter((task) => selected.has(task.id)));
-    setSelectedTaskIds([]);
-    setToast(message);
-  };
+  const syncRemoteTasks = useCallback(
+    (tasks: Task[], members = data.members) => {
+      if (!cloudConfigured || !cloudUserEmail) return;
+      tasks.forEach((task) => void syncTask(task, "upsert", members));
+    },
+    [cloudConfigured, cloudUserEmail, data.members, syncTask],
+  );
+  const bulkUpdateTasks = useCallback(
+    (patch: Partial<Task>, message: string) => {
+      if (!canEditWorkspace) {
+        setToast("Bạn chỉ có quyền xem workspace này.");
+        return;
+      }
+      if (!selectedTaskIds.length) return;
+      rememberUndo(message);
+      const selected = new Set(selectedTaskIds);
+      const timestamp = new Date().toISOString();
+      const updatedTasks = data.tasks.map((task) =>
+        selected.has(task.id)
+          ? {
+              ...task,
+              ...patch,
+              updated_at: timestamp,
+              activity: [
+                ...(task.activity || []),
+                {
+                  id: crypto.randomUUID(),
+                  type: "updated" as const,
+                  at: timestamp,
+                  summary: message,
+                },
+              ].slice(-200),
+            }
+          : task,
+      );
+      setData((d) => ({ ...d, tasks: updatedTasks }));
+      syncRemoteTasks(updatedTasks.filter((task) => selected.has(task.id)));
+      setSelectedTaskIds([]);
+      setToast(message);
+    },
+    [canEditWorkspace, data.tasks, rememberUndo, selectedTaskIds, syncRemoteTasks],
+  );
   const requestBrowserNotifications = async () => {
     if (!("Notification" in window)) {
       setToast("Trình duyệt này không hỗ trợ thông báo.");
@@ -1475,42 +1497,45 @@ export default function WorkspaceRuntime({
     setModal(null);
     setToast("Đã lưu bản nháp; bạn có thể phân loại sau.");
   };
-  const updateTaskDeadline = (task: Task, date: Date) => {
-    if (!canEditWorkspace) {
-      setToast("Bạn chỉ có quyền chỉnh deadline trong workspace này.");
-      return;
-    }
-    const timestamp = new Date().toISOString();
-    const nextDeadline = date.toISOString();
-    const nextTask: Task = {
-      ...task,
-      deadline: nextDeadline,
-      updated_at: timestamp,
-      activity: [
-        ...(task.activity || []),
-        {
-          id: crypto.randomUUID(),
-          type: "updated" as const,
-          at: timestamp,
-          summary: "Đã đổi deadline trên timeline",
-          changes: [
-            {
-              field: "Deadline",
-              from: task.deadline || "Chưa đặt",
-              to: nextDeadline,
-            },
-          ],
-        },
-      ].slice(-200),
-    };
-    rememberUndo("đổi deadline");
-    setData((current) => ({
-      ...current,
-      tasks: current.tasks.map((item) => (item.id === task.id ? nextTask : item)),
-    }));
-    syncRemoteTasks([nextTask]);
-    setToast(`Đã đổi deadline ${task.code || "task"}`);
-  };
+  const updateTaskDeadline = useCallback(
+    (task: Task, date: Date) => {
+      if (!canEditWorkspace) {
+        setToast("Bạn chỉ có quyền chỉnh deadline trong workspace này.");
+        return;
+      }
+      const timestamp = new Date().toISOString();
+      const nextDeadline = date.toISOString();
+      const nextTask: Task = {
+        ...task,
+        deadline: nextDeadline,
+        updated_at: timestamp,
+        activity: [
+          ...(task.activity || []),
+          {
+            id: crypto.randomUUID(),
+            type: "updated" as const,
+            at: timestamp,
+            summary: "Đã đổi deadline trên timeline",
+            changes: [
+              {
+                field: "Deadline",
+                from: task.deadline || "Chưa đặt",
+                to: nextDeadline,
+              },
+            ],
+          },
+        ].slice(-200),
+      };
+      rememberUndo("đổi deadline");
+      setData((current) => ({
+        ...current,
+        tasks: current.tasks.map((item) => (item.id === task.id ? nextTask : item)),
+      }));
+      syncRemoteTasks([nextTask]);
+      setToast(`Đã đổi deadline ${task.code || "task"}`);
+    },
+    [canEditWorkspace, rememberUndo, syncRemoteTasks],
+  );
   const { addComment: addTaskComment, toggleCommentPin: toggleTaskCommentPin } =
     useTaskMutations({
       data,
@@ -1519,55 +1544,58 @@ export default function WorkspaceRuntime({
       syncTasks: syncRemoteTasks,
       onError: setToast,
     });
-  const quickUpdateStatus = (task: Task) => {
-    if (!canEditWorkspace) {
-      setToast("Bạn chỉ có quyền xem workspace này.");
-      return;
-    }
-    const action = getPrimaryStatusAction(task);
-    const transition = resolveStatusTransition(
-      task.status,
-      action.target,
-      task.blocked_from,
-    );
-    if (!transition.allowed) {
-      setToast(`⚠️ ${transition.warning || "Không thể chuyển trạng thái task."}`);
-      return;
-    }
-    const nextStatus = transition.target;
-    const summary = transition.summary;
-    rememberUndo(summary);
-    const timestamp = new Date().toISOString();
-    const activity: TaskActivity = {
-      id: crypto.randomUUID(),
-      type: "status_changed",
-      at: timestamp,
-      summary,
-      changes: [
-        {
-          field: "Trạng thái",
-          from: labels[task.status],
-          to: labels[nextStatus],
-        },
-      ],
-    };
-    const nextTask: Task = {
-      ...task,
-      status: nextStatus,
-      snoozed_until: nextStatus === "done" ? undefined : task.snoozed_until,
-      ...(nextStatus === "blocked"
-        ? { blocked_from: transition.blocked_from }
-        : { blocked_from: undefined }),
-      updated_at: timestamp,
-      activity: [...(task.activity || []), activity].slice(-200),
-    };
-    setData((d) => ({
-      ...d,
-      tasks: d.tasks.map((current) => (current.id === task.id ? nextTask : current)),
-    }));
-    setToast(summary);
-    syncRemoteTasks([nextTask]);
-  };
+  const quickUpdateStatus = useCallback(
+    (task: Task) => {
+      if (!canEditWorkspace) {
+        setToast("Bạn chỉ có quyền xem workspace này.");
+        return;
+      }
+      const action = getPrimaryStatusAction(task);
+      const transition = resolveStatusTransition(
+        task.status,
+        action.target,
+        task.blocked_from,
+      );
+      if (!transition.allowed) {
+        setToast(`⚠️ ${transition.warning || "Không thể chuyển trạng thái task."}`);
+        return;
+      }
+      const nextStatus = transition.target;
+      const summary = transition.summary;
+      rememberUndo(summary);
+      const timestamp = new Date().toISOString();
+      const activity: TaskActivity = {
+        id: crypto.randomUUID(),
+        type: "status_changed",
+        at: timestamp,
+        summary,
+        changes: [
+          {
+            field: "Trạng thái",
+            from: labels[task.status],
+            to: labels[nextStatus],
+          },
+        ],
+      };
+      const nextTask: Task = {
+        ...task,
+        status: nextStatus,
+        snoozed_until: nextStatus === "done" ? undefined : task.snoozed_until,
+        ...(nextStatus === "blocked"
+          ? { blocked_from: transition.blocked_from }
+          : { blocked_from: undefined }),
+        updated_at: timestamp,
+        activity: [...(task.activity || []), activity].slice(-200),
+      };
+      setData((d) => ({
+        ...d,
+        tasks: d.tasks.map((current) => (current.id === task.id ? nextTask : current)),
+      }));
+      setToast(summary);
+      syncRemoteTasks([nextTask]);
+    },
+    [canEditWorkspace, labels, rememberUndo, syncRemoteTasks],
+  );
   const removeTask = (id: string) => {
     rememberUndo("lưu trữ task");
     const timestamp = new Date().toISOString();
@@ -1594,23 +1622,26 @@ export default function WorkspaceRuntime({
     setToast("Đã lưu trữ task");
     syncRemoteTasks([nextTask]);
   };
-  const saveInlineTitle = (task: Task, title: string) => {
-    if (!canEditWorkspace) return;
-    const previous = data.tasks.find((item) => item.id === task.id);
-    if (!previous) return;
-    const updated = updateTaskTitleInline(previous, title);
-    if (!updated) {
-      if (!title.trim()) setToast("Tiêu đề task không được để trống.");
-      return;
-    }
-    rememberUndo("sửa nhanh tiêu đề task");
-    setData((current) => ({
-      ...current,
-      tasks: current.tasks.map((item) => (item.id === task.id ? updated : item)),
-    }));
-    syncRemoteTasks([updated]);
-    setToast("Đã cập nhật tiêu đề task");
-  };
+  const saveInlineTitle = useCallback(
+    (task: Task, title: string) => {
+      if (!canEditWorkspace) return;
+      const previous = data.tasks.find((item) => item.id === task.id);
+      if (!previous) return;
+      const updated = updateTaskTitleInline(previous, title);
+      if (!updated) {
+        if (!title.trim()) setToast("Tiêu đề task không được để trống.");
+        return;
+      }
+      rememberUndo("sửa nhanh tiêu đề task");
+      setData((current) => ({
+        ...current,
+        tasks: current.tasks.map((item) => (item.id === task.id ? updated : item)),
+      }));
+      syncRemoteTasks([updated]);
+      setToast("Đã cập nhật tiêu đề task");
+    },
+    [canEditWorkspace, data.tasks, rememberUndo, syncRemoteTasks],
+  );
   const saveTemplateFromTask = (task: Task) => {
     const name = window.prompt("Tên template", task.title.slice(0, 80));
     if (!name?.trim()) return;
@@ -1757,88 +1788,158 @@ export default function WorkspaceRuntime({
         : [...d.members, m],
     }));
   };
-  const taskCard = (task: Task) => (
-    <LazyTaskCard
-      key={task.id}
-      task={task}
-      members={data.members}
-      locale={locale}
-      copy={copy}
-      now={now}
-      selectionMode={selectionMode}
-      canEdit={canEditWorkspace}
-      selected={selectedTaskIds.includes(task.id)}
-      dueText={dueText}
-      dueState={dueState}
-      onToggleSelection={toggleTaskSelection}
-      onOpen={(selectedTask) => {
-        setEdit(selectedTask);
-        setModal("task");
-      }}
-      onCopyCode={(code) => void copyTaskCode(code)}
-      onQuickUpdate={quickUpdateStatus}
-      onUpdateTitle={saveInlineTitle}
-      onDragStart={setDragId}
-      onDragEnd={() => setDragId(null)}
-      onDrop={dropTask}
-      onKeyboardMove={moveTaskByKeyboard}
-    />
+  const openTask = useCallback((task: Task) => {
+    setEdit(task);
+    setModal("task");
+  }, []);
+  const browseTasks = useCallback(() => router.push("/tasks"), [router]);
+  const openSettings = useCallback(() => setModal("settings"), []);
+  const taskCard = useCallback(
+    (task: Task) => (
+      <LazyTaskCard
+        key={task.id}
+        task={task}
+        members={data.members}
+        locale={locale}
+        copy={copy}
+        now={now}
+        selectionMode={selectionMode}
+        canEdit={canEditWorkspace}
+        selected={selectedTaskIds.includes(task.id)}
+        dueText={dueText}
+        dueState={dueState}
+        onToggleSelection={toggleTaskSelection}
+        onOpen={openTask}
+        onCopyCode={(code) => void copyTaskCode(code)}
+        onQuickUpdate={quickUpdateStatus}
+        onUpdateTitle={saveInlineTitle}
+        onDragStart={setDragId}
+        onDragEnd={() => setDragId(null)}
+        onDrop={dropTask}
+        onKeyboardMove={moveTaskByKeyboard}
+      />
+    ),
+    [
+      canEditWorkspace,
+      copy,
+      copyTaskCode,
+      data.members,
+      dropTask,
+      dueState,
+      dueText,
+      locale,
+      moveTaskByKeyboard,
+      now,
+      openTask,
+      quickUpdateStatus,
+      saveInlineTitle,
+      selectedTaskIds,
+      selectionMode,
+      toggleTaskSelection,
+    ],
   );
-  const runtimeValue: WorkspaceRuntimeValue = {
-    view,
-    data,
-    now,
-    locale,
-    copy,
-    canEditWorkspace,
-    activeTasks: active,
-    todayTasks,
-    visibleTasks,
-    reminderItems,
-    upcomingGroups,
-    templates,
-    sortMode,
-    focusMode,
-    setFocusMode,
-    selectionMode,
-    selectedTaskIds,
-    toggleSelectionMode,
-    setSelectedTaskIds: (ids) => setSelectedTaskIds(ids),
-    taskCard,
-    dropOnStatus,
-    bulkUpdateTasks,
-    savedViews,
-    selectedSavedViewId,
-    applySavedView,
-    saveCurrentView,
-    deleteSavedView,
-    searchRef,
-    search,
-    setSearch,
-    statusFilter,
-    setStatusFilter,
-    priorityFilter,
-    setPriorityFilter,
-    advancedFiltersOpen,
-    setAdvancedFiltersOpen,
-    archiveFilter,
-    setArchiveFilter,
-    assigneeFilter,
-    setAssigneeFilter,
-    dueFilter,
-    setDueFilter,
-    onOpenTask: (task) => {
-      setEdit(task);
-      setModal("task");
-    },
-    onQuickUpdate: quickUpdateStatus,
-    onBrowseTasks: () => router.push("/tasks"),
-    onUpdateDeadline: updateTaskDeadline,
-    dueText,
-    dueState,
-    formatDate,
-    onOpenSettings: () => setModal("settings"),
-  };
+  const runtimeValue = useMemo<WorkspaceRuntimeValue>(
+    () => ({
+      view,
+      data,
+      now,
+      locale,
+      copy,
+      canEditWorkspace,
+      activeTasks: active,
+      todayTasks,
+      visibleTasks,
+      reminderItems,
+      upcomingGroups,
+      templates,
+      sortMode,
+      focusMode,
+      setFocusMode,
+      selectionMode,
+      selectedTaskIds,
+      toggleSelectionMode,
+      setSelectedTaskIds,
+      taskCard,
+      dropOnStatus,
+      bulkUpdateTasks,
+      savedViews,
+      selectedSavedViewId,
+      applySavedView,
+      saveCurrentView,
+      deleteSavedView,
+      searchRef,
+      search,
+      setSearch,
+      statusFilter,
+      setStatusFilter,
+      priorityFilter,
+      setPriorityFilter,
+      advancedFiltersOpen,
+      setAdvancedFiltersOpen,
+      archiveFilter,
+      setArchiveFilter,
+      assigneeFilter,
+      setAssigneeFilter,
+      dueFilter,
+      setDueFilter,
+      onOpenTask: openTask,
+      onQuickUpdate: quickUpdateStatus,
+      onBrowseTasks: browseTasks,
+      onUpdateDeadline: updateTaskDeadline,
+      dueText,
+      dueState,
+      formatDate,
+      onOpenSettings: openSettings,
+    }),
+    [
+      active,
+      advancedFiltersOpen,
+      applySavedView,
+      archiveFilter,
+      assigneeFilter,
+      bulkUpdateTasks,
+      browseTasks,
+      canEditWorkspace,
+      copy,
+      data,
+      deleteSavedView,
+      dueFilter,
+      dueState,
+      dueText,
+      focusMode,
+      formatDate,
+      locale,
+      now,
+      openSettings,
+      priorityFilter,
+      quickUpdateStatus,
+      reminderItems,
+      saveCurrentView,
+      savedViews,
+      search,
+      selectedSavedViewId,
+      selectedTaskIds,
+      selectionMode,
+      setAdvancedFiltersOpen,
+      setArchiveFilter,
+      setAssigneeFilter,
+      setDueFilter,
+      setFocusMode,
+      setPriorityFilter,
+      setSearch,
+      setStatusFilter,
+      sortMode,
+      statusFilter,
+      taskCard,
+      templates,
+      todayTasks,
+      toggleSelectionMode,
+      updateTaskDeadline,
+      upcomingGroups,
+      view,
+      visibleTasks,
+    ],
+  );
   if (!ready) {
     return <WorkspaceLoading />;
   }

@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useWorkspaceRuntime } from "../../state/WorkspaceProvider";
+import { useWorkspaceActions, useWorkspaceData } from "../../state/WorkspaceProvider";
 
 const WorkspaceOverview = dynamic(
   () => import("./WorkspaceOverview").then((module) => module.WorkspaceOverview),
@@ -9,8 +9,8 @@ const WorkspaceOverview = dynamic(
 );
 
 export function OverviewController() {
-  const { data, now, locale, copy, dueText, onOpenTask, onQuickUpdate, onBrowseTasks } =
-    useWorkspaceRuntime();
+  const { data, now, locale, copy, dueText } = useWorkspaceData();
+  const { onOpenTask, onQuickUpdate, onBrowseTasks } = useWorkspaceActions();
 
   return (
     <WorkspaceOverview

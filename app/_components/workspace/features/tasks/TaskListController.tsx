@@ -14,7 +14,12 @@ import {
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { Select } from "@/app/_components/ui/Select";
-import { useWorkspaceRuntime } from "../../state/WorkspaceProvider";
+import {
+  useWorkspaceActions,
+  useWorkspaceData,
+  useWorkspaceFilters,
+  useWorkspaceView,
+} from "../../state/WorkspaceProvider";
 
 const TaskBoardColumns = dynamic(
   () => import("./TaskBoardColumns").then((module) => module.TaskBoardColumns),
@@ -25,9 +30,11 @@ const TaskBoardColumns = dynamic(
 );
 
 export function TaskListController() {
-  const runtime = useWorkspaceRuntime();
+  const { view } = useWorkspaceView();
+  const dataContext = useWorkspaceData();
+  const filtersContext = useWorkspaceFilters();
+  const actionsContext = useWorkspaceActions();
   const {
-    view,
     data,
     copy,
     visibleTasks,
@@ -62,7 +69,11 @@ export function TaskListController() {
     bulkUpdateTasks,
     taskCard,
     dropOnStatus,
-  } = runtime;
+  } = {
+    ...dataContext,
+    ...filtersContext,
+    ...actionsContext,
+  };
   const labels = copy.status;
   const priorityLabels = copy.priority;
   const tasks = view === "today" ? todayTasks : visibleTasks;

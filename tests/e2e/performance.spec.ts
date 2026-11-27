@@ -44,6 +44,23 @@ const makeBoard = (size: number) => ({
   sort_mode: "smart",
 });
 
+const unlockScreenForBenchmark = () => {
+  localStorage.setItem(
+    "taskboard-screen-lock-v2",
+    JSON.stringify({
+      displayName: "Performance User",
+      salt: "taskboard-performance-salt",
+      passcodeHash: "yYJDCSfixCJpGmLR2EXwjCc6hnMOOi3pZBGhOF7J3mo=",
+      autoLockMinutes: 0,
+      passcodeLength: 6,
+    }),
+  );
+  sessionStorage.setItem(
+    "taskboard-screen-unlocked-until-v2",
+    String(Date.now() + 24 * 60 * 60 * 1000),
+  );
+};
+
 test.describe("browser performance benchmark", () => {
   test.describe.configure({ timeout: 120_000 });
 
@@ -54,6 +71,7 @@ test.describe("browser performance benchmark", () => {
       testInfo.project.name !== "chromium-desktop",
       "Run the expensive benchmark on desktop only.",
     );
+    await page.addInitScript(unlockScreenForBenchmark);
     const results: Array<Record<string, number>> = [];
     await page.goto("/tasks");
     await expect(page.getByRole("heading", { name: /Danh sách task/ })).toBeVisible();
@@ -63,6 +81,20 @@ test.describe("browser performance benchmark", () => {
       const board = makeBoard(size);
       await page.evaluate(async (value) => {
         window.localStorage.clear();
+        localStorage.setItem(
+          "taskboard-screen-lock-v2",
+          JSON.stringify({
+            displayName: "Performance User",
+            salt: "taskboard-performance-salt",
+            passcodeHash: "yYJDCSfixCJpGmLR2EXwjCc6hnMOOi3pZBGhOF7J3mo=",
+            autoLockMinutes: 0,
+            passcodeLength: 6,
+          }),
+        );
+        sessionStorage.setItem(
+          "taskboard-screen-unlocked-until-v2",
+          String(Date.now() + 24 * 60 * 60 * 1000),
+        );
         await new Promise<void>((resolve, reject) => {
           const request = indexedDB.open("taskboard-focus-v2", 2);
           request.onupgradeneeded = () => {
@@ -112,10 +144,21 @@ test.describe("browser performance benchmark", () => {
         .locator(".kanban-column")
         .filter({ hasText: size - 1 === 0 ? "Chờ review" : "Đang làm" })
         .first();
-      await matchingColumn
-        .locator(".task-render-item")
-        .first()
-        .scrollIntoViewIfNeeded();
+      await expect
+        .poll(
+          async () => {
+            const item = matchingColumn.locator(".task-render-item").first();
+            if (!(await item.count())) return false;
+            try {
+              await item.scrollIntoViewIfNeeded();
+              return true;
+            } catch {
+              return false;
+            }
+          },
+          { timeout: 10_000 },
+        )
+        .toBe(true);
       await expect.poll(() => matchingCard.count(), { timeout: 10_000 }).toBe(1);
       const searchMs = Date.now() - searchStarted;
 

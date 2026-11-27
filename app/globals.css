@@ -5712,6 +5712,15 @@
   contain-intrinsic-size: 0 188px;
   min-height: 188px;
 }
+.virtualized-task-space {
+  position: relative;
+  min-width: 0;
+}
+.virtualized-task-window {
+  position: absolute;
+  inset: 0;
+  min-width: 0;
+}
 .task-form-fieldset {
   min-width: 0;
   border: 0;
