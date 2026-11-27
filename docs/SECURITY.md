@@ -4,6 +4,7 @@
 - Cloud mode có Supabase Auth, remote task CRUD, workspace membership và RLS theo workspace. Cần chạy schema và kiểm thử bằng project Supabase thật trước khi coi đây là bằng chứng production.
 - Khi Supabase được cấu hình, `/login` hỗ trợ password hoặc email OTP 6 số qua Supabase Auth. OTP chỉ là phương thức cấp session Auth; vẫn phải bật RLS và kiểm tra redirect/email template trong project thật.
 - Màn hình khóa local dùng OTP passcode 6 số, băm bằng Web Crypto, salt riêng và session unlock trong tab; đây là lớp bảo vệ thao tác trên thiết bị, không phải xác thực server. Người dùng mới phải tự đặt tên/passcode riêng cho thiết bị và không nên dùng mã PIN dễ đoán.
+- UI nên được hiểu là “Khóa giao diện trên thiết bị này”, không phải màn hình đăng nhập. Khi cần bảo vệ dữ liệu trước người dùng khác hoặc truy cập từ thiết bị khác, phải dùng Supabase Auth/RLS.
 - Auto-lock có thể cấu hình theo thời gian không hoạt động. Khi session unlock hết hạn, toàn bộ workspace bị phủ bởi lock gate và các action phía dưới không thể thao tác qua UI.
 - Không coi passcode client là bí mật tuyệt đối: người có DevTools hoặc quyền đọc local storage vẫn có thể bypass. Dữ liệu cloud vẫn phải được bảo vệ bằng Supabase Auth/RLS.
 - Recovery local cho phép reset riêng cấu hình screen lock bằng xác nhận `RESET`; thao tác này không xóa task/workspace nhưng cũng không phải cơ chế xác thực mạnh. Dữ liệu nhạy cảm cần Supabase Auth/RLS.

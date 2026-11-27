@@ -29,6 +29,7 @@ import type { RefObject } from "react";
 import type { AppLocale } from "@/lib/i18n";
 import type { SyncState } from "@/lib/repositories/task-repository";
 import { Select } from "@/app/_components/ui/Select";
+import { useEffect, useState } from "react";
 import type { BoardNotification } from "../dialogs/NotificationPopover";
 import type { WorkspaceView } from "./workspace-routes";
 import type { WorkspaceNavigationCounts } from "./WorkspaceSidebar";
@@ -108,6 +109,14 @@ export function WorkspaceHeader({
   onLock: () => void;
   isOnline: boolean;
 }) {
+  const [showSyncStatus, setShowSyncStatus] = useState(false);
+  useEffect(() => {
+    const media = window.matchMedia("(min-width: 981px)");
+    const update = () => setShowSyncStatus(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
   const viewLabel =
     view === "overview"
       ? "Tổng quan"
@@ -139,6 +148,23 @@ export function WorkspaceHeader({
       {!isOnline && (
         <span className="offline-indicator" role="status">
           <WifiOff size={14} /> Ngoại tuyến · thay đổi sẽ đồng bộ khi có mạng
+        </span>
+      )}
+      {showSyncStatus && (
+        <span
+          className={`sync-status sync-${syncState.status}`}
+          aria-live="polite"
+          title={
+            syncState.status === "synced" && syncState.at
+              ? `Đồng bộ lúc ${new Date(syncState.at).toLocaleTimeString("vi-VN")}`
+              : undefined
+          }
+        >
+          {syncState.status === "syncing"
+            ? "Đang đồng bộ..."
+            : syncState.status === "synced"
+              ? "Đã đồng bộ"
+              : "Lưu trên thiết bị"}
         </span>
       )}
       <div className="top-actions">

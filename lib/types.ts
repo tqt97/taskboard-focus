@@ -58,6 +58,7 @@ export type SavedView = {
   due: string;
   focus: boolean;
   archive?: "active" | "archived";
+  isDefault?: boolean;
 };
 export type DependencyState = "ready" | "waiting" | "blocked";
 export type RecurrenceRule = {

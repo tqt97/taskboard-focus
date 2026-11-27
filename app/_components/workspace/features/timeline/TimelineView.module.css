@@ -180,7 +180,8 @@
 .timelineScope :global(.calendar-event.milestone-not-draggable),
 .timelineScope :global(.release-milestone.milestone-not-draggable) {
   cursor: not-allowed;
-  opacity: 0.78;
+  opacity: 1;
+  filter: saturate(0.82);
 }
 .timelineScope :global(.calendar-event:active),
 .timelineScope :global(.release-milestone:active) {

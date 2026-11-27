@@ -35,7 +35,8 @@ export function useSavedViews(workspaceId: string, ready: boolean) {
               typeof view.priority === "string" &&
               typeof view.assignee === "string" &&
               typeof view.due === "string" &&
-              typeof view.focus === "boolean",
+              typeof view.focus === "boolean" &&
+              (view.isDefault === undefined || typeof view.isDefault === "boolean"),
           )
         : [];
       setSavedViews(validViews);

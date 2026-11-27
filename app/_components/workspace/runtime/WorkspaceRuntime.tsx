@@ -67,6 +67,7 @@ import { useTaskMutations } from "../hooks/useTaskMutations";
 import { mergeBoardImport } from "@/lib/taskboard/import-merge";
 import { diffTaskFields } from "@/lib/taskboard/activity-diff";
 import { useWorkspacePersistence } from "../hooks/useWorkspacePersistence";
+import { useWorkspaceChannel } from "../hooks/useWorkspaceChannel";
 import { useWorkspaceNotifications } from "../hooks/useWorkspaceNotifications";
 import { useBrowserReminders } from "../hooks/useBrowserReminders";
 import { createQuickCaptureTask } from "@/lib/taskboard/quick-capture";
@@ -412,8 +413,14 @@ export default function WorkspaceRuntime({
   const canEditWorkspace =
     !remoteWorkspaceIds.includes(workspaceId) ||
     can(currentWorkspaceRole, "edit_tasks");
+  const publishWorkspaceData = useWorkspaceChannel({
+    workspaceId,
+    ready,
+    onRemoteData: setData,
+  });
   useWorkspacePersistence({
     data,
+    publishWorkspaceData,
     workspaceId,
     localWorkspaces,
     ready,
@@ -1156,6 +1163,7 @@ export default function WorkspaceRuntime({
       due: dueFilter,
       focus: focusMode,
       archive: archiveFilter,
+      isDefault: false,
     };
     const nextViews = [...savedViews, view].slice(-12);
     setSavedViews(nextViews);
@@ -1192,6 +1200,33 @@ export default function WorkspaceRuntime({
     },
     [savedViews],
   );
+  useEffect(() => {
+    if (!ready || selectedSavedViewId || !savedViews.length) return;
+    if (
+      search ||
+      statusFilter !== "all" ||
+      priorityFilter !== "all" ||
+      assigneeFilter !== "all" ||
+      dueFilter !== "all" ||
+      archiveFilter !== "active" ||
+      focusMode
+    )
+      return;
+    const defaultView = savedViews.find((view) => view.isDefault);
+    if (defaultView) applySavedView(defaultView.id);
+  }, [
+    applySavedView,
+    archiveFilter,
+    assigneeFilter,
+    dueFilter,
+    focusMode,
+    priorityFilter,
+    ready,
+    savedViews,
+    search,
+    selectedSavedViewId,
+    statusFilter,
+  ]);
   const deleteSavedView = useCallback(() => {
     if (!selectedSavedViewId) return;
     const nextViews = savedViews.filter((item) => item.id !== selectedSavedViewId);
@@ -1204,6 +1239,40 @@ export default function WorkspaceRuntime({
       return;
     }
     setToast("Đã xóa bộ lọc đã lưu");
+  }, [savedViews, selectedSavedViewId, workspaceId]);
+  const renameSavedView = useCallback(() => {
+    const current = savedViews.find((item) => item.id === selectedSavedViewId);
+    if (!current) return;
+    const name = window.prompt("Tên mới cho view", current.name);
+    if (!name?.trim()) return;
+    const nextViews = savedViews.map((item) =>
+      item.id === current.id ? { ...item, name: name.trim().slice(0, 80) } : item,
+    );
+    setSavedViews(nextViews);
+    if (persistSavedViews(workspaceId, nextViews)) setToast("Đã đổi tên view");
+  }, [savedViews, selectedSavedViewId, workspaceId]);
+  const duplicateSavedView = useCallback(() => {
+    const current = savedViews.find((item) => item.id === selectedSavedViewId);
+    if (!current) return;
+    const duplicate = {
+      ...current,
+      id: crypto.randomUUID(),
+      name: `${current.name} (copy)`,
+      isDefault: false,
+    };
+    const nextViews = [...savedViews, duplicate].slice(-12);
+    setSavedViews(nextViews);
+    setSelectedSavedViewId(duplicate.id);
+    if (persistSavedViews(workspaceId, nextViews)) setToast("Đã nhân bản view");
+  }, [savedViews, selectedSavedViewId, workspaceId]);
+  const setDefaultSavedView = useCallback(() => {
+    if (!selectedSavedViewId) return;
+    const nextViews = savedViews.map((item) => ({
+      ...item,
+      isDefault: item.id === selectedSavedViewId,
+    }));
+    setSavedViews(nextViews);
+    if (persistSavedViews(workspaceId, nextViews)) setToast("Đã đặt view mặc định");
   }, [savedViews, selectedSavedViewId, workspaceId]);
   const rememberUndo = useCallback(
     (message: string) => setUndoState({ data, message }),
@@ -1852,7 +1921,14 @@ export default function WorkspaceRuntime({
     },
     [openTaskWithDeepLink],
   );
-  const browseTasks = useCallback(() => router.push("/tasks"), [router]);
+  const browseTasks = useCallback(
+    (query?: { assignee?: string }) => {
+      const params = new URLSearchParams();
+      if (query?.assignee) params.set("assignee", query.assignee);
+      router.push(params.toString() ? `/tasks?${params}` : "/tasks");
+    },
+    [router],
+  );
   const openSettings = useCallback(() => setModal("settings"), []);
   const taskCard = useCallback(
     (
@@ -1932,6 +2008,9 @@ export default function WorkspaceRuntime({
       applySavedView,
       saveCurrentView,
       deleteSavedView,
+      renameSavedView,
+      duplicateSavedView,
+      setDefaultSavedView,
       searchRef,
       search,
       setSearch,
@@ -1968,6 +2047,7 @@ export default function WorkspaceRuntime({
       copy,
       data,
       deleteSavedView,
+      duplicateSavedView,
       dueFilter,
       dueState,
       dueText,
@@ -1980,6 +2060,7 @@ export default function WorkspaceRuntime({
       quickUpdateStatus,
       reminderItems,
       saveCurrentView,
+      setDefaultSavedView,
       savedViews,
       search,
       selectedSavedViewId,
@@ -1996,6 +2077,7 @@ export default function WorkspaceRuntime({
       sortMode,
       statusFilter,
       taskCard,
+      renameSavedView,
       templates,
       todayTasks,
       toggleSelectionMode,

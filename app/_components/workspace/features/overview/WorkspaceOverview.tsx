@@ -144,7 +144,7 @@ export function WorkspaceOverview({
   dueText: (value: string, copy: UiCopy) => string;
   onOpenTask: (task: Task) => void;
   onQuickUpdate: (task: Task) => void;
-  onBrowseTasks: () => void;
+  onBrowseTasks: (query?: { assignee?: string }) => void;
 }) {
   const active = useMemo(() => getActiveTasks(tasks), [tasks]);
   const taskMap = useMemo(() => new Map(tasks.map((task) => [task.id, task])), [tasks]);
@@ -329,7 +329,7 @@ export function WorkspaceOverview({
             <>
               <h2>{copy.overview.noWorkTitle}</h2>
               <p>{copy.overview.noWorkDescription}</p>
-              <Button variant="secondary" onClick={onBrowseTasks} type="button">
+              <Button variant="secondary" onClick={() => onBrowseTasks()} type="button">
                 <ListChecks size={16} /> {copy.overview.browseTasks}
               </Button>
             </>
@@ -524,7 +524,17 @@ export function WorkspaceOverview({
           {workload.length ? (
             <div className="workload-list">
               {workload.map(({ id, member, total, urgent, overdue }) => (
-                <div className="workload-row" key={id}>
+                <button
+                  className="workload-row"
+                  key={id}
+                  type="button"
+                  aria-label={`Mở danh sách task của ${member.name}`}
+                  onClick={() =>
+                    onBrowseTasks({
+                      assignee: id === "__unassigned" ? "__unassigned" : id,
+                    })
+                  }
+                >
                   <span className={`avatar avatar-${member.color}`}>
                     {id === "__unassigned" ? "?" : member.name.slice(0, 1)}
                   </span>
@@ -536,7 +546,7 @@ export function WorkspaceOverview({
                   <small className="workload-risk">
                     {copy.overview.workloadSummary(total, urgent, overdue)}
                   </small>
-                </div>
+                </button>
               ))}
             </div>
           ) : (

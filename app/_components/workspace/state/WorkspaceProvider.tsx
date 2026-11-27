@@ -40,6 +40,9 @@ export type WorkspaceRuntimeValue = {
   applySavedView: (id: string) => void;
   saveCurrentView: () => void;
   deleteSavedView: () => void;
+  renameSavedView: () => void;
+  duplicateSavedView: () => void;
+  setDefaultSavedView: () => void;
   searchRef: RefObject<HTMLInputElement | null>;
   search: string;
   setSearch: (value: string) => void;
@@ -57,7 +60,7 @@ export type WorkspaceRuntimeValue = {
   setDueFilter: (value: string) => void;
   onOpenTask: (task: Task) => void;
   onQuickUpdate: (task: Task) => void;
-  onBrowseTasks: () => void;
+  onBrowseTasks: (query?: { assignee?: string }) => void;
   onUpdateDeadline: (task: Task, deadline: Date) => void;
   dueText: (value: string, copy: UiCopy) => string;
   dueState: (value: string) => string;
@@ -116,6 +119,9 @@ type WorkspaceActionsValue = Pick<
   | "applySavedView"
   | "saveCurrentView"
   | "deleteSavedView"
+  | "renameSavedView"
+  | "duplicateSavedView"
+  | "setDefaultSavedView"
   | "onOpenTask"
   | "onQuickUpdate"
   | "onBrowseTasks"
@@ -229,6 +235,9 @@ export function WorkspaceProvider({
       applySavedView: value.applySavedView,
       saveCurrentView: value.saveCurrentView,
       deleteSavedView: value.deleteSavedView,
+      renameSavedView: value.renameSavedView,
+      duplicateSavedView: value.duplicateSavedView,
+      setDefaultSavedView: value.setDefaultSavedView,
       onOpenTask: value.onOpenTask,
       onQuickUpdate: value.onQuickUpdate,
       onBrowseTasks: value.onBrowseTasks,
@@ -239,6 +248,7 @@ export function WorkspaceProvider({
       value.applySavedView,
       value.bulkUpdateTasks,
       value.deleteSavedView,
+      value.duplicateSavedView,
       value.dropOnStatus,
       value.onBrowseTasks,
       value.onOpenSettings,
@@ -246,7 +256,9 @@ export function WorkspaceProvider({
       value.onQuickUpdate,
       value.onUpdateDeadline,
       value.saveCurrentView,
+      value.setDefaultSavedView,
       value.taskCard,
+      value.renameSavedView,
     ],
   );
   const view = useMemo<WorkspaceViewValue>(

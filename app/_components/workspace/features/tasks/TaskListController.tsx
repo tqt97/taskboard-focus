@@ -14,7 +14,7 @@ import {
   X,
 } from "lucide-react";
 import dynamic from "next/dynamic";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Select } from "@/app/_components/ui/Select";
 import {
   useWorkspaceActions,
@@ -33,6 +33,7 @@ const TaskBoardColumns = dynamic(
 );
 
 export function TaskListController() {
+  const [bulkDeadline, setBulkDeadline] = useState("");
   const { view } = useWorkspaceView();
   const dataContext = useWorkspaceData();
   const filtersContext = useWorkspaceFilters();
@@ -55,6 +56,9 @@ export function TaskListController() {
     applySavedView,
     saveCurrentView,
     deleteSavedView,
+    renameSavedView,
+    duplicateSavedView,
+    setDefaultSavedView,
     searchRef,
     search,
     setSearch,
@@ -157,7 +161,7 @@ export function TaskListController() {
               { value: "", label: "Chọn view đã lưu" },
               ...savedViews.map((savedView) => ({
                 value: savedView.id,
-                label: savedView.name,
+                label: savedView.isDefault ? `★ ${savedView.name}` : savedView.name,
               })),
             ]}
             onValueChange={applySavedView}
@@ -165,6 +169,27 @@ export function TaskListController() {
           <Button variant="text" onClick={saveCurrentView}>
             <Save size={14} />
             Lưu view hiện tại
+          </Button>
+          <Button
+            variant="text"
+            onClick={renameSavedView}
+            disabled={!selectedSavedViewId}
+          >
+            Đổi tên
+          </Button>
+          <Button
+            variant="text"
+            onClick={duplicateSavedView}
+            disabled={!selectedSavedViewId}
+          >
+            Nhân bản
+          </Button>
+          <Button
+            variant="text"
+            onClick={setDefaultSavedView}
+            disabled={!selectedSavedViewId}
+          >
+            Đặt mặc định
           </Button>
           <Button
             variant="text"
@@ -301,6 +326,45 @@ export function TaskListController() {
               <AlertTriangle size={14} />
               Ưu tiên cao
             </Button>
+            <Select
+              aria-label="Giao task đã chọn cho thành viên"
+              value=""
+              options={[
+                { value: "", label: "Giao cho..." },
+                ...data.members
+                  .filter((member) => member.active)
+                  .map((member) => ({ value: member.id, label: member.name })),
+              ]}
+              onValueChange={(memberId) => {
+                if (!memberId) return;
+                bulkUpdateTasks(
+                  { assignee_id: memberId, assignee_ids: [memberId] },
+                  "Đã giao các task đã chọn",
+                );
+              }}
+            />
+            <label className="bulk-deadline-field">
+              <span className="sr-only">Deadline cho task đã chọn</span>
+              <input
+                type="date"
+                aria-label="Chọn deadline cho task đã chọn"
+                value={bulkDeadline}
+                onChange={(event) => setBulkDeadline(event.target.value)}
+              />
+              <Button
+                variant="secondary"
+                disabled={!bulkDeadline}
+                onClick={() => {
+                  bulkUpdateTasks(
+                    { deadline: new Date(`${bulkDeadline}T23:59:59`).toISOString() },
+                    "Đã cập nhật deadline cho các task đã chọn",
+                  );
+                  setBulkDeadline("");
+                }}
+              >
+                Áp deadline
+              </Button>
+            </label>
             <Button
               variant="text"
               className="action-clear"

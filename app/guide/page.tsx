@@ -12,6 +12,7 @@ import {
   LockKeyhole,
   Search,
   ShieldCheck,
+  Users,
 } from "lucide-react";
 import styles from "./guide.module.css";
 
@@ -52,6 +53,11 @@ const features = [
     icon: Cloud,
     title: "Local-first và cloud",
     text: "Dữ liệu local được lưu trên trình duyệt. Khi cấu hình Supabase, bạn có thể đồng bộ workspace cloud.",
+  },
+  {
+    icon: Users,
+    title: "Team workload",
+    text: "Overview cho biết tổng task, task khẩn và task quá hạn theo từng người; bấm một dòng để đi thẳng tới danh sách của họ.",
   },
 ] as const;
 
@@ -168,6 +174,31 @@ export default function GuidePage() {
             </dl>
           </section>
         </div>
+
+        <section className={styles.guideCard} aria-labelledby="sharing-title">
+          <div className={styles.cardHeading}>
+            <Search size={18} />
+            <h2 id="sharing-title">Link, view và đồng bộ</h2>
+          </div>
+          <ul>
+            <li>
+              Bộ lọc được ghi vào URL, nên bạn có thể bookmark hoặc gửi link như
+              <code>/tasks?status=review&amp;assignee=m1</code>.
+            </li>
+            <li>
+              Task mở từ notification, timeline hoặc workload có thể giữ trong URL để
+              refresh và quay lại đúng ngữ cảnh.
+            </li>
+            <li>
+              Hai tab trên cùng trình duyệt nhận thay đổi local gần như ngay lập tức;
+              cloud sync vẫn cần Supabase Auth/RLS và được hiển thị rõ ở header.
+            </li>
+            <li>
+              Views đã lưu có thể đổi tên, nhân bản và đặt làm mặc định trên thiết bị
+              này; hiện chưa đồng bộ giữa các thành viên.
+            </li>
+          </ul>
+        </section>
 
         <section className={styles.safety} aria-labelledby="safety-title">
           <div className={styles.safetyIcon} aria-hidden="true">

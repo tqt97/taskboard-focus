@@ -11,6 +11,7 @@ import {
 
 export function useWorkspacePersistence({
   data,
+  publishWorkspaceData,
   workspaceId,
   localWorkspaces,
   ready,
@@ -19,6 +20,7 @@ export function useWorkspacePersistence({
   onError,
 }: {
   data: BoardData;
+  publishWorkspaceData: (data: BoardData) => void;
   workspaceId: string;
   localWorkspaces: LocalWorkspaceSummary[];
   ready: boolean;
@@ -28,6 +30,7 @@ export function useWorkspacePersistence({
 }) {
   const backupFailureNotified = useRef(false);
   const fallbackNotified = useRef(false);
+
   useEffect(() => {
     if (!ready || !persistenceReady) return;
     setSaveStatus("saving");
@@ -71,6 +74,7 @@ export function useWorkspacePersistence({
             "Không thể lưu local; hãy export backup và kiểm tra dung lượng trình duyệt.",
           );
         });
+      publishWorkspaceData(data);
     }, 180);
     return () => window.clearTimeout(timer);
   }, [
@@ -78,6 +82,7 @@ export function useWorkspacePersistence({
     localWorkspaces,
     onError,
     persistenceReady,
+    publishWorkspaceData,
     ready,
     setSaveStatus,
     workspaceId,

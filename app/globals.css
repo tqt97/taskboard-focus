@@ -6384,6 +6384,24 @@ html {
   white-space: nowrap;
 }
 
+.sync-status {
+  display: inline-flex;
+  align-items: center;
+  min-width: max-content;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.sync-status.syncing {
+  color: var(--accent);
+}
+
+.sync-status.synced {
+  color: var(--success-text);
+}
+
 .search-box,
 .select-wrap,
 .template-select,

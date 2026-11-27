@@ -37,6 +37,11 @@
 }
 
 .overviewScope :global(.workload-row) {
+  width: 100%;
+  border: 1px solid var(--line);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
   display: grid;
   grid-template-columns: 28px minmax(0, 1fr) auto;
   grid-template-areas:
@@ -47,9 +52,14 @@
   min-height: 48px;
   gap: 2px 8px;
   padding: 7px 8px;
-  border: 1px solid var(--line);
   border-radius: 9px;
   background: var(--surface2);
+}
+
+.overviewScope :global(.workload-row:hover),
+.overviewScope :global(.workload-row:focus-visible) {
+  border-color: var(--accent);
+  background: var(--surface);
 }
 
 .overviewScope :global(.workload-row .avatar) {
