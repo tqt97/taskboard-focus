@@ -1,21 +1,15 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Archive,
-  Check,
   ChevronDown,
-  Copy,
   ExternalLink,
-  FilePenLine,
   FileText,
   Link2,
   ListChecks,
   MessageCircle,
   Plus,
-  RotateCcw,
-  Trash2,
   Upload,
-  X,
+  Trash2,
 } from "lucide-react";
 import type {
   Member,
@@ -41,6 +35,8 @@ import {
 import type { AppLocale } from "@/lib/i18n";
 import { TaskHistoryPanel } from "./TaskHistoryPanel";
 import { TaskCommentsPanel } from "./TaskCommentsPanel";
+import { TaskModalFooter } from "./TaskModalFooter";
+import { TaskModalTabs, type TaskModalTab } from "./TaskModalTabs";
 
 const labels: Record<Status, string> = {
   todo: "Chưa làm",
@@ -121,7 +117,7 @@ export function TaskModal({
     [attachments, setAttachments] = useState<TaskAttachment[]>(task.attachments || []),
     [checklist, setChecklist] = useState<TaskChecklistItem[]>(task.checklist || []),
     [uploadingAttachment, setUploadingAttachment] = useState(false),
-    [activeTab, setActiveTab] = useState<"details" | "history" | "comments">("details"),
+    [activeTab, setActiveTab] = useState<TaskModalTab>("details"),
     [resourcesOpen, setResourcesOpen] = useState(
       Boolean((task.attachments || []).length || legacyLinks(task).length),
     ),
@@ -329,6 +325,7 @@ export function TaskModal({
       panelClassName="modal task-modal"
       labelledBy="task-modal-title"
       onBackdropClick={closeModal}
+      onEscape={closeModal}
     >
       <DialogHeader
         eyebrow={isNew ? "TẠO CÔNG VIỆC" : "CHI TIẾT CÔNG VIỆC"}
@@ -348,45 +345,21 @@ export function TaskModal({
             {error}
           </div>
         )}
-        <div className="modal-tabs" role="tablist" aria-label="Nội dung task">
-          <Button
-            className={`modal-tab${activeTab === "details" ? " active" : ""}`}
-            type="button"
-            role="tab"
-            aria-selected={activeTab === "details"}
-            aria-controls="task-details-panel"
-            onClick={() => setActiveTab("details")}
-          >
-            Thông tin task
-          </Button>
-          <Button
-            className={`modal-tab${activeTab === "history" ? " active" : ""}`}
-            type="button"
-            role="tab"
-            aria-selected={activeTab === "history"}
-            aria-controls="task-history-panel"
-            onClick={() => setActiveTab("history")}
-          >
-            Lịch sử thay đổi
-            {form.activity?.length ? <span>{form.activity.length}</span> : null}
-          </Button>
-          {!isNew && (
-            <Button
-              className={`modal-tab${activeTab === "comments" ? " active" : ""}`}
-              type="button"
-              role="tab"
-              aria-selected={activeTab === "comments"}
-              aria-controls="task-comments-panel"
-              onClick={() => setActiveTab("comments")}
-            >
-              <MessageCircle size={14} /> Thảo luận
-              {form.comments?.length ? <span>{form.comments.length}</span> : null}
-            </Button>
-          )}
-        </div>
+        <TaskModalTabs
+          activeTab={activeTab}
+          isNew={isNew}
+          activityCount={form.activity?.length || 0}
+          commentCount={form.comments?.length || 0}
+          onChange={setActiveTab}
+        />
         {activeTab === "details" ? (
           <fieldset className="task-form-fieldset" disabled={readOnly}>
-            <div className="form-grid" id="task-details-panel" role="tabpanel">
+            <div
+              className="form-grid"
+              id="task-details-panel"
+              role="tabpanel"
+              aria-labelledby="task-tab-details"
+            >
               <details
                 className="form-block form-block-collapsible full"
                 aria-labelledby="task-core-heading"
@@ -1151,53 +1124,18 @@ export function TaskModal({
           />
         )}
       </div>
-      <footer className="modal-footer">
-        {!isNew && (
-          <Button
-            variant="danger"
-            className="ghost"
-            disabled={readOnly}
-            onClick={task.archived_at ? onRestore : onDelete}
-          >
-            {task.archived_at ? <RotateCcw size={15} /> : <Archive size={15} />}
-            {task.archived_at ? "Khôi phục task" : "Lưu trữ task"}
-          </Button>
-        )}
-        {!isNew && (
-          <Button
-            variant="text"
-            type="button"
-            disabled={readOnly}
-            onClick={onSaveTemplate}
-          >
-            <Copy size={14} />
-            Lưu thành template
-          </Button>
-        )}
-        <span />
-        <Button variant="secondary" onClick={closeModal}>
-          <X size={15} />
-          Hủy
-        </Button>
-        <Button
-          variant="secondary"
-          type="button"
-          disabled={readOnly || !form.title.trim()}
-          onClick={() => save(true)}
-        >
-          <FilePenLine size={15} />
-          Lưu nháp
-        </Button>
-        <Button
-          variant="primary"
-          type="button"
-          disabled={readOnly || !form.title.trim()}
-          onClick={() => save(false)}
-        >
-          <Check size={15} />
-          Lưu task
-        </Button>
-      </footer>
+      <TaskModalFooter
+        isNew={isNew}
+        archived={Boolean(task.archived_at)}
+        readOnly={readOnly}
+        hasTitle={Boolean(form.title.trim())}
+        onRestore={onRestore}
+        onDelete={onDelete}
+        onSaveTemplate={onSaveTemplate}
+        onClose={closeModal}
+        onSaveDraft={() => save(true)}
+        onSave={() => save(false)}
+      />
     </DialogFrame>
   );
 }

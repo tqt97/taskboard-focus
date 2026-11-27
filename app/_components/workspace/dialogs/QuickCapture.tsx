@@ -21,7 +21,9 @@ export function QuickCapture({
       panelClassName="quick-capture modal"
       overlayClassName="quick-capture-overlay"
       labelledBy="quick-capture-title"
+      describedBy="quick-capture-description"
       onBackdropClick={onClose}
+      onEscape={onClose}
       onSubmit={(event) => {
         event.preventDefault();
         if (title.trim()) onSave(title.trim());
@@ -31,7 +33,9 @@ export function QuickCapture({
         titleId="quick-capture-title"
         title="Lưu bản nháp"
         description={
-          <small>Chỉ cần tiêu đề; bạn có thể phân loại và bổ sung sau.</small>
+          <small id="quick-capture-description">
+            Chỉ cần tiêu đề; bạn có thể phân loại và bổ sung sau.
+          </small>
         }
         closeLabel="Đóng"
         onClose={onClose}

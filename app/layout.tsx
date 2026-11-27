@@ -1,4 +1,4 @@
-import "./globals.css";
+import "./base.css";
 import type { Viewport } from "next";
 import { RootDocument } from "./_components/layout/RootDocument";
 import { siteMetadata } from "./_components/layout/SiteMetadata";

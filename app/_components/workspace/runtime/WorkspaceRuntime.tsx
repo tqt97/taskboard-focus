@@ -19,7 +19,6 @@ import type {
   Priority,
   Severity,
   SavedView,
-  SortMode,
   Status,
   Task,
   TaskActivity,
@@ -92,6 +91,9 @@ import type { WorkspaceView } from "../layout/workspace-routes";
 import { WorkspaceRouteContent } from "../features/WorkspaceRouteContent";
 import { WorkspaceSidebar } from "../layout/WorkspaceSidebar";
 import { WorkspaceHeader } from "../layout/WorkspaceHeader";
+import { useWorkspaceUiState } from "./useWorkspaceUiState";
+import { useWorkspaceFilters } from "./useWorkspaceFilters";
+import { useWorkspaceTaskOrdering } from "./useWorkspaceTaskOrdering";
 import {
   WorkspaceProvider,
   type WorkspaceRuntimeValue,
@@ -309,48 +311,78 @@ export default function WorkspaceRuntime({
       Record<string, WorkspaceRole>
     >({}),
     [remoteMembers, setRemoteMembers] = useState<RemoteWorkspaceMember[]>([]),
-    [search, setSearch] = useState(""),
-    [statusFilter, setStatusFilter] = useState("all"),
-    [priorityFilter, setPriorityFilter] = useState("all"),
-    [assigneeFilter, setAssigneeFilter] = useState("all"),
-    [dueFilter, setDueFilter] = useState("all"),
-    [archiveFilter, setArchiveFilter] = useState<"active" | "archived">("active"),
-    [modal, setModal] = useState<"task" | "settings" | "quick-capture" | null>(null),
-    [edit, setEdit] = useState<Task | null>(null),
-    [confirm, setConfirm] = useState<string | null>(null),
-    [importPreview, setImportPreview] = useState<BoardData | null>(null),
-    [settingsTab, setSettingsTab] = useState("members"),
-    [dark, setDark] = useState(false),
-    [toast, setToast] = useState(""),
-    [dragId, setDragId] = useState<string | null>(null),
-    [sortMode, setSortMode] = useState<SortMode>("smart"),
-    [focusMode, setFocusMode] = useState(false),
-    [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]),
-    [selectionMode, setSelectionMode] = useState(false),
-    [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false),
-    [mobileMenuOpen, setMobileMenuOpen] = useState(false),
-    [selectedSavedViewId, setSelectedSavedViewId] = useState(""),
-    [templates, setTemplates] = useState<TaskTemplate[]>([]),
-    [templateCreateMode, setTemplateCreateMode] = useState(false),
-    [undoState, setUndoState] = useState<{ data: BoardData; message: string } | null>(
-      null,
-    ),
-    [notificationsOpen, setNotificationsOpen] = useState(false),
     notificationRef = useRef<HTMLDivElement>(null),
     searchRef = useRef<HTMLInputElement>(null),
-    [readNotificationIds, setReadNotificationIds] = useState<string[]>([]),
     [reminderSettings, setReminderSettings] = useState<ReminderSettings>(
       defaultReminderSettings,
     ),
     [browserPermission, setBrowserPermission] = useState<
       NotificationPermission | "unsupported"
     >("default"),
-    [sidebarCollapsed, setSidebarCollapsed] = useState(false),
     [displayName, setDisplayName] = useState("Tuấn"),
-    [locale, setLocale] = useState<AppLocale>("vi"),
     [cloudUserId, setCloudUserId] = useState(""),
-    [cloudUserEmail, setCloudUserEmail] = useState(""),
-    [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "error">("saved");
+    [cloudUserEmail, setCloudUserEmail] = useState("");
+  const {
+    modal,
+    setModal,
+    edit,
+    setEdit,
+    confirm,
+    setConfirm,
+    importPreview,
+    setImportPreview,
+    settingsTab,
+    setSettingsTab,
+    dark,
+    setDark,
+    toast,
+    setToast,
+    dragId,
+    setDragId,
+    sortMode,
+    setSortMode,
+    focusMode,
+    setFocusMode,
+    selectedTaskIds,
+    setSelectedTaskIds,
+    selectionMode,
+    setSelectionMode,
+    advancedFiltersOpen,
+    setAdvancedFiltersOpen,
+    mobileMenuOpen,
+    setMobileMenuOpen,
+    selectedSavedViewId,
+    setSelectedSavedViewId,
+    templateCreateMode,
+    setTemplateCreateMode,
+    undoState,
+    setUndoState,
+    notificationsOpen,
+    setNotificationsOpen,
+    readNotificationIds,
+    setReadNotificationIds,
+    sidebarCollapsed,
+    setSidebarCollapsed,
+    locale,
+    setLocale,
+    saveStatus,
+    setSaveStatus,
+  } = useWorkspaceUiState();
+  const {
+    search,
+    setSearch,
+    statusFilter,
+    setStatusFilter,
+    priorityFilter,
+    setPriorityFilter,
+    assigneeFilter,
+    setAssigneeFilter,
+    dueFilter,
+    setDueFilter,
+    archiveFilter,
+    setArchiveFilter,
+  } = useWorkspaceFilters();
+  const [templates, setTemplates] = useState<TaskTemplate[]>([]);
   const [isOnline, setIsOnline] = useState(true);
   const [screenLockConfig, setScreenLockConfig] = useState<ScreenLockConfig | null>(
     null,
@@ -1655,110 +1687,18 @@ export default function WorkspaceRuntime({
     setModal(null);
     setToast("Đã khôi phục task");
   };
-  const reorder = (target: string) => {
-    if (!canEditWorkspace) {
-      setToast("Bạn chỉ có quyền xem workspace này.");
-      return;
-    }
-    if (!dragId || dragId === target) return;
-    rememberUndo("đổi thứ tự task");
-    const list = [...ordered],
-      from = list.findIndex((t) => t.id === dragId),
-      to = list.findIndex((t) => t.id === target);
-    if (from < 0 || to < 0) return;
-    const [item] = list.splice(from, 1);
-    list.splice(to, 0, item);
-    const timestamp = new Date().toISOString();
-    const previousOrder = new Map(
-      data.tasks.map((task) => [task.id, task.order_index]),
-    );
-    const nextTasks = list.map((t, i) =>
-      previousOrder.get(t.id) === i
-        ? { ...t, order_index: i }
-        : { ...t, order_index: i, updated_at: timestamp },
-    );
-    setData((d) => ({ ...d, sort_mode: "manual", tasks: nextTasks }));
-    syncRemoteTasks(nextTasks.filter((task) => task.updated_at === timestamp));
-    setSortMode("manual");
-    setDragId(null);
-  };
-  const dropOnStatus = (status: Status, target?: string) => {
-    if (!canEditWorkspace) {
-      setToast("Bạn chỉ có quyền xem workspace này.");
-      return;
-    }
-    if (!dragId) return;
-    const list = [...ordered],
-      from = list.findIndex((t) => t.id === dragId);
-    if (from < 0) return;
-    const source = list[from];
-    const transition = resolveStatusTransition(
-      source.status,
-      status,
-      source.blocked_from,
-    );
-    if (!transition.allowed) {
-      setToast(`⚠️ ${transition.warning || "Không thể chuyển trạng thái task."}`);
-      return;
-    }
-    rememberUndo(
-      transition.target === "done" ? "hoàn tất task" : "chuyển trạng thái task",
-    );
-    const [item] = list.splice(from, 1);
-    const timestamp = new Date().toISOString();
-    const moved = {
-      ...item,
-      status: transition.target,
-      snoozed_until: transition.target === "done" ? undefined : item.snoozed_until,
-      ...(transition.target === "blocked"
-        ? { blocked_from: transition.blocked_from }
-        : { blocked_from: undefined }),
-      updated_at: timestamp,
-      activity:
-        transition.target === item.status
-          ? item.activity
-          : [
-              ...(item.activity || []),
-              {
-                id: crypto.randomUUID(),
-                type: "status_changed" as const,
-                at: timestamp,
-                summary: transition.summary,
-              },
-            ].slice(-200),
-    };
-    let insertAt = target ? list.findIndex((t) => t.id === target) : -1;
-    if (insertAt < 0) {
-      const same = list
-        .map((t) => (t.status === status ? list.indexOf(t) : -1))
-        .filter((i) => i >= 0);
-      insertAt = same.length ? same[same.length - 1] + 1 : list.length;
-    }
-    list.splice(insertAt, 0, moved);
-    const previousOrder = new Map(
-      data.tasks.map((task) => [task.id, task.order_index]),
-    );
-    const nextTasks = list.map((t, i) => {
-      const changed = t.id === moved.id || previousOrder.get(t.id) !== i;
-      return changed
-        ? { ...t, order_index: i, updated_at: timestamp }
-        : { ...t, order_index: i };
-    });
-    setData((d) => ({ ...d, sort_mode: "manual", tasks: nextTasks }));
-    syncRemoteTasks(nextTasks.filter((task) => task.updated_at === timestamp));
-    setSortMode("manual");
-    setDragId(null);
-    setToast(status === item.status ? "Đã đổi vị trí task" : transition.summary);
-  };
-  const dropTask = (target: Task) => {
-    if (!canEditWorkspace) return;
-    if (!dragId || dragId === target.id) return;
-    const source = ordered.find((t) => t.id === dragId);
-    if (!source) return;
-    source.status === target.status
-      ? reorder(target.id)
-      : dropOnStatus(target.status, target.id);
-  };
+  const { dropOnStatus, dropTask, moveTaskByKeyboard } = useWorkspaceTaskOrdering({
+    canEditWorkspace,
+    data,
+    ordered,
+    dragId,
+    setData,
+    setDragId,
+    setSortMode,
+    rememberUndo,
+    syncRemoteTasks,
+    setToast,
+  });
   const exportData = () => {
     const blob = new Blob(
       [
@@ -1841,6 +1781,7 @@ export default function WorkspaceRuntime({
       onDragStart={setDragId}
       onDragEnd={() => setDragId(null)}
       onDrop={dropTask}
+      onKeyboardMove={moveTaskByKeyboard}
     />
   );
   const runtimeValue: WorkspaceRuntimeValue = {
@@ -1965,6 +1906,14 @@ export default function WorkspaceRuntime({
             dark={dark}
             onToggleDark={() => setDark((value) => !value)}
             onOpenSettings={() => setModal("settings")}
+            onLock={() => {
+              setMobileMenuOpen(false);
+              window.setTimeout(() => {
+                clearUnlockSession();
+                setScreenUnlocked(false);
+                setModal(null);
+              }, 0);
+            }}
             isOnline={isOnline}
           />
           <div className="content">

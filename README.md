@@ -26,7 +26,7 @@
 - Export/import backup JSON schema v1.
 - Prefix task cấu hình được, link chính/link phụ, tên hiển thị và passcode lock-screen local.
 - Loading/error fallback, validation import/form, keyboard interaction và format code bằng Prettier.
-- SEO metadata đầy đủ, icon SVG, Apple icon và web manifest; workspace local vẫn `noindex`.
+- Private-app metadata, icon SVG, Apple icon và web manifest; workspace/login đều `noindex, nofollow` và không sinh canonical `localhost`.
 - Workspace layout persistent: sidebar, header và provider không remount khi chuyển route; chỉ content route thay đổi.
 - Sidebar count được memo theo dữ liệu liên quan; feature content và dialog nặng được lazy-load theo route/tương tác.
 - Schema Supabase, hướng dẫn Vercel và tài liệu mở rộng.

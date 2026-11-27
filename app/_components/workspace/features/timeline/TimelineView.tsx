@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/app/_components/ui/Button";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   CalendarRange,
   ChevronLeft,
@@ -149,6 +149,7 @@ export function TimelineView({
   onUpdateDeadline: (task: Task, date: Date) => void;
 }) {
   const [mode, setMode] = useState<TimelineMode>("calendar");
+  const modeTabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const [cursor, setCursor] = useState(() => startOfWeek(new Date()));
   const [assignee, setAssignee] = useState("all");
   const [milestoneFilter, setMilestoneFilter] = useState<MilestoneFilter>("all");
@@ -203,6 +204,22 @@ export function TimelineView({
     event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setData("text/task-id", task.id);
   };
+  const handleModeTabKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+    event.preventDefault();
+    const modes: TimelineMode[] = ["calendar", "timeline"];
+    const currentIndex = modes.indexOf(mode);
+    const nextIndex =
+      event.key === "Home"
+        ? 0
+        : event.key === "End"
+          ? modes.length - 1
+          : (currentIndex + (event.key === "ArrowRight" ? 1 : -1) + modes.length) %
+            modes.length;
+    const nextMode = modes[nextIndex];
+    setMode(nextMode);
+    modeTabRefs.current[nextIndex]?.focus();
+  };
 
   return (
     <section className="timeline-view panel" aria-label={labels.aria}>
@@ -211,7 +228,14 @@ export function TimelineView({
           <Button
             className={mode === "calendar" ? "selected" : ""}
             role="tab"
+            id="timeline-tab-calendar"
+            aria-controls="timeline-panel-calendar"
             aria-selected={mode === "calendar"}
+            tabIndex={mode === "calendar" ? 0 : -1}
+            ref={(element) => {
+              modeTabRefs.current[0] = element;
+            }}
+            onKeyDown={handleModeTabKeyDown}
             onClick={() => setMode("calendar")}
           >
             <CalendarRange size={15} /> {labels.calendar}
@@ -219,7 +243,14 @@ export function TimelineView({
           <Button
             className={mode === "timeline" ? "selected" : ""}
             role="tab"
+            id="timeline-tab-timeline"
+            aria-controls="timeline-panel-timeline"
             aria-selected={mode === "timeline"}
+            tabIndex={mode === "timeline" ? 0 : -1}
+            ref={(element) => {
+              modeTabRefs.current[1] = element;
+            }}
+            onKeyDown={handleModeTabKeyDown}
             onClick={() => setMode("timeline")}
           >
             <GitBranch size={15} /> {labels.timeline}
@@ -300,7 +331,13 @@ export function TimelineView({
         </span>
       </div>
       {mode === "calendar" ? (
-        <div className="calendar-grid">
+        <div
+          className="calendar-grid"
+          role="tabpanel"
+          id="timeline-panel-calendar"
+          aria-labelledby="timeline-tab-calendar"
+          tabIndex={0}
+        >
           {days.map((day) => (
             <div
               className={`calendar-day${dateKey(day) === dateKey(new Date()) ? " today" : ""}`}
@@ -344,6 +381,10 @@ export function TimelineView({
       ) : (
         <div
           className="release-timeline"
+          role="tabpanel"
+          id="timeline-panel-timeline"
+          aria-labelledby="timeline-tab-timeline"
+          tabIndex={0}
           style={{ "--timeline-days": rangeLength } as React.CSSProperties}
         >
           <div className="release-timeline-header">

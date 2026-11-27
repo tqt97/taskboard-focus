@@ -71,6 +71,7 @@ export function WorkspaceHeader({
   dark,
   onToggleDark,
   onOpenSettings,
+  onLock,
   isOnline,
 }: {
   view: WorkspaceView;
@@ -103,6 +104,7 @@ export function WorkspaceHeader({
   dark: boolean;
   onToggleDark: () => void;
   onOpenSettings: () => void;
+  onLock: () => void;
   isOnline: boolean;
 }) {
   const viewLabel =
@@ -199,6 +201,10 @@ export function WorkspaceHeader({
                 onClick={() => onNavigate("/timeline")}
               >
                 <CalendarRange size={17} /> Lịch & timeline
+              </Button>
+              <span className="nav-divider" aria-hidden="true" />
+              <Button onClick={onLock}>
+                <Moon size={17} /> Khóa màn hình
               </Button>
             </nav>
           </>

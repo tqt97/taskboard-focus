@@ -31,7 +31,11 @@ export function ImportDialog({
   const [showAll, setShowAll] = useState(false);
   const conflicts = showAll ? preview.conflicts : preview.conflicts.slice(0, 20);
   return (
-    <DialogFrame panelClassName="modal import-modal" labelledBy="import-title">
+    <DialogFrame
+      panelClassName="modal import-modal"
+      labelledBy="import-title"
+      onEscape={onCancel}
+    >
       <DialogHeader
         eyebrow="IMPORT PREVIEW"
         titleId="import-title"

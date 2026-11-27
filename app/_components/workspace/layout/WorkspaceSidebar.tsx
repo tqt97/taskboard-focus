@@ -86,7 +86,7 @@ export function WorkspaceSidebar({
           </Button>
         </div>
       </div>
-      <nav>
+      <nav aria-label="Điều hướng workspace">
         <Button
           className={view === "overview" ? "nav-item active" : "nav-item"}
           onClick={() => onNavigate("/")}

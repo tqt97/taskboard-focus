@@ -44,7 +44,11 @@ export function ConflictDialog({
     }
   };
   return (
-    <DialogFrame panelClassName="modal conflict-modal" labelledBy="conflict-title">
+    <DialogFrame
+      panelClassName="modal conflict-modal"
+      labelledBy="conflict-title"
+      onEscape={onClose}
+    >
       <DialogHeader
         eyebrow="CONFLICT CENTER"
         titleId="conflict-title"

@@ -1,0 +1,95 @@
+@layer tokens {
+  :root {
+    --bg: #f5f7fb;
+    --surface: #fff;
+    --surface2: #f8f9fc;
+    --text: #182230;
+    --muted: #8993a3;
+    --line: #e9edf3;
+    --border: var(--line);
+    --panel: var(--surface);
+    --accent: #4c72e8;
+    --accent-dark: #385ed2;
+    --accent-fill: #4c72e8;
+    --accent-fill-hover: #385ed2;
+    --shadow: 0 10px 30px rgba(24, 34, 48, 0.045);
+    --green: #208d68;
+    --red: #e85b5b;
+    --danger: var(--red);
+    --success: var(--green);
+    --orange: #e99a3b;
+    --purple: #8863d7;
+    --focus-color: #4c72e8;
+    --focus-ring: 0 0 0 3px rgb(66 91 213 / 22%);
+    --surface-muted: #eff3f8;
+    --accent-tint: #edf1ff;
+    --danger-fill: #c83f50;
+    --danger-bg: #fff1f2;
+    --danger-text: #a8293d;
+    --warning-bg: #fff7e6;
+    --warning-text: #8a4b00;
+    --info-bg: #edf3ff;
+    --info-text: #2949a8;
+    --success-bg: #eaf8f1;
+    --success-text: #086b4f;
+    --status-todo: #617087;
+    --status-progress: #3558c8;
+    --status-review: #6b45b5;
+    --status-blocked: #9a5a05;
+    --status-done: #087653;
+    --card-shadow: 0 2px 8px rgb(23 36 58 / 5%);
+    --card-shadow-hover: 0 8px 20px rgb(23 36 58 / 11%);
+    --color-brand-soft: #edf1ff;
+    --color-surface-raised: var(--surface2);
+    --color-text-primary: var(--text);
+    --color-text-muted: var(--muted);
+    --color-border: var(--line);
+    --color-success: var(--green);
+    --color-danger: var(--red);
+    --radius-control: 8px;
+    --radius-panel: 12px;
+    --space-control-x: 12px;
+    --shadow-panel: var(--shadow);
+    --font-sans:
+      "Taskboard Geist", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+      "Segoe UI", sans-serif;
+  }
+}
+
+[data-theme="dark"] {
+  --bg: #101827;
+  --surface: #172235;
+  --surface2: #202d42;
+  --text: #edf2fb;
+  --muted: #a9b6c9;
+  --line: #314057;
+  --accent: #92a8ff;
+  --accent-dark: #b3c1ff;
+  --accent-fill: #526be0;
+  --accent-fill-hover: #4158c5;
+  --shadow: 0 12px 30px rgba(0, 0, 0, 0.2);
+  --green: #5dd1a3;
+  --red: #ff8992;
+  --orange: #f2b462;
+  --purple: #c1a7ff;
+  --focus-ring: 0 0 0 3px rgba(146, 168, 255, 0.28);
+  --focus-color: #92a8ff;
+  --surface-muted: #202d42;
+  --accent-tint: #27345c;
+  --danger-fill: #d65368;
+  --danger-bg: #482532;
+  --danger-text: #ffb2ba;
+  --warning-bg: #49351d;
+  --warning-text: #ffd18a;
+  --info-bg: #27345c;
+  --info-text: #b8c6ff;
+  --success-bg: #1d4139;
+  --success-text: #83e3bd;
+  --status-todo: #a9b6c9;
+  --status-progress: #aebdff;
+  --status-review: #d0b8ff;
+  --status-blocked: #ffd18a;
+  --status-done: #83e3bd;
+  --card-shadow: 0 2px 8px rgb(0 0 0 / 18%);
+  --card-shadow-hover: 0 10px 24px rgb(0 0 0 / 30%);
+}

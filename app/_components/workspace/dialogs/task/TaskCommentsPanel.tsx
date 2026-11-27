@@ -43,7 +43,12 @@ export function TaskCommentsPanel({
   };
 
   return (
-    <section className="task-comments-panel" id="task-comments-panel" role="tabpanel">
+    <section
+      className="task-comments-panel"
+      id="task-comments-panel"
+      role="tabpanel"
+      aria-labelledby="task-tab-comments"
+    >
       <div className="form-block-heading">
         <div>
           <h3>Thảo luận</h3>

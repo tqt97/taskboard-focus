@@ -1,15 +1,13 @@
 import type { Metadata } from "next";
 
-const fallbackAppUrl = "http://localhost:3000";
 const configuredAppUrl = process.env.NEXT_PUBLIC_APP_URL?.trim() || "";
 const metadataBase = (() => {
+  if (!configuredAppUrl) return undefined;
   try {
-    const url = new URL(configuredAppUrl || fallbackAppUrl);
-    return url.protocol === "http:" || url.protocol === "https:"
-      ? url
-      : new URL(fallbackAppUrl);
+    const url = new URL(configuredAppUrl);
+    return url.protocol === "http:" || url.protocol === "https:" ? url : undefined;
   } catch {
-    return new URL(fallbackAppUrl);
+    return undefined;
   }
 })();
 
@@ -26,7 +24,6 @@ export const siteMetadata: Metadata = {
   publisher: "Taskboard",
   referrer: "strict-origin-when-cross-origin",
   formatDetection: { telephone: false },
-  alternates: { canonical: "/" },
   icons: {
     icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
     apple: [{ url: "/apple-icon.svg", type: "image/svg+xml" }],
@@ -36,7 +33,6 @@ export const siteMetadata: Metadata = {
     siteName: "Taskboard",
     title: "Taskboard — Theo dõi công việc và mốc phát hành",
     description: "Bảng quản lý task cá nhân với Kanban, deadline và tiến độ phát hành.",
-    url: "/",
   },
   twitter: {
     card: "summary",

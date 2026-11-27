@@ -5,6 +5,7 @@ import { ArrowLeft, Check, KeyRound, Mail, ShieldCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { requestEmailOtp, signInWithPassword, verifyEmailOtp } from "@/lib/auth";
 import { isSupabaseConfigured } from "@/lib/supabase-config";
+import styles from "./login.module.css";
 
 type LoginMode = "password" | "otp";
 
@@ -20,7 +21,25 @@ export default function LoginPage() {
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const otpRefs = useRef<Array<HTMLInputElement | null>>([]);
+  const modeTabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const otpValue = otp.join("");
+
+  const handleModeTabKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+    event.preventDefault();
+    const modes: LoginMode[] = ["password", "otp"];
+    const currentIndex = modes.indexOf(mode);
+    const nextIndex =
+      event.key === "Home"
+        ? 0
+        : event.key === "End"
+          ? modes.length - 1
+          : (currentIndex + (event.key === "ArrowRight" ? 1 : -1) + modes.length) %
+            modes.length;
+    const nextMode = modes[nextIndex];
+    switchMode(nextMode);
+    modeTabRefs.current[nextIndex]?.focus();
+  };
 
   useEffect(() => {
     if (cooldown <= 0) return;
@@ -112,8 +131,8 @@ export default function LoginPage() {
 
   const content =
     mode === "password" ? (
-      <form className="auth-form" onSubmit={submitPassword}>
-        <label className="field">
+      <form className={styles.authForm} onSubmit={submitPassword}>
+        <label className={styles.field}>
           <span>Email</span>
           <input
             type="email"
@@ -122,7 +141,7 @@ export default function LoginPage() {
             onChange={(event) => setEmail(event.target.value)}
           />
         </label>
-        <label className="field">
+        <label className={styles.field}>
           <span>Mật khẩu</span>
           <input
             type="password"
@@ -132,13 +151,13 @@ export default function LoginPage() {
             onChange={(event) => setPassword(event.target.value)}
           />
         </label>
-        <button className="primary-button" disabled={busy} type="submit">
+        <button className={styles.primaryButton} disabled={busy} type="submit">
           <KeyRound size={16} /> {busy ? "Đang đăng nhập…" : "Đăng nhập"}
         </button>
       </form>
     ) : (
-      <form className="auth-form" onSubmit={verifyOtp}>
-        <label className="field">
+      <form className={styles.authForm} onSubmit={verifyOtp}>
+        <label className={styles.field}>
           <span>Email</span>
           <input
             type="email"
@@ -150,7 +169,7 @@ export default function LoginPage() {
         </label>
         {!otpSent ? (
           <button
-            className="primary-button"
+            className={styles.primaryButton}
             disabled={busy}
             type="button"
             onClick={sendOtp}
@@ -159,9 +178,9 @@ export default function LoginPage() {
           </button>
         ) : (
           <>
-            <div className="otp-field">
+            <div className={styles.otpField}>
               <span>Nhập mã OTP 6 số</span>
-              <div className="auth-otp-row">
+              <div className={styles.authOtpRow}>
                 {otp.map((digit, index) => (
                   <input
                     key={index}
@@ -182,11 +201,11 @@ export default function LoginPage() {
                 ))}
               </div>
             </div>
-            <button className="primary-button" disabled={busy} type="submit">
+            <button className={styles.primaryButton} disabled={busy} type="submit">
               <Check size={16} /> {busy ? "Đang xác thực…" : "Xác nhận OTP"}
             </button>
             <button
-              className="text-button"
+              className={styles.textButton}
               type="button"
               disabled={busy || cooldown > 0}
               onClick={sendOtp}
@@ -199,35 +218,42 @@ export default function LoginPage() {
     );
 
   return (
-    <main className="auth-shell">
-      <section className="auth-card" aria-labelledby="login-title">
-        <span className="eyebrow">TASKBOARD · CLOUD</span>
-        <div className="auth-heading-icon">
+    <main className={styles.authShell}>
+      <section className={styles.authCard} aria-labelledby="login-title">
+        <span className={styles.eyebrow}>TASKBOARD · CLOUD</span>
+        <div className={styles.authHeadingIcon}>
           <ShieldCheck size={22} />
         </div>
         <h1 id="login-title">Đăng nhập workspace</h1>
         <p>Đăng nhập bằng mật khẩu hoặc mã OTP gửi tới email Supabase Auth.</p>
         {error && (
-          <div className="form-error" role="alert">
+          <div className={styles.formError} role="alert">
             {error}
           </div>
         )}
         {notice && (
-          <div className="form-notice" role="status">
+          <div className={styles.formNotice} role="status">
             {notice}
           </div>
         )}
         {isSupabaseConfigured && (
           <div
-            className="auth-mode-tabs"
+            className={styles.authModeTabs}
             role="tablist"
             aria-label="Phương thức đăng nhập"
           >
             <button
               type="button"
               role="tab"
+              id="login-tab-password"
+              aria-controls="login-panel-password"
               aria-selected={mode === "password"}
-              className={mode === "password" ? "selected" : ""}
+              tabIndex={mode === "password" ? 0 : -1}
+              ref={(element) => {
+                modeTabRefs.current[0] = element;
+              }}
+              onKeyDown={handleModeTabKeyDown}
+              className={mode === "password" ? styles.selected : ""}
               onClick={() => switchMode("password")}
             >
               Mật khẩu
@@ -235,20 +261,38 @@ export default function LoginPage() {
             <button
               type="button"
               role="tab"
+              id="login-tab-otp"
+              aria-controls="login-panel-otp"
               aria-selected={mode === "otp"}
-              className={mode === "otp" ? "selected" : ""}
+              tabIndex={mode === "otp" ? 0 : -1}
+              ref={(element) => {
+                modeTabRefs.current[1] = element;
+              }}
+              onKeyDown={handleModeTabKeyDown}
+              className={mode === "otp" ? styles.selected : ""}
               onClick={() => switchMode("otp")}
             >
               OTP email
             </button>
           </div>
         )}
-        {content}
-        <button className="text-button" type="button" onClick={() => router.push("/")}>
+        <div
+          role="tabpanel"
+          id={`login-panel-${mode}`}
+          aria-labelledby={`login-tab-${mode}`}
+          tabIndex={0}
+        >
+          {content}
+        </div>
+        <button
+          className={styles.textButton}
+          type="button"
+          onClick={() => router.push("/")}
+        >
           <ArrowLeft size={14} /> Tiếp tục local
         </button>
         {!isSupabaseConfigured && (
-          <small className="auth-hint">
+          <small className={styles.authHint}>
             OTP chỉ khả dụng khi đã cấu hình Supabase.
           </small>
         )}

@@ -6,6 +6,8 @@ import {
   CheckCheck,
   CheckCircle2,
   Copy,
+  ArrowDown,
+  ArrowUp,
   MoreHorizontal,
   Pencil,
   Play,
@@ -19,6 +21,7 @@ import { intlLocale } from "@/lib/i18n";
 import type { Member, Task } from "@/lib/types";
 import { isSnoozed } from "@/lib/taskboard/selectors";
 import { getPrimaryStatusAction } from "@/lib/taskboard/status-transitions";
+import styles from "./TaskCard.module.css";
 
 export function TaskCard({
   task,
@@ -39,6 +42,7 @@ export function TaskCard({
   onDragStart,
   onDragEnd,
   onDrop,
+  onKeyboardMove,
 }: {
   task: Task;
   members: Member[];
@@ -58,6 +62,7 @@ export function TaskCard({
   onDragStart: (taskId: string) => void;
   onDragEnd: () => void;
   onDrop: (task: Task) => void;
+  onKeyboardMove: (task: Task, direction: "up" | "down") => void;
 }) {
   const [editingTitle, setEditingTitle] = useState(false);
   const [draftTitle, setDraftTitle] = useState(task.title);
@@ -75,9 +80,6 @@ export function TaskCard({
   return (
     <article
       className={`task-card task-status-${task.status}`}
-      role="button"
-      tabIndex={0}
-      aria-label={`Mở task ${task.code || "TASK"}: ${task.title}`}
       draggable
       onDragStart={() => onDragStart(task.id)}
       onDragEnd={onDragEnd}
@@ -85,13 +87,6 @@ export function TaskCard({
       onDrop={(event) => {
         event.stopPropagation();
         onDrop(task);
-      }}
-      onClick={() => (selectionMode ? onToggleSelection(task.id) : onOpen(task))}
-      onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          selectionMode ? onToggleSelection(task.id) : onOpen(task);
-        }
       }}
     >
       <div className="task-top">
@@ -129,8 +124,8 @@ export function TaskCard({
         <Button
           variant="icon"
           className="mini"
-          aria-label="Mở task"
-          title="Mở chi tiết task"
+          aria-label={`Mở menu task ${task.code || "TASK"}`}
+          title={`Mở menu task ${task.code || "TASK"}`}
           onClick={(event) => {
             event.stopPropagation();
             onOpen(task);
@@ -187,7 +182,14 @@ export function TaskCard({
         </form>
       ) : (
         <div className="task-title-row">
-          <h3>{task.title}</h3>
+          <button
+            className={styles.open}
+            type="button"
+            aria-label={`Mở task ${task.code || "TASK"}: ${task.title}`}
+            onClick={() => (selectionMode ? onToggleSelection(task.id) : onOpen(task))}
+          >
+            <h3>{task.title}</h3>
+          </button>
           {canEdit && !selectionMode && (
             <Button
               type="button"
@@ -245,6 +247,30 @@ export function TaskCard({
             )}
             {primaryAction.label}
           </Button>
+          {canEdit && (
+            <>
+              <Button
+                type="button"
+                variant="icon"
+                className="mini"
+                aria-label={`Đưa task ${task.code || "TASK"} lên`}
+                title="Đưa task lên"
+                onClick={() => onKeyboardMove(task, "up")}
+              >
+                <ArrowUp size={13} aria-hidden="true" />
+              </Button>
+              <Button
+                type="button"
+                variant="icon"
+                className="mini"
+                aria-label={`Đưa task ${task.code || "TASK"} xuống`}
+                title="Đưa task xuống"
+                onClick={() => onKeyboardMove(task, "down")}
+              >
+                <ArrowDown size={13} aria-hidden="true" />
+              </Button>
+            </>
+          )}
         </div>
       )}
       <div className="task-meta">

@@ -3,20 +3,14 @@
 import { useEffect, useState } from "react";
 import {
   AlertTriangle,
-  Bell,
   Check,
-  Database,
   Download,
   Eye,
   EyeOff,
   FileUp,
-  FileText,
   Plus,
-  Palette,
-  Plug,
   Send,
   Trash2,
-  Users,
   X,
 } from "lucide-react";
 import type { BoardData, Member } from "@/lib/types";
@@ -32,6 +26,7 @@ import { DialogFrame } from "@/app/_components/ui/DialogFrame";
 import { DialogHeader } from "@/app/_components/ui/DialogHeader";
 import type { TaskTemplate } from "@/lib/types";
 import { TemplateManagerPanel } from "./TemplateManagerPanel";
+import { SettingsTabs } from "./SettingsTabs";
 import type { ScreenLockConfig } from "@/lib/taskboard/screen-lock";
 
 export type ReminderSettings = {
@@ -157,6 +152,7 @@ export function SettingsModal({
       panelClassName="modal settings-modal"
       labelledBy="settings-modal-title"
       onBackdropClick={onClose}
+      onEscape={onClose}
     >
       <DialogHeader
         eyebrow="WORKSPACE"
@@ -166,51 +162,14 @@ export function SettingsModal({
         onClose={onClose}
       />
       <div className="settings-layout">
-        <nav className="settings-tabs" aria-label="Điều hướng cài đặt">
-          <div className="settings-tab-group">
-            <span className="settings-tab-group-label">Cài đặt nhanh</span>
-            <Button
-              className={tab === "notifications" ? "selected" : ""}
-              onClick={() => setTab("notifications")}
-            >
-              <Bell size={15} /> Thông báo
-            </Button>
-            <Button
-              className={tab === "appearance" ? "selected" : ""}
-              onClick={() => setTab("appearance")}
-            >
-              <Palette size={15} /> Giao diện
-            </Button>
-          </div>
-          <div className="settings-tab-group">
-            <span className="settings-tab-group-label">Workspace</span>
-            <Button
-              className={tab === "members" ? "selected" : ""}
-              onClick={() => setTab("members")}
-            >
-              <Users size={15} /> Đội ngũ
-            </Button>
-            <Button
-              className={tab === "integrations" ? "selected" : ""}
-              onClick={() => setTab("integrations")}
-            >
-              <Plug size={15} /> Tích hợp
-            </Button>
-            <Button
-              className={tab === "data" ? "selected" : ""}
-              onClick={() => setTab("data")}
-            >
-              <Database size={15} /> Dữ liệu
-            </Button>
-            <Button
-              className={tab === "templates" ? "selected" : ""}
-              onClick={() => setTab("templates")}
-            >
-              <FileText size={15} /> Template
-            </Button>
-          </div>
-        </nav>
-        <div className="settings-content">
+        <SettingsTabs tab={tab} onChange={setTab} />
+        <div
+          className="settings-content"
+          role="tabpanel"
+          id={`settings-panel-${tab}`}
+          aria-labelledby={`settings-tab-${tab}`}
+          tabIndex={0}
+        >
           {tab === "templates" && (
             <>
               <div className="setting-intro">
@@ -849,6 +808,7 @@ export function ConfirmDialog({
       overlayClassName="confirm-overlay"
       panelClassName="confirm-dialog"
       labelledBy="confirm-dialog-title"
+      onEscape={onCancel}
     >
       <div className="confirm-icon">
         <AlertTriangle size={22} />

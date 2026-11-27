@@ -12,7 +12,7 @@ npm run dev
 
 Mở http://localhost:3000. Không cần điền biến môi trường để dùng localStorage.
 
-`NEXT_PUBLIC_APP_URL` nếu có phải là URL đầy đủ, ví dụ `https://taskboard.example.com`. Nếu biến bị bỏ trống hoặc sai định dạng, app tự dùng fallback local để không làm hỏng build metadata.
+Đây là private workspace app nên metadata đặt `noindex, nofollow`; không cần canonical public cho các route workspace/login. Nếu cần Open Graph URL tuyệt đối cho môi trường nội bộ, đặt `NEXT_PUBLIC_APP_URL` là URL đầy đủ, ví dụ `https://taskboard.example.com`. Khi biến bỏ trống hoặc sai định dạng, app không tự sinh URL `localhost` giả cho metadata.
 
 ## Vercel
 

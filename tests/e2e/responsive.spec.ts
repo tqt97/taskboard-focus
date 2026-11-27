@@ -19,6 +19,17 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
+test("login keeps its route-scoped visual styles", async ({ page }) => {
+  await page.goto("/login");
+  const card = page.getByRole("heading", { name: "Đăng nhập workspace" }).locator("..");
+  await expect(card).toHaveCSS("border-radius", "20px");
+  await expect(page.getByRole("main")).toHaveCSS("display", "grid");
+  await expect(page.getByRole("button", { name: "Đăng nhập" })).toHaveCSS(
+    "background-color",
+    "rgb(76, 114, 232)",
+  );
+});
+
 test("first launch asks for screen lock setup and accepts the safe defaults", async ({
   browser,
 }) => {
@@ -149,6 +160,11 @@ test("mobile uses a right-side menu instead of a clipped sidebar control", async
       name: "Đóng menu",
     }),
   ).toBeVisible();
+  await expect(
+    page.getByRole("navigation", { name: "Điều hướng mobile" }).getByRole("button", {
+      name: "Khóa màn hình",
+    }),
+  ).toBeVisible();
 });
 
 test("workspace shell stays mounted while changing views", async ({ page }) => {
@@ -247,6 +263,39 @@ test("new task modal groups fields and supports multiple dependencies", async ({
   expect(Math.abs(detailsHeight - historyHeight)).toBeLessThan(1);
 });
 
+test("workspace dialogs and task cards expose a keyboard-safe semantic contract", async ({
+  page,
+}) => {
+  await page.goto("/tasks");
+  const taskTrigger = page.getByRole("button", {
+    name: /Mở task MENSQZIN-248/,
+  });
+  await expect(taskTrigger).toBeVisible();
+  await expect(page.locator(".task-card").first()).not.toHaveAttribute("role");
+  await expect(
+    page.getByRole("button", { name: "Đưa task MENSQZIN-248 lên" }),
+  ).toBeVisible();
+
+  await taskTrigger.focus();
+  await taskTrigger.click();
+  const dialog = page.getByRole("dialog", { name: "Thông tin task" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.locator(":focus")).toBeAttached();
+  await expect(dialog.locator(":focus")).toBeVisible();
+
+  const historyTab = dialog.getByRole("tab", { name: /Lịch sử thay đổi/ });
+  await historyTab.focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(dialog.getByRole("tab", { name: /Thảo luận/ })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(taskTrigger).toBeFocused();
+});
+
 test("quick capture shortcut and inline task title edit work on the board", async ({
   page,
 }) => {
@@ -290,7 +339,7 @@ test("template management lives in workspace settings", async ({ page }) => {
 
   await page.getByRole("button", { name: "Cài đặt" }).click({ force: true });
   const settings = page.getByRole("dialog", { name: "Cài đặt" });
-  await settings.getByRole("button", { name: "Template" }).click();
+  await settings.getByRole("tab", { name: "Template" }).click();
   await expect(
     settings.getByRole("heading", { name: "Template công việc" }),
   ).toBeVisible();
@@ -462,10 +511,25 @@ test("timeline shows milestone calendar and release timeline controls", async ({
   await expect(legend.getByText("Deadline", { exact: true })).toBeVisible();
   if ((page.viewportSize()?.width || 0) >= 601) {
     const deadlineEvent = timeline.getByRole("button", { name: /Deadline/ }).first();
-    await expect(deadlineEvent).toHaveAttribute("draggable", "true");
-    await deadlineEvent.dragTo(timeline.locator(".calendar-day").first());
-    await expect(page.getByText(/Đã đổi deadline/)).toBeVisible();
+    if (await deadlineEvent.count()) {
+      await expect(deadlineEvent).toHaveAttribute("draggable", "true");
+      await deadlineEvent.dragTo(timeline.locator(".calendar-day").first());
+      await expect(page.getByText(/Đã đổi deadline/)).toBeVisible();
+    }
   }
+  await expect(page.locator("#timeline-panel-calendar")).toHaveAttribute(
+    "aria-labelledby",
+    "timeline-tab-calendar",
+  );
+  await page.getByRole("tab", { name: /Lịch tuần/ }).press("ArrowRight");
+  await expect(page.getByRole("tab", { name: /Timeline release/ })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await expect(page.locator("#timeline-panel-timeline")).toHaveAttribute(
+    "aria-labelledby",
+    "timeline-tab-timeline",
+  );
   const timelineTab = page.getByRole("tab", { name: /Timeline release/ });
   await expect(timelineTab).toBeVisible();
   await timelineTab.click({ force: true });

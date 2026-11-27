@@ -10,7 +10,12 @@ export function TaskHistoryPanel({
   locale: AppLocale;
 }) {
   return (
-    <section className="task-history-panel" id="task-history-panel" role="tabpanel">
+    <section
+      className="task-history-panel"
+      id="task-history-panel"
+      role="tabpanel"
+      aria-labelledby="task-tab-history"
+    >
       <div className="form-block-heading">
         <div>
           <h3>Lịch sử thay đổi</h3>
