@@ -5842,10 +5842,37 @@
 .timeline-drag-hint {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 7px;
   margin-left: auto;
-  color: var(--muted);
+  min-height: 30px;
+  padding: 3px 9px 3px 5px;
+  border-left: 3px solid var(--accent);
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--accent) 5%, var(--surface));
   font-size: 10px;
+}
+.timeline-drag-icon {
+  display: inline-grid;
+  width: 23px;
+  height: 23px;
+  place-items: center;
+  border-radius: 5px;
+  background: var(--accent-tint);
+  color: var(--accent);
+}
+.timeline-drag-copy {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  min-width: 0;
+}
+.timeline-drag-copy strong {
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 800;
+}
+.timeline-drag-copy > span {
+  color: var(--muted);
 }
 .calendar-grid {
   display: grid;
@@ -5909,7 +5936,8 @@
 }
 .calendar-event.milestone-not-draggable,
 .release-milestone.milestone-not-draggable {
-  cursor: pointer;
+  cursor: not-allowed;
+  opacity: 0.78;
 }
 .calendar-event:active,
 .release-milestone:active {

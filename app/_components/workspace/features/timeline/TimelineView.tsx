@@ -35,9 +35,11 @@ const timelineCopy = {
     previous: "Khoảng thời gian trước",
     next: "Khoảng thời gian sau",
     today: "Hôm nay",
-    dragHint: "Kéo mốc Deadline sang ngày khác để đổi hạn",
-    readOnlyDragHint:
-      "Chỉ Deadline có thể kéo; mở task để sửa các mốc Dev/Staging/Release.",
+    dragHint: { lead: "Chỉ Deadline", body: "có thể kéo sang ngày khác để đổi hạn" },
+    readOnlyDragHint: {
+      lead: "Chỉ xem",
+      body: "mở task để sửa Deadline, Dev/Staging/Release",
+    },
     openDetails: "Mở chi tiết task để chỉnh mốc này",
     dependency: "Phụ thuộc",
     noDependency: "Không có phụ thuộc",
@@ -61,9 +63,11 @@ const timelineCopy = {
     previous: "Previous period",
     next: "Next period",
     today: "Today",
-    dragHint: "Drag a Deadline milestone to another day to reschedule it",
-    readOnlyDragHint:
-      "Only Deadline can be dragged; open the task to edit Dev/Staging/Release.",
+    dragHint: { lead: "Only Deadline", body: "can be dragged to reschedule" },
+    readOnlyDragHint: {
+      lead: "View only",
+      body: "open the task to edit Deadline, Dev/Staging/Release",
+    },
     openDetails: "Open task details to edit this milestone",
     dependency: "Depends on",
     noDependency: "No dependencies",
@@ -87,9 +91,11 @@ const timelineCopy = {
     previous: "前の期間",
     next: "次の期間",
     today: "今日",
-    dragHint: "Deadlineを別の日へドラッグして変更",
-    readOnlyDragHint:
-      "ドラッグできるのはDeadlineのみ。Dev/Staging/Releaseはタスク詳細で変更します。",
+    dragHint: { lead: "Deadlineのみ", body: "別の日へドラッグして変更" },
+    readOnlyDragHint: {
+      lead: "閲覧のみ",
+      body: "タスク詳細でDeadline、Dev/Staging/Releaseを変更",
+    },
     openDetails: "タスク詳細でこのマイルストーンを変更",
     dependency: "依存先",
     noDependency: "依存関係なし",
@@ -327,7 +333,15 @@ export function TimelineView({
           {labels.today}
         </Button>
         <span className="timeline-drag-hint">
-          <Move size={13} /> {readOnly ? labels.readOnlyDragHint : labels.dragHint}
+          <span className="timeline-drag-icon" aria-hidden="true">
+            <Move size={13} />
+          </span>
+          <span className="timeline-drag-copy">
+            <strong>
+              {(readOnly ? labels.readOnlyDragHint : labels.dragHint).lead}
+            </strong>
+            <span>{(readOnly ? labels.readOnlyDragHint : labels.dragHint).body}</span>
+          </span>
         </span>
       </div>
       {mode === "calendar" ? (
@@ -355,7 +369,7 @@ export function TimelineView({
                 {visibleTasks.flatMap((task) =>
                   eventsForDay(task, day).map((milestone) => (
                     <Button
-                      className={`calendar-event milestone-${milestone.key}${milestone.key === "deadline" ? "" : " milestone-not-draggable"}`}
+                      className={`calendar-event milestone-${milestone.key}${milestone.key === "deadline" && !readOnly ? "" : " milestone-not-draggable"}`}
                       key={`${task.id}-${milestone.key}`}
                       draggable={milestone.key === "deadline" && !readOnly}
                       onDragStart={(event) => handleDragStart(task, event)}
@@ -434,7 +448,7 @@ export function TimelineView({
                   >
                     {eventsForDay(task, day).map((milestone) => (
                       <Button
-                        className={`release-milestone milestone-${milestone.key}${milestone.key === "deadline" ? "" : " milestone-not-draggable"}`}
+                        className={`release-milestone milestone-${milestone.key}${milestone.key === "deadline" && !readOnly ? "" : " milestone-not-draggable"}`}
                         key={`${task.id}-${milestone.key}`}
                         draggable={milestone.key === "deadline" && !readOnly}
                         onDragStart={(event) => handleDragStart(task, event)}

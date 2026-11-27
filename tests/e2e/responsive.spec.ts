@@ -512,6 +512,9 @@ test("timeline shows milestone calendar and release timeline controls", async ({
     "true",
   );
   const timeline = page.getByRole("region", { name: "Lịch và timeline công việc" });
+  await expect(timeline.locator(".timeline-drag-hint strong")).toHaveText(
+    "Chỉ Deadline",
+  );
   const legend = timeline.locator(".timeline-legend");
   await expect(legend.getByText("Dev up", { exact: true })).toBeVisible();
   await expect(legend.getByText("Staging up", { exact: true })).toBeVisible();
@@ -546,6 +549,9 @@ test("timeline shows milestone calendar and release timeline controls", async ({
   await expect(
     timeline.locator(".release-milestone.milestone-dev_up").first(),
   ).toHaveAttribute("draggable", "false");
+  await expect(
+    timeline.locator(".release-milestone.milestone-dev_up").first(),
+  ).toHaveCSS("cursor", "not-allowed");
   await expect(page.getByRole("combobox", { name: "Người phụ trách" })).toBeVisible();
   await expect(page.getByRole("combobox", { name: "Mốc hiển thị" })).toBeVisible();
 });
