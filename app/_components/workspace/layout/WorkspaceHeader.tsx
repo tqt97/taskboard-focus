@@ -4,6 +4,7 @@ import { Button } from "@/app/_components/ui/Button";
 import dynamic from "next/dynamic";
 import {
   Bell,
+  BookOpen,
   CalendarDays,
   CalendarRange,
   CloudDownload,
@@ -230,6 +231,14 @@ export function WorkspaceHeader({
           onValueChange={(value) => onLocaleChange(value as AppLocale)}
         />
         <div className="header-utility-actions" aria-label="Công cụ workspace">
+          <Button
+            variant="icon"
+            aria-label="Mở hướng dẫn sử dụng"
+            title="Hướng dẫn sử dụng"
+            onClick={() => onNavigate("/guide")}
+          >
+            <BookOpen size={17} />
+          </Button>
           {cloudConfigured && cloudUserEmail ? (
             <>
               <Button
