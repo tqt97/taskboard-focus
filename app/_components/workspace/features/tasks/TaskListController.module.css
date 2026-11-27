@@ -14,6 +14,94 @@
   color: #536174;
 }
 
+.taskScope :global(.tasks-panel .kanban-column > header .status) {
+  color: #536174;
+}
+
+.taskScope :global(.task-flat-list) {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: start;
+  gap: 10px;
+}
+
+.taskScope :global(.task-flat-list-item) {
+  min-width: 0;
+}
+
+.taskScope :global(.task-flat-list .task-card.task-card-compact) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0 14px;
+  min-height: 0;
+  padding: 9px 12px;
+  border-radius: 10px;
+}
+
+.taskScope :global(.task-flat-list .task-card-compact .task-top),
+.taskScope :global(.task-flat-list .task-card-compact .task-title-row),
+.taskScope :global(.task-flat-list .task-card-compact .task-next-action),
+.taskScope :global(.task-flat-list .task-card-compact .task-checklist-progress),
+.taskScope :global(.task-flat-list .task-card-compact .task-dependency),
+.taskScope :global(.task-flat-list .task-card-compact .task-snooze-info),
+.taskScope :global(.task-flat-list .task-card-compact .task-meta) {
+  grid-column: 1;
+}
+
+.taskScope :global(.task-flat-list .task-card-compact .task-top) {
+  margin-bottom: 1px;
+}
+
+.taskScope :global(.task-flat-list .task-card-compact .task-title-row h3) {
+  margin: 1px 0 3px;
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.taskScope :global(.task-flat-list .task-card-compact .task-card-actions) {
+  grid-column: 2;
+  grid-row: 1 / span 5;
+  align-self: center;
+  margin: 0;
+}
+
+.taskScope :global(.task-flat-list .task-card-compact .task-meta) {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--line);
+}
+
+.taskScope :global(.task-flat-list .task-card-compact .task-next-action),
+.taskScope :global(.task-flat-list .task-card-compact .task-checklist-progress),
+.taskScope :global(.task-flat-list .task-card-compact .task-dependency),
+.taskScope :global(.task-flat-list .task-card-compact .task-snooze-info) {
+  margin: 2px 0;
+  font-size: 10px;
+}
+
+@media (max-width: 620px) {
+  .taskScope :global(.task-flat-list) {
+    grid-template-columns: 1fr;
+  }
+
+  .taskScope :global(.task-flat-list .task-card.task-card-compact) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .taskScope :global(.task-flat-list .task-card-compact .task-card-actions) {
+    grid-column: 1;
+    grid-row: auto;
+    justify-self: start;
+    margin-top: 7px;
+  }
+}
+
+@media (min-width: 621px) and (max-width: 980px) {
+  .taskScope :global(.task-flat-list) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 .taskScope :global(.task-panel-actions) {
   display: flex;
   align-items: center;

@@ -43,6 +43,8 @@ export function TaskCard({
   onDragEnd,
   onDrop,
   onKeyboardMove,
+  dragEnabled = true,
+  density = "board",
 }: {
   task: Task;
   members: Member[];
@@ -63,6 +65,8 @@ export function TaskCard({
   onDragEnd: () => void;
   onDrop: (task: Task) => void;
   onKeyboardMove: (task: Task, direction: "up" | "down") => void;
+  dragEnabled?: boolean;
+  density?: "board" | "compact";
 }) {
   const [editingTitle, setEditingTitle] = useState(false);
   const [draftTitle, setDraftTitle] = useState(task.title);
@@ -79,18 +83,18 @@ export function TaskCard({
 
   return (
     <article
-      className={`task-card task-status-${task.status}`}
-      draggable={canEdit}
+      className={`task-card task-status-${task.status}${density === "compact" ? " task-card-compact" : ""}`}
+      draggable={canEdit && dragEnabled}
       onDragStart={() => {
-        if (canEdit) onDragStart(task.id);
+        if (canEdit && dragEnabled) onDragStart(task.id);
       }}
       onDragEnd={onDragEnd}
       onDragOver={(event) => {
-        if (canEdit) event.preventDefault();
+        if (canEdit && dragEnabled) event.preventDefault();
       }}
       onDrop={(event) => {
         event.stopPropagation();
-        if (canEdit) onDrop(task);
+        if (canEdit && dragEnabled) onDrop(task);
       }}
     >
       <div className="task-top">
@@ -233,7 +237,7 @@ export function TaskCard({
           }).format(new Date(task.snoozed_until))}
         </p>
       ) : null}
-      {!selectionMode && (
+      {!selectionMode && density !== "compact" && (
         <div className="task-card-actions" onClick={(event) => event.stopPropagation()}>
           <Button
             type="button"

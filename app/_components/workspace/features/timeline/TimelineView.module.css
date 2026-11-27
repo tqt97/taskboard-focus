@@ -211,9 +211,12 @@
   font-size: 10px;
 }
 .timelineScope :global(.calendar-event small) {
-  color: var(--milestone-color);
+  color: #314a98 !important;
   font-size: 9px;
   font-weight: 800;
+}
+:global([data-theme="dark"]) .timelineScope :global(.calendar-event small) {
+  color: #c4d0ff !important;
 }
 .timelineScope :global(.calendar-empty) {
   padding: 8px 4px;

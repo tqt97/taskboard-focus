@@ -742,7 +742,7 @@ export default function WorkspaceRuntime({
   );
   const visibleTasks = useMemo(
     () =>
-      focusMode
+      focusMode && view === "tasks"
         ? filtered.filter(
             (task) =>
               task.status !== "done" &&
@@ -753,7 +753,7 @@ export default function WorkspaceRuntime({
                 Boolean(dueState(task.deadline))),
           )
         : filtered,
-    [filtered, focusMode],
+    [filtered, focusMode, view],
   );
   const reminderTasks = useMemo(
     () =>
@@ -761,10 +761,11 @@ export default function WorkspaceRuntime({
     [data.tasks],
   );
   const active = view === "timeline" ? reminderTasks : [];
-  const todayTasks = useMemo(
-    () => (view === "today" ? getTodayTasks(data.tasks, now) : []),
-    [data.tasks, now, view],
-  );
+  const todayTasks = useMemo(() => {
+    if (view !== "today") return [];
+    const todayIds = new Set(getTodayTasks(data.tasks, now).map((task) => task.id));
+    return filtered.filter((task) => todayIds.has(task.id));
+  }, [data.tasks, filtered, now, view]);
   const navigationTaskCounts = useMemo(() => {
     let activeCount = 0;
     let draftCount = 0;
@@ -1854,7 +1855,10 @@ export default function WorkspaceRuntime({
   const browseTasks = useCallback(() => router.push("/tasks"), [router]);
   const openSettings = useCallback(() => setModal("settings"), []);
   const taskCard = useCallback(
-    (task: Task) => (
+    (
+      task: Task,
+      options?: { dragEnabled?: boolean; density?: "board" | "compact" },
+    ) => (
       <LazyTaskCard
         key={task.id}
         task={task}
@@ -1876,6 +1880,8 @@ export default function WorkspaceRuntime({
         onDragEnd={() => setDragId(null)}
         onDrop={dropTask}
         onKeyboardMove={moveTaskByKeyboard}
+        dragEnabled={options?.dragEnabled}
+        density={options?.density}
       />
     ),
     [

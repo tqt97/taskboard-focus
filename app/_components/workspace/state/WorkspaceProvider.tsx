@@ -29,7 +29,10 @@ export type WorkspaceRuntimeValue = {
   selectedTaskIds: string[];
   toggleSelectionMode: () => void;
   setSelectedTaskIds: (ids: string[]) => void;
-  taskCard: (task: Task) => ReactNode;
+  taskCard: (
+    task: Task,
+    options?: { dragEnabled?: boolean; density?: "board" | "compact" },
+  ) => ReactNode;
   dropOnStatus: (status: Task["status"], targetId?: string) => void;
   bulkUpdateTasks: (patch: Partial<Task>, message: string) => void;
   savedViews: SavedView[];

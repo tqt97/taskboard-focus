@@ -40,7 +40,10 @@ function MeasuredTaskItem({
   onHeight,
 }: {
   task: Task;
-  taskCard: (task: Task) => ReactNode;
+  taskCard: (
+    task: Task,
+    options?: { dragEnabled?: boolean; density?: "board" | "compact" },
+  ) => ReactNode;
   top: number;
   onHeight: (id: string, height: number) => void;
 }) {

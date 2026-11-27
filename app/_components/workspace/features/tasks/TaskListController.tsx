@@ -14,6 +14,7 @@ import {
   X,
 } from "lucide-react";
 import dynamic from "next/dynamic";
+import { useMemo } from "react";
 import { Select } from "@/app/_components/ui/Select";
 import {
   useWorkspaceActions,
@@ -21,6 +22,7 @@ import {
   useWorkspaceFilters,
   useWorkspaceView,
 } from "../../state/WorkspaceProvider";
+import { TaskFlatList } from "./TaskFlatList";
 
 const TaskBoardColumns = dynamic(
   () => import("./TaskBoardColumns").then((module) => module.TaskBoardColumns),
@@ -38,6 +40,7 @@ export function TaskListController() {
   const {
     data,
     copy,
+    dueState,
     visibleTasks,
     todayTasks,
     focusMode,
@@ -77,7 +80,25 @@ export function TaskListController() {
   };
   const labels = copy.status;
   const priorityLabels = copy.priority;
-  const tasks = view === "today" ? todayTasks : visibleTasks;
+  const tasks = useMemo(() => {
+    const source = view === "today" ? todayTasks : visibleTasks;
+    if (view === "tasks") return source;
+    return [...source].sort((a, b) => {
+      if (view === "drafts") {
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      }
+      const aOverdue = a.deadline && dueState(a.deadline) === "overdue" ? 0 : 1;
+      const bOverdue = b.deadline && dueState(b.deadline) === "overdue" ? 0 : 1;
+      if (aOverdue !== bOverdue) return aOverdue - bOverdue;
+      const priorityRank = { urgent: 0, high: 1, medium: 2, low: 3 };
+      const priorityDifference = priorityRank[a.priority] - priorityRank[b.priority];
+      if (priorityDifference) return priorityDifference;
+      return (
+        new Date(a.deadline || "9999-12-31").getTime() -
+        new Date(b.deadline || "9999-12-31").getTime()
+      );
+    });
+  }, [dueState, todayTasks, view, visibleTasks]);
 
   return (
     <div className={styles.taskScope}>
@@ -89,9 +110,11 @@ export function TaskListController() {
               {tasks.length} task
               {view === "today"
                 ? " cần xử lý hôm nay"
-                : focusMode
-                  ? " cần tập trung"
-                  : " · trạng thái đi từ trái sang phải"}
+                : view === "drafts"
+                  ? " bản nháp gần đây"
+                  : focusMode
+                    ? " cần tập trung"
+                    : " · trạng thái đi từ trái sang phải"}
             </p>
           </div>
           <div className="task-panel-actions">
@@ -104,23 +127,25 @@ export function TaskListController() {
               <CheckCheck size={14} />
               {selectionMode ? "Đang chọn" : "Chọn nhiều"}
             </Button>
-            <div className="view-switch">
-              <Button
-                className={focusMode ? "" : "selected"}
-                onClick={() => setFocusMode(false)}
-              >
-                Kanban
-              </Button>
-              <Button
-                className={focusMode ? "selected" : ""}
-                onClick={() => setFocusMode(true)}
-              >
-                Focus
-              </Button>
-              <span className="view-switch-note">
-                {sortMode === "manual" ? "Thứ tự kéo thả" : "Ưu tiên → deadline"}
-              </span>
-            </div>
+            {view === "tasks" && (
+              <div className="view-switch">
+                <Button
+                  className={focusMode ? "" : "selected"}
+                  onClick={() => setFocusMode(false)}
+                >
+                  Kanban
+                </Button>
+                <Button
+                  className={focusMode ? "selected" : ""}
+                  onClick={() => setFocusMode(true)}
+                >
+                  Focus
+                </Button>
+                <span className="view-switch-note">
+                  {sortMode === "manual" ? "Thứ tự kéo thả" : "Ưu tiên → deadline"}
+                </span>
+              </div>
+            )}
           </div>
         </div>
         <div className="saved-view-bar">
@@ -163,18 +188,20 @@ export function TaskListController() {
             />
             <kbd>Ctrl/⌘ K</kbd>
           </label>
-          <label className="select-wrap">
-            <Filter size={15} />
-            <Select
-              aria-label="Lọc theo trạng thái"
-              value={statusFilter}
-              options={[
-                { value: "all", label: "Mọi trạng thái" },
-                ...Object.entries(labels).map(([value, label]) => ({ value, label })),
-              ]}
-              onValueChange={setStatusFilter}
-            />
-          </label>
+          {view === "tasks" && (
+            <label className="select-wrap">
+              <Filter size={15} />
+              <Select
+                aria-label="Lọc theo trạng thái"
+                value={statusFilter}
+                options={[
+                  { value: "all", label: "Mọi trạng thái" },
+                  ...Object.entries(labels).map(([value, label]) => ({ value, label })),
+                ]}
+                onValueChange={setStatusFilter}
+              />
+            </label>
+          )}
           <label className="select-wrap priority-filter">
             <Select
               aria-label="Lọc theo mức ưu tiên"
@@ -284,58 +311,64 @@ export function TaskListController() {
             </Button>
           </div>
         )}
-        <div className="priority-guide">
-          <span className="guide-note">
-            <i className="urgent" />
-            Trên cùng = cần xử lý trước
-          </span>
-          <span className="guide-note">
-            <ArrowDownUp size={13} /> Kanban: tiến độ trái → phải
-          </span>
-          <div className="legend-group">
-            <b>Priority</b>
-            <span>
-              <i className="legend-swatch urgent" />
-              Khẩn
+        {view === "tasks" && (
+          <div className="priority-guide">
+            <span className="guide-note">
+              <i className="urgent" />
+              Trên cùng = cần xử lý trước
             </span>
-            <span>
-              <i className="legend-swatch high" />
-              Cao
+            <span className="guide-note">
+              <ArrowDownUp size={13} /> Kanban: tiến độ trái → phải
             </span>
-            <span>
-              <i className="legend-swatch medium" />
-              Vừa
-            </span>
-            <span>
-              <i className="legend-swatch low" />
-              Thấp
-            </span>
+            <div className="legend-group">
+              <b>Priority</b>
+              <span>
+                <i className="legend-swatch urgent" />
+                Khẩn
+              </span>
+              <span>
+                <i className="legend-swatch high" />
+                Cao
+              </span>
+              <span>
+                <i className="legend-swatch medium" />
+                Vừa
+              </span>
+              <span>
+                <i className="legend-swatch low" />
+                Thấp
+              </span>
+            </div>
+            <div className="legend-group">
+              <b>Severity</b>
+              <span>
+                <i className="legend-swatch severity-critical" />
+                Nghiêm trọng
+              </span>
+              <span>
+                <i className="legend-swatch severity-high" />
+                Cao
+              </span>
+              <span>
+                <i className="legend-swatch severity-medium" />
+                Vừa
+              </span>
+              <span>
+                <i className="legend-swatch severity-low" />
+                Thấp
+              </span>
+            </div>
           </div>
-          <div className="legend-group">
-            <b>Severity</b>
-            <span>
-              <i className="legend-swatch severity-critical" />
-              Nghiêm trọng
-            </span>
-            <span>
-              <i className="legend-swatch severity-high" />
-              Cao
-            </span>
-            <span>
-              <i className="legend-swatch severity-medium" />
-              Vừa
-            </span>
-            <span>
-              <i className="legend-swatch severity-low" />
-              Thấp
-            </span>
-          </div>
-        </div>
-        <TaskBoardColumns
-          tasks={tasks}
-          taskCard={taskCard}
-          onDropStatus={dropOnStatus}
-        />
+        )}
+        {view === "tasks" ? (
+          <TaskBoardColumns
+            tasks={tasks}
+            taskCard={taskCard}
+            onDropStatus={dropOnStatus}
+          />
+        ) : (
+          <TaskFlatList tasks={tasks} taskCard={taskCard} />
+        )}
       </section>
     </div>
   );
