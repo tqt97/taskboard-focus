@@ -204,7 +204,7 @@ test("new task modal groups fields and supports multiple dependencies", async ({
   await expect(dialog.getByRole("tab", { name: /Lịch sử thay đổi/ })).toBeVisible();
   await expect(dialog.getByRole("heading", { name: "Thông tin chính" })).toBeVisible();
   await expect(
-    dialog.getByText("Dùng khi công việc lặp lại đều đặn", { exact: false }),
+    dialog.getByText("Thiết lập chu kỳ và ngày kết thúc", { exact: false }),
   ).toBeVisible();
   await expect(
     dialog.locator('details[aria-labelledby="task-detail-heading"]'),
@@ -217,6 +217,11 @@ test("new task modal groups fields and supports multiple dependencies", async ({
   await expect(
     dialog.locator('details[aria-labelledby="task-detail-heading"]'),
   ).toHaveAttribute("open", "");
+  await dialog.getByRole("button", { name: "Thêm bước" }).click();
+  const deleteChecklistItem = dialog.getByRole("button", { name: "Xóa bước 1" });
+  await expect(deleteChecklistItem).toHaveClass(/danger-action/);
+  await deleteChecklistItem.hover();
+  await expect(deleteChecklistItem).toHaveCSS("background-color", "rgb(200, 63, 80)");
   const relationBlock = dialog.locator(
     'details[aria-labelledby="task-relation-heading"]',
   );
@@ -226,17 +231,20 @@ test("new task modal groups fields and supports multiple dependencies", async ({
   ).toBeVisible();
   const snoozeInput = dialog.getByLabel("Hoãn đến");
   await expect(snoozeInput).toBeVisible();
-  await dialog.getByRole("button", { name: "1 tuần" }).click();
-  await expect(snoozeInput).not.toHaveValue("");
+  await expect(dialog.getByRole("button", { name: "1 ngày" })).toHaveCount(0);
+  await expect(dialog.getByRole("button", { name: "1 tuần" })).toHaveCount(0);
   await expect(dialog.getByText("Chưa có tài liệu hoặc liên kết")).toBeVisible();
-  const resourcesBlock = relationBlock.locator("details.resource-details");
-  await resourcesBlock.locator("summary").click();
+  const resourcesBlock = relationBlock.locator(".resource-details-always-open");
+  await expect(resourcesBlock).toBeVisible();
   await expect(dialog.getByText("Chưa có file đính kèm")).toBeVisible();
 
   await dialog.getByRole("button", { name: "Thêm liên kết" }).click();
-  await dialog.getByLabel("Mục đích liên kết 1").selectOption("Redmine");
+  await dialog.getByRole("combobox", { name: "Mục đích liên kết 1" }).click();
+  await page.getByRole("option", { name: "Redmine" }).click();
   await dialog.getByLabel("URL liên kết 1").fill("https://example.com/redmine");
-  await expect(dialog.getByLabel("Mục đích liên kết 1")).toHaveValue("Redmine");
+  await expect(
+    dialog.getByRole("combobox", { name: "Mục đích liên kết 1" }),
+  ).toHaveAttribute("aria-valuetext", "Redmine");
   const openLink = dialog.getByRole("link", { name: "Mở liên kết 1 trong tab mới" });
   await expect(openLink).toHaveAttribute("target", "_blank");
   await expect(openLink).toHaveAttribute("rel", "noopener noreferrer");

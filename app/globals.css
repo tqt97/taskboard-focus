@@ -1377,6 +1377,34 @@
     padding: 7px 9px;
     font-size: 11px;
   }
+  .checklist-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 42px;
+    min-height: 28px;
+    margin-left: auto;
+    padding: 0 8px;
+    border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--line));
+    border-radius: 999px;
+    background: var(--accent-tint);
+    color: var(--accent);
+    font-size: 11px;
+    font-weight: 800;
+  }
+  .checklist-progress {
+    height: 6px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: var(--line);
+  }
+  .checklist-progress span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, var(--accent), var(--accent-dark));
+    transition: width 180ms ease;
+  }
   .checklist-list {
     display: grid;
     gap: 6px;
@@ -3040,6 +3068,48 @@
   }
   .resource-summary:hover .resource-summary-control {
     background: #e9edff;
+  }
+  .resource-summary-static {
+    cursor: default;
+    margin-top: 0;
+  }
+  .resource-summary-static .resource-summary-control {
+    background: var(--accent-tint);
+  }
+  .planning-dates-row {
+    align-items: start;
+  }
+  .planning-control {
+    min-width: 0;
+  }
+  .planning-control > small {
+    color: var(--muted);
+    font-size: 10px;
+    line-height: 1.35;
+  }
+  .planning-control-input,
+  .recurrence-controls {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+  }
+  .planning-control-input input,
+  .recurrence-controls input,
+  .recurrence-controls .ui-select {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+  .planning-control-input .text-button {
+    flex: none;
+    white-space: nowrap;
+    font-size: 10px;
+  }
+  .recurrence-controls input[type="number"] {
+    max-width: 64px;
+  }
+  .recurrence-controls input[type="date"] {
+    min-width: 128px;
   }
   .task-history-panel {
     display: grid;
@@ -6358,6 +6428,11 @@
 .danger-text {
   color: var(--danger);
 }
+.text-button.danger-text:hover:not(:disabled) {
+  border-radius: 7px;
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
 .task-title-row,
 .task-inline-title-form {
   display: flex;
@@ -6522,6 +6597,29 @@ textarea:focus-visible {
   border-color: color-mix(in srgb, var(--accent) 30%, var(--line));
   background: color-mix(in srgb, var(--accent) 5%, var(--surface));
   color: var(--accent);
+}
+
+.icon-button.danger-action {
+  border: 1px solid color-mix(in srgb, var(--danger-text) 28%, var(--line));
+  background: var(--danger-bg);
+  color: var(--danger-text);
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease,
+    transform 140ms ease;
+}
+
+.icon-button.danger-action:hover:not(:disabled) {
+  border-color: var(--danger-fill);
+  background: var(--danger-fill);
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.icon-button.danger-action:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--danger-text) 32%, transparent);
+  outline-offset: 2px;
 }
 
 .text-button {

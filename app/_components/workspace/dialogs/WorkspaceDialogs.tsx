@@ -229,7 +229,7 @@ export function SettingsModal({
                       />
                       <Button
                         variant="icon"
-                        className="mini"
+                        className="mini danger-action"
                         type="button"
                         title="Xóa thành viên cloud"
                         aria-label={`Xóa thành viên ${member.user_id}`}

@@ -63,8 +63,7 @@ export function TemplateManagerPanel({
                 ) : deleteId === template.id ? (
                   <div className="template-manager-actions">
                     <Button
-                      variant="text"
-                      className="danger-text"
+                      variant="danger"
                       onClick={() => {
                         if (onDelete(template.id)) setDeleteId("");
                       }}
@@ -90,7 +89,7 @@ export function TemplateManagerPanel({
                     </Button>
                     <Button
                       variant="icon"
-                      className="danger-text"
+                      className="danger-action"
                       aria-label={`Xóa ${template.name}`}
                       onClick={() => setDeleteId(template.id)}
                     >

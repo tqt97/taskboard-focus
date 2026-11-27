@@ -118,9 +118,6 @@ export function TaskModal({
     [checklist, setChecklist] = useState<TaskChecklistItem[]>(task.checklist || []),
     [uploadingAttachment, setUploadingAttachment] = useState(false),
     [activeTab, setActiveTab] = useState<TaskModalTab>("details"),
-    [resourcesOpen, setResourcesOpen] = useState(
-      Boolean((task.attachments || []).length || legacyLinks(task).length),
-    ),
     [dependencySearch, setDependencySearch] = useState(""),
     [assigneeIds, setAssigneeIds] = useState<string[]>(
       task.assignee_ids?.length
@@ -200,8 +197,10 @@ export function TaskModal({
     setChecklist((items) =>
       [...items, { id: crypto.randomUUID(), title: "", done: false }].slice(-100),
     );
-  const setSnooze = (days: number) =>
-    field("snoozed_until", new Date(Date.now() + days * 86400000).toISOString());
+  const completedChecklistCount = checklist.filter((item) => item.done).length;
+  const checklistProgress = checklist.length
+    ? Math.round((completedChecklistCount / checklist.length) * 100)
+    : 0;
   const save = (draft: boolean) => {
     const filledLinks = links.filter((link) => link.url.trim());
     const title = form.title.trim();
@@ -547,121 +546,99 @@ export function TaskModal({
                     </label>
                   ))}
                 </div>
-                <label className="field">
-                  <span>Deadline</span>
-                  <input
-                    type="date"
-                    value={toDateInputValue(form.deadline)}
-                    onChange={(e) =>
-                      field("deadline", fromDateInputValue(e.target.value))
-                    }
-                  />
-                </label>
-                <div className="field full">
-                  <span>
-                    Hoãn đến <small>Chỉ hiện ngoài card khi task đang được hoãn.</small>
-                  </span>
-                  <p className="field-hint">
-                    Dùng để tạm ẩn task khỏi Today. Task hoàn tất sẽ tự bỏ mốc hoãn.
-                  </p>
-                  <div className="field-row field-row-3">
+                <div className="field-row field-row-3 full planning-dates-row">
+                  <label className="field planning-control">
+                    <span>Deadline</span>
                     <input
-                      type="datetime-local"
-                      aria-label="Hoãn đến"
-                      value={toDateTimeLocalValue(form.snoozed_until || "")}
-                      onChange={(event) =>
-                        field(
-                          "snoozed_until",
-                          fromDateTimeLocalValue(event.target.value) || undefined,
-                        )
+                      type="date"
+                      value={toDateInputValue(form.deadline)}
+                      onChange={(e) =>
+                        field("deadline", fromDateInputValue(e.target.value))
                       }
-                      disabled={readOnly}
                     />
-                    <Button
-                      variant="secondary"
-                      type="button"
-                      onClick={() => setSnooze(1)}
-                      disabled={readOnly}
-                    >
-                      1 ngày
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      type="button"
-                      onClick={() => setSnooze(7)}
-                      disabled={readOnly}
-                    >
-                      1 tuần
-                    </Button>
-                    {form.snoozed_until && (
-                      <Button
-                        variant="text"
-                        type="button"
-                        onClick={() => field("snoozed_until", undefined)}
+                  </label>
+                  <div className="field planning-control">
+                    <span>Hoãn đến</span>
+                    <div className="planning-control-input">
+                      <input
+                        type="datetime-local"
+                        aria-label="Hoãn đến"
+                        value={toDateTimeLocalValue(form.snoozed_until || "")}
+                        onChange={(event) =>
+                          field(
+                            "snoozed_until",
+                            fromDateTimeLocalValue(event.target.value) || undefined,
+                          )
+                        }
                         disabled={readOnly}
-                      >
-                        Bỏ hoãn
-                      </Button>
-                    )}
+                      />
+                      {form.snoozed_until && (
+                        <Button
+                          variant="text"
+                          type="button"
+                          onClick={() => field("snoozed_until", undefined)}
+                          disabled={readOnly}
+                        >
+                          Bỏ hoãn
+                        </Button>
+                      )}
+                    </div>
+                    <small>Ẩn khỏi Today đến thời điểm đã chọn.</small>
                   </div>
-                </div>
-                <div className="field full recurrence-field">
-                  <span>
-                    Lặp lại task <small>Tự tạo nhắc việc theo chu kỳ đã chọn.</small>
-                  </span>
-                  <p className="field-hint">
-                    Dùng khi công việc lặp lại đều đặn, ví dụ kiểm tra báo cáo mỗi tuần.
-                  </p>
-                  <div className="field-row field-row-3">
-                    <Select
-                      aria-label="Tần suất lặp lại"
-                      value={form.recurrence?.frequency || "none"}
-                      options={[
-                        { value: "none", label: "Không lặp" },
-                        { value: "daily", label: "Mỗi ngày" },
-                        { value: "weekly", label: "Mỗi tuần" },
-                        { value: "monthly", label: "Mỗi tháng" },
-                      ]}
-                      onValueChange={(value) =>
-                        field(
-                          "recurrence",
-                          value === "none"
-                            ? undefined
-                            : {
-                                frequency: value as "daily" | "weekly" | "monthly",
-                                interval: form.recurrence?.interval || 1,
-                              },
-                        )
-                      }
-                    />
-                    {form.recurrence && (
-                      <input
-                        type="number"
-                        min={1}
-                        max={365}
-                        aria-label="Khoảng lặp"
-                        value={form.recurrence.interval}
-                        onChange={(e) =>
-                          field("recurrence", {
-                            ...form.recurrence!,
-                            interval: Math.max(1, Number(e.target.value) || 1),
-                          })
+                  <div className="field planning-control recurrence-field">
+                    <span>Lặp lại</span>
+                    <div className="recurrence-controls">
+                      <Select
+                        aria-label="Tần suất lặp lại"
+                        value={form.recurrence?.frequency || "none"}
+                        options={[
+                          { value: "none", label: "Không lặp" },
+                          { value: "daily", label: "Mỗi ngày" },
+                          { value: "weekly", label: "Mỗi tuần" },
+                          { value: "monthly", label: "Mỗi tháng" },
+                        ]}
+                        onValueChange={(value) =>
+                          field(
+                            "recurrence",
+                            value === "none"
+                              ? undefined
+                              : {
+                                  frequency: value as "daily" | "weekly" | "monthly",
+                                  interval: form.recurrence?.interval || 1,
+                                },
+                          )
                         }
                       />
-                    )}
-                    {form.recurrence && (
-                      <input
-                        type="date"
-                        aria-label="Ngày kết thúc lặp"
-                        value={toDateInputValue(form.recurrence.until || "")}
-                        onChange={(e) =>
-                          field("recurrence", {
-                            ...form.recurrence!,
-                            until: fromDateInputValue(e.target.value) || undefined,
-                          })
-                        }
-                      />
-                    )}
+                      {form.recurrence && (
+                        <input
+                          type="number"
+                          min={1}
+                          max={365}
+                          aria-label="Khoảng lặp"
+                          value={form.recurrence.interval}
+                          onChange={(e) =>
+                            field("recurrence", {
+                              ...form.recurrence!,
+                              interval: Math.max(1, Number(e.target.value) || 1),
+                            })
+                          }
+                        />
+                      )}
+                      {form.recurrence && (
+                        <input
+                          type="date"
+                          aria-label="Ngày kết thúc lặp"
+                          value={toDateInputValue(form.recurrence.until || "")}
+                          onChange={(e) =>
+                            field("recurrence", {
+                              ...form.recurrence!,
+                              until: fromDateInputValue(e.target.value) || undefined,
+                            })
+                          }
+                        />
+                      )}
+                    </div>
+                    <small>Thiết lập chu kỳ và ngày kết thúc nếu cần.</small>
                   </div>
                 </div>
               </details>
@@ -688,14 +665,24 @@ export function TaskModal({
                     placeholder="Bối cảnh, yêu cầu, lưu ý..."
                   />
                 </label>
-                <div className="checklist-panel field full">
+                <div className="checklist-panel content-subsection field full">
                   <div className="checklist-heading">
                     <div>
                       <b>
                         <ListChecks size={15} /> Checklist
                       </b>
-                      <small>Chia task thành các bước nhỏ để dễ hoàn thành.</small>
+                      <small>
+                        {checklist.length
+                          ? `${completedChecklistCount}/${checklist.length} bước đã hoàn thành`
+                          : "Chia task thành các bước nhỏ để dễ hoàn thành."}
+                      </small>
                     </div>
+                    <span
+                      className="checklist-count"
+                      aria-label={`${checklistProgress}% hoàn thành`}
+                    >
+                      {checklistProgress}%
+                    </span>
                     <Button
                       variant="secondary"
                       type="button"
@@ -703,6 +690,16 @@ export function TaskModal({
                     >
                       <Plus size={14} /> Thêm bước
                     </Button>
+                  </div>
+                  <div
+                    className="checklist-progress"
+                    role="progressbar"
+                    aria-label="Tiến độ checklist"
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={checklistProgress}
+                  >
+                    <span style={{ width: `${checklistProgress}%` }} />
                   </div>
                   {checklist.length ? (
                     <div className="checklist-list">
@@ -738,7 +735,7 @@ export function TaskModal({
                           />
                           <Button
                             variant="icon"
-                            className="mini"
+                            className="mini danger-action"
                             type="button"
                             title="Xóa bước checklist"
                             aria-label={`Xóa bước ${index + 1}`}
@@ -841,12 +838,8 @@ export function TaskModal({
                     )}
                   </div>
                 </label>
-                <details
-                  className="resource-details field full"
-                  open={resourcesOpen}
-                  onToggle={(event) => setResourcesOpen(event.currentTarget.open)}
-                >
-                  <summary className="resource-summary">
+                <div className="resource-details resource-details-always-open field full">
+                  <div className="resource-summary resource-summary-static">
                     <span className="resource-summary-copy">
                       <b>Tài liệu & liên kết</b>
                       <small>
@@ -855,11 +848,8 @@ export function TaskModal({
                           : "Chưa có tài liệu hoặc liên kết"}
                       </small>
                     </span>
-                    <span className="resource-summary-control">
-                      <span>{resourcesOpen ? "Thu gọn" : "Mở rộng"}</span>
-                      <ChevronDown size={16} aria-hidden="true" />
-                    </span>
-                  </summary>
+                    <span className="resource-summary-control">Luôn hiển thị</span>
+                  </div>
                   <div className="attachment-panel field full">
                     <div className="attachment-heading">
                       <div>
@@ -965,7 +955,7 @@ export function TaskModal({
                             )}
                             <Button
                               variant="icon"
-                              className="mini"
+                              className="mini danger-action"
                               type="button"
                               aria-label="Xóa file đính kèm"
                               title="Xóa file đính kèm"
@@ -1077,7 +1067,7 @@ export function TaskModal({
                             )}
                             <Button
                               variant="icon"
-                              className="mini"
+                              className="mini danger-action"
                               type="button"
                               aria-label={`Xóa liên kết ${index + 1}`}
                               title="Xóa liên kết"
@@ -1090,7 +1080,7 @@ export function TaskModal({
                       })
                     )}
                   </div>
-                </details>
+                </div>
               </details>
             </div>
           </fieldset>

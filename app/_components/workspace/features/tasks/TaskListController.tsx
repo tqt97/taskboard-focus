@@ -130,6 +130,7 @@ export function TaskListController() {
         </Button>
         <Button
           variant="text"
+          className="danger-text"
           onClick={deleteSavedView}
           disabled={!selectedSavedViewId}
           aria-label="Xóa bộ lọc đã lưu"
