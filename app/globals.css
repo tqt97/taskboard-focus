@@ -4887,64 +4887,6 @@
   }
 }
 
-/* Settings typography: make controls readable and keep supporting copy secondary. */
-.settings-modal .settings-tabs button {
-  font-size: 13px;
-}
-.settings-modal .setting-intro h3 {
-  font-size: 16px;
-}
-.settings-modal .setting-intro p,
-.settings-modal .muted-note {
-  font-size: 12px;
-}
-.settings-modal .setting-member input,
-.settings-modal .add-member input,
-.settings-modal .field input,
-.settings-modal .field textarea {
-  font-size: 14px;
-}
-.settings-modal .field > .ui-select .ui-select-trigger,
-.settings-modal .setting-row .ui-select-trigger {
-  font-size: 14px;
-}
-.settings-modal .field > span {
-  font-size: 13px;
-}
-.settings-modal .tiny-toggle {
-  font-size: 11px;
-}
-.settings-modal .add-member .secondary-button,
-.settings-modal .integration-test-button,
-.settings-modal .passcode-row .secondary-button {
-  font-size: 12px;
-}
-.settings-modal .setting-row b {
-  font-size: 14px;
-}
-.settings-modal .setting-row small {
-  font-size: 12px;
-}
-.settings-modal .setting-row .ui-select-trigger {
-  font-size: 14px;
-}
-.settings-modal .integration-card b {
-  font-size: 14px;
-}
-.settings-modal .integration-card small,
-.settings-modal .integration-feedback {
-  font-size: 12px;
-}
-.settings-modal .connection-status {
-  font-size: 11px;
-}
-.settings-modal .data-summary span {
-  font-size: 12px;
-}
-.settings-modal .data-summary strong {
-  font-size: 14px;
-}
-
 @media (max-width: 600px) {
   .settings-modal .settings-tabs button {
     font-size: 12px;

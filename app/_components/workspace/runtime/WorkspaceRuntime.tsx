@@ -94,6 +94,7 @@ import { WorkspaceHeader } from "../layout/WorkspaceHeader";
 import { useWorkspaceUiState } from "./useWorkspaceUiState";
 import { useWorkspaceFilters } from "./useWorkspaceFilters";
 import { useWorkspaceTaskOrdering } from "./useWorkspaceTaskOrdering";
+import { useWorkspaceTaskDeepLink } from "./useWorkspaceTaskDeepLink";
 import {
   WorkspaceProvider,
   type WorkspaceRuntimeValue,
@@ -816,16 +817,30 @@ export default function WorkspaceRuntime({
     readIds: readNotificationIds,
     dueText,
   });
+  const { openTask: openTaskWithDeepLink, closeTask: closeTaskWithDeepLink } =
+    useWorkspaceTaskDeepLink({
+      tasks: data.tasks,
+      ready,
+      modal,
+      onOpen: (task) => {
+        setTemplateCreateMode(false);
+        setEdit(task);
+        setModal("task");
+      },
+      onClose: () => {
+        setModal(null);
+        setEdit(null);
+        setTemplateCreateMode(false);
+      },
+    });
   const openTaskFromNotification = useCallback(
     (taskId: string) => {
       const task = data.tasks.find((item) => item.id === taskId);
       if (!task) return;
       setNotificationsOpen(false);
-      setTemplateCreateMode(false);
-      setEdit(task);
-      setModal("task");
+      openTaskWithDeepLink(task);
     },
-    [data.tasks],
+    [data.tasks, openTaskWithDeepLink],
   );
   useBrowserReminders({
     ready,
@@ -1830,10 +1845,12 @@ export default function WorkspaceRuntime({
     if (affectedTasks.length) syncRemoteTasks(affectedTasks);
     setToast(`Đã xóa thành viên ${member.name}`);
   };
-  const openTask = useCallback((task: Task) => {
-    setEdit(task);
-    setModal("task");
-  }, []);
+  const openTask = useCallback(
+    (task: Task) => {
+      openTaskWithDeepLink(task);
+    },
+    [openTaskWithDeepLink],
+  );
   const browseTasks = useCallback(() => router.push("/tasks"), [router]);
   const openSettings = useCallback(() => setModal("settings"), []);
   const taskCard = useCallback(
@@ -2261,9 +2278,7 @@ export default function WorkspaceRuntime({
             members={data.members}
             isNew={!edit || templateCreateMode}
             onClose={() => {
-              setModal(null);
-              setEdit(null);
-              setTemplateCreateMode(false);
+              closeTaskWithDeepLink();
             }}
             onSave={saveTask}
             onPrefixChange={(prefix) => setData((d) => ({ ...d, code_prefix: prefix }))}

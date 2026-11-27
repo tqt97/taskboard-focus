@@ -236,18 +236,11 @@ export function ScreenLockGate({
       )}
       {setup && (
         <p className="screen-lock-default-note">
-          <strong>Mặc định tiện lợi</strong>
-          <span className="screen-lock-default-values">
-            <span>
-              <small>Tên hiển thị</small>
-              <b>Anonymous</b>
-            </span>
-            <span>
-              <small>Passcode</small>
-              <b>123456</b>
-            </span>
-          </span>
-          <small>Bạn nên đổi passcode trước khi dùng dữ liệu nhạy cảm.</small>
+          <strong>Tạo passcode riêng cho thiết bị này</strong>
+          <small>
+            Đây là lớp khóa giao diện trên thiết bị, không thay thế đăng nhập cloud.
+            Không dùng lại mã PIN dễ đoán.
+          </small>
         </p>
       )}
       <Button

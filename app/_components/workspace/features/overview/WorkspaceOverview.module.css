@@ -2,6 +2,25 @@
   display: contents;
 }
 
+/* Shared muted text was too faint on the light surface; keep overview data AA-readable. */
+.overviewScope :global(.panel),
+.overviewScope :global(.stat-card) {
+  color: #556070;
+}
+
+.overviewScope :global(.stat-card > strong small) {
+  color: #556070;
+}
+
+.overviewScope :global(.status),
+.overviewScope :global(.overview-grid .panel p) {
+  color: #4f5d70;
+}
+
+.overviewScope :global(.pill.priority-urgent) {
+  color: #b42318;
+}
+
 .overviewScope :global(.workload-panel) {
   min-width: 0;
 }
@@ -74,6 +93,11 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 10px;
+}
+
+.overviewScope :global(.workload-row:has(.avatar-gray)) {
+  border-style: dashed;
+  background: color-mix(in srgb, var(--surface2) 80%, var(--warning) 20%);
 }
 
 @media (max-width: 700px) {

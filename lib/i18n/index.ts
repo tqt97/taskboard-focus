@@ -80,6 +80,8 @@ export type UiCopy = {
     teamTitle: string;
     teamDescription: string;
     noOpenByMember: string;
+    unassigned: string;
+    workloadSummary: (total: number, urgent: number, overdue: number) => string;
     action: {
       start: string;
       review: string;
@@ -150,6 +152,9 @@ const copy: Record<AppLocale, UiCopy> = {
       teamTitle: "Tải công việc",
       teamDescription: "Task đang mở theo người phụ trách",
       noOpenByMember: "Chưa có task đang mở theo người.",
+      unassigned: "Chưa giao",
+      workloadSummary: (total, urgent, overdue) =>
+        `${total} task${urgent ? ` · ${urgent} khẩn` : ""}${overdue ? ` · ${overdue} quá hạn` : ""}`,
       action: {
         start: "Bắt đầu task",
         review: "Review task",
@@ -218,6 +223,9 @@ const copy: Record<AppLocale, UiCopy> = {
       teamTitle: "Workload",
       teamDescription: "Open tasks by assignee",
       noOpenByMember: "No open tasks by member.",
+      unassigned: "Unassigned",
+      workloadSummary: (total, urgent, overdue) =>
+        `${total} task${urgent ? ` · ${urgent} urgent` : ""}${overdue ? ` · ${overdue} overdue` : ""}`,
       action: {
         start: "Start task",
         review: "Review task",
@@ -286,6 +294,9 @@ const copy: Record<AppLocale, UiCopy> = {
       teamTitle: "作業量",
       teamDescription: "担当者ごとの未完了タスク",
       noOpenByMember: "担当者ごとの未完了タスクはありません。",
+      unassigned: "未割り当て",
+      workloadSummary: (total, urgent, overdue) =>
+        `${total}件${urgent ? ` · 緊急 ${urgent}` : ""}${overdue ? ` · 期限超過 ${overdue}` : ""}`,
       action: {
         start: "タスクを開始",
         review: "タスクをレビュー",

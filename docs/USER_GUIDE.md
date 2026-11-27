@@ -36,7 +36,7 @@ Trong Cài đặt → Dữ liệu, app giữ 7 bản sao tự động theo ngày
 
 ## Dữ liệu và khóa màn hình
 
-Local workspace ưu tiên lưu bất đồng bộ trong IndexedDB; nếu không ghi được, app dùng localStorage dự phòng và hiển thị thông báo. Lần đầu mở app, màn hình sẽ hỏi tên hiển thị, OTP passcode 6 số và thời gian tự khóa. Mặc định tiện lợi là `Anonymous` / `123456`, nên đổi passcode nếu dữ liệu nhạy cảm. Có thể đổi lại trong **Cài đặt → Giao diện** hoặc khóa ngay bằng nút khóa. Bản sao tự động nằm trên cùng thiết bị; xóa site data/browser profile có thể làm mất cả workspace lẫn thiết lập khóa. Cloud workspace cần Supabase Auth và RLS; passcode client không bảo vệ endpoint khỏi DevTools.
+Local workspace ưu tiên lưu bất đồng bộ trong IndexedDB; nếu không ghi được, app dùng localStorage dự phòng và hiển thị thông báo. Lần đầu mở app, màn hình sẽ hỏi tên hiển thị, passcode 6 số do bạn tự đặt và thời gian tự khóa. Có thể đổi lại trong **Cài đặt → Giao diện** hoặc khóa ngay bằng nút khóa. Bản sao tự động nằm trên cùng thiết bị; xóa site data/browser profile có thể làm mất cả workspace lẫn thiết lập khóa. Cloud workspace cần Supabase Auth và RLS; passcode client không bảo vệ endpoint khỏi DevTools.
 
 Nếu quên passcode, chọn **Quên passcode hoặc đang dùng mã cũ?**, nhập `RESET` và xác nhận. Thao tác này chỉ xóa cấu hình khóa màn hình, không xóa task hoặc workspace; sau đó app yêu cầu thiết lập passcode mới. Nếu đang nâng cấp từ mã cũ 4 số, có thể nhập mã cũ để mở khóa rồi đổi sang 6 số trong phần Cài đặt.
 

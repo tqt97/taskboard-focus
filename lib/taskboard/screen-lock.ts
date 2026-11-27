@@ -14,7 +14,7 @@ export type ScreenLockConfig = {
 
 export const defaultScreenLockConfig = {
   displayName: "Anonymous",
-  passcode: "123456",
+  passcode: "",
   autoLockMinutes: 15,
 };
 

@@ -30,7 +30,7 @@ test("login keeps its route-scoped visual styles", async ({ page }) => {
   );
 });
 
-test("first launch asks for screen lock setup and accepts the safe defaults", async ({
+test("first launch asks for screen lock setup and accepts a user-chosen passcode", async ({
   browser,
 }) => {
   const context = await browser.newContext();
@@ -39,8 +39,10 @@ test("first launch asks for screen lock setup and accepts the safe defaults", as
 
   const gate = page.getByRole("dialog");
   await expect(gate.getByRole("heading", { name: "Thiết lập màn hình" })).toBeVisible();
-  await expect(gate.getByText(/Anonymous/)).toBeVisible();
-  await expect(gate.getByText(/123456/)).toBeVisible();
+  await expect(gate.getByText(/Tạo passcode riêng/)).toBeVisible();
+  for (const [index, digit] of Array.from("246810").entries()) {
+    await gate.getByLabel(`Passcode số ${index + 1}`).fill(digit);
+  }
   await gate.getByRole("button", { name: "Bắt đầu sử dụng" }).click();
   await expect(gate).toHaveCount(0);
   await expect(page.locator(".topbar")).toBeVisible();

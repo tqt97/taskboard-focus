@@ -237,24 +237,42 @@ export function WorkspaceOverview({
     });
   }, [locale, now, tasks]);
   const maxCreated = Math.max(...creationActivity.map((item) => item.count), 1);
-  const workload = useMemo(
-    () =>
-      members
-        .map((member) => {
-          const assigned = openTasks.filter((task) =>
-            taskAssigneeIds(task).includes(member.id),
-          );
-          return {
-            member,
-            total: assigned.length,
-            urgent: assigned.filter((task) => task.priority === "urgent").length,
-            overdue: assigned.filter((task) => isOverdue(task, now)).length,
-          };
-        })
-        .filter((item) => item.total > 0)
-        .sort((a, b) => b.total - a.total || b.overdue - a.overdue),
-    [members, now, openTasks],
-  );
+  const workload = useMemo(() => {
+    const items = members
+      .filter((member) => member.active)
+      .map((member) => {
+        const assigned = openTasks.filter((task) =>
+          taskAssigneeIds(task).includes(member.id),
+        );
+        return {
+          id: member.id,
+          member,
+          total: assigned.length,
+          urgent: assigned.filter((task) => task.priority === "urgent").length,
+          overdue: assigned.filter((task) => isOverdue(task, now)).length,
+        };
+      })
+      .filter((item) => item.total > 0);
+    const unassigned = openTasks.filter((task) => taskAssigneeIds(task).length === 0);
+    if (unassigned.length) {
+      items.push({
+        id: "__unassigned",
+        member: {
+          id: "__unassigned",
+          name: copy.overview.unassigned,
+          role: copy.overview.unassigned,
+          color: "gray",
+          active: true,
+        },
+        total: unassigned.length,
+        urgent: unassigned.filter((task) => task.priority === "urgent").length,
+        overdue: unassigned.filter((task) => isOverdue(task, now)).length,
+      });
+    }
+    return items.sort(
+      (a, b) => b.overdue - a.overdue || b.urgent - a.urgent || b.total - a.total,
+    );
+  }, [copy.overview.unassigned, members, now, openTasks]);
   const nextAction = nextTask ? getNextAction(nextTask, tasks, now) : null;
   const nextActionCopy =
     nextTask && nextAction ? localizeNextAction(nextTask, nextAction.key, copy) : null;
@@ -505,21 +523,19 @@ export function WorkspaceOverview({
           </div>
           {workload.length ? (
             <div className="workload-list">
-              {workload.map(({ member, total, urgent, overdue }) => (
-                <div className="workload-row" key={member.id}>
+              {workload.map(({ id, member, total, urgent, overdue }) => (
+                <div className="workload-row" key={id}>
                   <span className={`avatar avatar-${member.color}`}>
-                    {member.name.slice(0, 1)}
+                    {id === "__unassigned" ? "?" : member.name.slice(0, 1)}
                   </span>
                   <span className="workload-name">
                     <b>{member.name}</b>
                     <small>{member.role}</small>
                   </span>
                   <span className="workload-count">{total}</span>
-                  {(urgent > 0 || overdue > 0) && (
-                    <small className="workload-risk">
-                      {urgent ? `${urgent} khẩn` : `${overdue} quá hạn`}
-                    </small>
-                  )}
+                  <small className="workload-risk">
+                    {copy.overview.workloadSummary(total, urgent, overdue)}
+                  </small>
                 </div>
               ))}
             </div>

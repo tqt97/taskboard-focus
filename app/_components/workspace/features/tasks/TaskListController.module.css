@@ -2,6 +2,18 @@
   display: contents;
 }
 
+/* Keep the dense task controls readable in the light theme (WCAG AA). */
+.taskScope :global(.tasks-panel) {
+  color: #556070;
+}
+
+.taskScope :global(.search-box > kbd),
+.taskScope :global(.priority-guide .guide-note),
+.taskScope :global(.legend-group > span),
+.taskScope :global(.select-wrap .ui-select-value) {
+  color: #536174;
+}
+
 .taskScope :global(.task-panel-actions) {
   display: flex;
   align-items: center;

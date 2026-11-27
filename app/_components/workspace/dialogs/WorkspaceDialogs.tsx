@@ -30,6 +30,7 @@ import type { TaskTemplate } from "@/lib/types";
 import { TemplateManagerPanel } from "./TemplateManagerPanel";
 import { SettingsTabs } from "./SettingsTabs";
 import type { ScreenLockConfig } from "@/lib/taskboard/screen-lock";
+import styles from "./WorkspaceDialogs.module.css";
 
 export type ReminderSettings = {
   browserEnabled: boolean;
@@ -157,7 +158,7 @@ export function SettingsModal({
     [inviteSending, setInviteSending] = useState(false);
   return (
     <DialogFrame
-      panelClassName="modal settings-modal"
+      panelClassName={`modal settings-modal ${styles.settingsScope}`}
       labelledBy="settings-modal-title"
       onBackdropClick={onClose}
       onEscape={onClose}

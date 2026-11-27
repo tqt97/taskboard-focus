@@ -1,0 +1,61 @@
+.settingsScope :global(.settings-tabs button) {
+  font-size: 13px;
+}
+
+.settingsScope :global(.setting-intro h3) {
+  font-size: 16px;
+}
+
+.settingsScope :global(.setting-intro p),
+.settingsScope :global(.muted-note) {
+  font-size: 12px;
+}
+
+.settingsScope :global(.setting-member input),
+.settingsScope :global(.add-member input),
+.settingsScope :global(.field input),
+.settingsScope :global(.field textarea) {
+  font-size: 14px;
+}
+
+.settingsScope :global(.field > .ui-select .ui-select-trigger),
+.settingsScope :global(.setting-row .ui-select-trigger) {
+  font-size: 14px;
+}
+
+.settingsScope :global(.field > span) {
+  font-size: 13px;
+}
+
+.settingsScope :global(.tiny-toggle) {
+  font-size: 11px;
+}
+
+.settingsScope :global(.add-member .secondary-button),
+.settingsScope :global(.integration-test-button),
+.settingsScope :global(.passcode-row .secondary-button) {
+  font-size: 12px;
+}
+
+.settingsScope :global(.setting-row b),
+.settingsScope :global(.integration-card b) {
+  font-size: 14px;
+}
+
+.settingsScope :global(.setting-row small),
+.settingsScope :global(.integration-card small),
+.settingsScope :global(.integration-feedback) {
+  font-size: 12px;
+}
+
+.settingsScope :global(.connection-status) {
+  font-size: 11px;
+}
+
+.settingsScope :global(.data-summary span) {
+  font-size: 12px;
+}
+
+.settingsScope :global(.data-summary strong) {
+  font-size: 14px;
+}

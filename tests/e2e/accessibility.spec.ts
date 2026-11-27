@@ -56,3 +56,33 @@ test("task dialog has no serious or critical accessibility violations", async ({
     ),
   ).toEqual([]);
 });
+
+for (const route of ["/", "/today", "/drafts", "/inbox", "/timeline"]) {
+  test(`${route} has no serious or critical accessibility violations`, async ({
+    page,
+  }) => {
+    await page.goto(route);
+    await expect(page.locator(".app-shell")).toBeVisible();
+    const results = await new AxeBuilder({ page })
+      .withTags(["wcag2a", "wcag2aa"])
+      .analyze();
+    expect(
+      results.violations.filter((item) =>
+        ["critical", "serious"].includes(item.impact || ""),
+      ),
+    ).toEqual([]);
+  });
+}
+
+test("task deep link opens the requested task and clears on close", async ({
+  page,
+}) => {
+  await page.goto("/tasks?task=t1");
+  const dialog = page.getByRole("dialog", { name: "Thông tin task" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("textbox").first()).toHaveValue(
+    "Hoàn thiện luồng thanh toán",
+  );
+  await dialog.getByRole("button", { name: "Đóng cửa sổ task" }).click();
+  await expect(page).toHaveURL(/\/tasks$/);
+});
