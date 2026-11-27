@@ -189,12 +189,10 @@ export function Select({
         type="button"
         role="combobox"
         aria-label={ariaLabel}
-        aria-valuetext={
-          typeof selectedOption?.label === "string" ? selectedOption.label : undefined
-        }
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={listId}
+        aria-owns={open ? listId : undefined}
         aria-activedescendant={
           open && selectedIndex >= 0 ? `${listId}-option-${selectedIndex}` : undefined
         }

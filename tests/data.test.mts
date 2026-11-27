@@ -104,6 +104,15 @@ test("accepts an explicitly versioned v1 backup", () => {
   assert.deepEqual(result.data.tasks[0].assignee_ids, ["m1"]);
 });
 
+test("accepts an explicitly versioned v2 backup through the backup parser", () => {
+  const payload = { ...fixture(), schema_version: 2 };
+
+  const result = parseBoardBackupText(JSON.stringify(payload));
+
+  assert.ok(result.data);
+  assert.deepEqual(result.data.tasks[0].assignee_ids, ["m1"]);
+});
+
 test("rejects duplicate assignees and dependencies", () => {
   const duplicateAssignees = fixture();
   duplicateAssignees.tasks[0].assignee_ids = ["m1", "m1"];

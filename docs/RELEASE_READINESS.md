@@ -1,6 +1,6 @@
 # Taskboard release readiness
 
-Ngày rà soát: 2026-11-26
+Ngày rà soát: 2026-11-27
 
 Tài liệu này tách rõ phần đã có bằng chứng local/browser khỏi phần cần runtime Supabase thật. Không coi test bị `skip` là bằng chứng cloud đã hoàn tất.
 
@@ -35,7 +35,7 @@ Tài liệu này tách rõ phần đã có bằng chứng local/browser khỏi p
 | Multi-workspace            | Đã kiểm chứng local/browser             | workspace/task/template/view isolation E2E                                                         |
 | Realtime collaboration     | Contract đã triển khai, runtime pending | task + assignee subscriptions; cần Supabase multi-client smoke test                                |
 
-Trong rà soát 2026-11-26, quick capture, snapshot backup, daily reminder digest, persistent workspace layout, lazy route chunks và IndexedDB-first async persistence đã được triển khai. Build hiện báo First Load JS workspace khoảng 103 kB và route entry khoảng 1.52 kB; các page workspace nằm trong route group `(workspace)` và trả content controller thật. Supabase/Chatwork runtime vẫn cần credentials và dịch vụ thật.
+Trong rà soát 2026-11-27, quick capture, snapshot backup, daily reminder digest, persistent workspace layout, lazy route chunks, IndexedDB-first async persistence và axe accessibility assertions đã được triển khai. Build hiện báo First Load JS workspace khoảng 105 kB và route entry khoảng 1.52 kB; các page workspace nằm trong route group `(workspace)` và trả content controller thật. Supabase/Chatwork runtime vẫn cần credentials và dịch vụ thật.
 
 ## Required cloud gate
 
@@ -51,13 +51,14 @@ Lệnh sẽ fail rõ ràng nếu thiếu các biến `TASKBOARD_TEST_*`; không 
 
 ```text
 npm run typecheck             pass
-npm run test                  74 passed, 1 skipped (Supabase credentials absent)
+npm run test                  77 passed, 1 skipped (Supabase credentials absent)
 npm run format:check          pass
-npm run build                 pass; First Load JS workspace ~103 kB, route entry ~1.52 kB
-responsive E2E                12 passed, 2 skipped
-performance E2E               1 passed (100/1,000/10,000 task benchmark)
+npm run build                 pass; First Load JS workspace ~105 kB, route entry ~1.52 kB
+responsive E2E                22 passed, 2 skipped (desktop targeted run)
+axe accessibility E2E         2 passed (desktop targeted run)
+performance E2E               100/1,000 pass; 10,000-task dependency-search path remains a separate investigation
 npm run test:supabase         not run: test credentials absent
 CI                            now runs unit tests before production build/deploy
 ```
 
-E2E cases reported as passed covered responsive layouts, persistent shell navigation, task flows, backup/restore, drafts, discussions, timeline, local persistence and browser performance at 100/1,000/10,000 tasks. Two skips are declared viewport skips for workspace selector isolation where the sidebar is replaced by mobile navigation. The full matrix runner can generate temporary trace artifacts during teardown in this local environment, so the release evidence records the stable targeted suites above instead of claiming a clean full-matrix exit. Supabase authorization, Realtime and push delivery still need a configured test project and dedicated accounts.
+E2E cases reported as passed cover responsive layouts, persistent shell navigation, task flows, backup/restore, drafts, discussions, timeline, local persistence, axe checks and browser performance at 100/1,000 tasks. The 10,000-task dependency-search path remains a separate performance investigation and is not used as the normal regression gate. Two skips are declared viewport skips for workspace selector isolation where the sidebar is replaced by mobile navigation. Supabase authorization, Realtime and push delivery still need a configured test project and dedicated accounts.

@@ -80,13 +80,17 @@ export function TaskCard({
   return (
     <article
       className={`task-card task-status-${task.status}`}
-      draggable
-      onDragStart={() => onDragStart(task.id)}
+      draggable={canEdit}
+      onDragStart={() => {
+        if (canEdit) onDragStart(task.id);
+      }}
       onDragEnd={onDragEnd}
-      onDragOver={(event) => event.preventDefault()}
+      onDragOver={(event) => {
+        if (canEdit) event.preventDefault();
+      }}
       onDrop={(event) => {
         event.stopPropagation();
-        onDrop(task);
+        if (canEdit) onDrop(task);
       }}
     >
       <div className="task-top">
@@ -236,6 +240,7 @@ export function TaskCard({
             className={`task-quick-action${task.status === "review" ? " success" : ""}`}
             title={primaryAction.title}
             aria-label={primaryAction.title}
+            disabled={!canEdit}
             onClick={() => onQuickUpdate(task)}
           >
             {task.status === "blocked" ? (

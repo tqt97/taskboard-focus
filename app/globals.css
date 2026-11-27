@@ -196,7 +196,7 @@
   }
   .breadcrumbs {
     font-size: 11px;
-    color: #9aa3b1;
+    color: var(--muted);
   }
   .breadcrumbs span {
     padding: 0 9px;
@@ -565,7 +565,7 @@
     color: #8993a3;
   }
   .stat-foot {
-    color: #a0a8b5;
+    color: var(--muted);
     font-size: 10px;
   }
   .dashboard-grid {
@@ -590,7 +590,7 @@
   }
   .panel-heading p {
     font-size: 10px;
-    color: #9aa3b1;
+    color: var(--muted);
     margin: 0;
   }
   .text-button {
@@ -1075,12 +1075,12 @@
   }
   .member-row small {
     font-size: 9px;
-    color: #9aa3b1;
+    color: var(--muted);
     margin-top: 2px;
   }
   .member-work {
     font-size: 9px;
-    color: #9aa3b1;
+    color: var(--muted);
   }
   .manage-button {
     margin: 15px -1px -3px;
@@ -1139,7 +1139,7 @@
   .footer {
     display: flex;
     justify-content: space-between;
-    color: #a0a8b5;
+    color: var(--muted);
     font-size: 9px;
     padding: 22px 2px 0;
   }
@@ -1147,7 +1147,7 @@
     display: flex;
     align-items: center;
     gap: 5px;
-    color: #7fa38f;
+    color: var(--success-text);
   }
   .footer-dot {
     padding: 0 4px;
@@ -1248,14 +1248,14 @@
   .field > span {
     font-size: 10px;
     font-weight: 700;
-    color: #6e7a8c;
+    color: var(--muted);
   }
   .field > span b {
     color: #e25e5e;
   }
   .field small {
     font-weight: 400;
-    color: #9aa3b1;
+    color: var(--muted);
   }
   .field input,
   .field textarea,
@@ -1861,7 +1861,7 @@
   }
   .integration-card small {
     font-size: 9px;
-    color: #9aa3b1;
+    color: var(--muted);
     margin-top: 3px;
   }
   .connection-status {
@@ -2330,7 +2330,7 @@
   }
   .empty-state b {
     font-size: 12px;
-    color: #6e7a8c;
+    color: var(--muted);
   }
   .empty-state span {
     font-size: 10px;
@@ -2962,7 +2962,7 @@
     border: 1px solid var(--line);
     border-radius: 7px;
     padding: 9px 10px;
-    color: #7d8898;
+    color: var(--muted);
     font-size: 10px;
   }
   .checkbox-line input {

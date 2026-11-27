@@ -746,13 +746,14 @@ export function SettingsModal({
                   <input
                     type={showPasscode ? "text" : "password"}
                     inputMode="numeric"
+                    aria-label="Passcode mới"
                     value={passcode}
-                    maxLength={4}
+                    maxLength={6}
                     onChange={(e) => {
                       setPasscode(e.target.value.replace(/\D/g, "").slice(0, 6));
                       setPasscodeError("");
                     }}
-                    placeholder="1234"
+                    placeholder="123456"
                   />
                   <Button
                     variant="icon"
@@ -766,7 +767,7 @@ export function SettingsModal({
                   <Button
                     variant="secondary"
                     onClick={() => {
-                      if (passcode && passcode.length !== 4) {
+                      if (passcode && passcode.length !== 6) {
                         setPasscodeError("Passcode mới phải gồm đúng 6 chữ số.");
                         return;
                       }

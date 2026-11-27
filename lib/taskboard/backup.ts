@@ -15,6 +15,7 @@ export function parseBoardBackupText(text: string): ParseBoardResult {
     typeof value === "object" &&
     "schema_version" in value &&
     value.schema_version !== 1 &&
+    value.schema_version !== 2 &&
     value.schema_version !== boardSchemaVersion
   ) {
     return {

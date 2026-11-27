@@ -26,7 +26,7 @@ test("login keeps its route-scoped visual styles", async ({ page }) => {
   await expect(page.getByRole("main")).toHaveCSS("display", "grid");
   await expect(page.getByRole("button", { name: "Đăng nhập" })).toHaveCSS(
     "background-color",
-    "rgb(76, 114, 232)",
+    "rgb(63, 95, 197)",
   );
 });
 
@@ -67,6 +67,16 @@ test("manual lock blocks the workspace until the correct passcode is entered", a
   }
   await gate.getByRole("button", { name: "Mở khóa" }).click({ force: true });
   await expect(gate).toHaveCount(0);
+});
+
+test("settings accepts a six-digit screen-lock passcode", async ({ page }) => {
+  await page.goto("/tasks");
+  await page.getByRole("button", { name: "Cài đặt" }).click({ force: true });
+  const settings = page.getByRole("dialog", { name: "Cài đặt" });
+  await settings.getByRole("tab", { name: "Giao diện" }).click();
+  await settings.getByRole("textbox", { name: "Passcode mới" }).fill("654321");
+  await settings.getByRole("button", { name: "Lưu bảo mật" }).click();
+  await expect(page.getByRole("status")).toContainText("Đã cập nhật bảo mật");
 });
 
 test("deleting the local screen-lock config re-enters setup instead of leaving a stale unlock", async ({
@@ -244,7 +254,7 @@ test("new task modal groups fields and supports multiple dependencies", async ({
   await dialog.getByLabel("URL liên kết 1").fill("https://example.com/redmine");
   await expect(
     dialog.getByRole("combobox", { name: "Mục đích liên kết 1" }),
-  ).toHaveAttribute("aria-valuetext", "Redmine");
+  ).toContainText("Redmine");
   const openLink = dialog.getByRole("link", { name: "Mở liên kết 1 trong tab mới" });
   await expect(openLink).toHaveAttribute("target", "_blank");
   await expect(openLink).toHaveAttribute("rel", "noopener noreferrer");
@@ -332,12 +342,11 @@ test("saved filters can be selected and removed", async ({ page }) => {
   page.once("dialog", (dialog) => void dialog.accept("Review queue"));
   await page.getByRole("button", { name: "Lưu view hiện tại" }).click();
   const savedViews = page.getByRole("combobox", { name: "Chọn saved view" });
-  await expect(savedViews).toHaveValue(/.+/);
-  await savedViews.selectOption({ label: "Review queue" });
+  await savedViews.click();
+  await page.getByRole("option", { name: "Review queue" }).click();
   await page.getByRole("button", { name: "Xóa bộ lọc đã lưu" }).click();
-  await expect(savedViews.locator("option", { hasText: "Review queue" })).toHaveCount(
-    0,
-  );
+  await savedViews.click();
+  await expect(page.getByRole("option", { name: "Review queue" })).toHaveCount(0);
 });
 
 test("template management lives in workspace settings", async ({ page }) => {
@@ -384,7 +393,7 @@ test("replacing a backup can be undone to restore the prior workspace", async ({
   await page.goto("/tasks");
   await page.getByRole("button", { name: "Cài đặt" }).click({ force: true });
   const settings = page.getByRole("dialog", { name: "Cài đặt" });
-  await settings.getByRole("button", { name: "Dữ liệu" }).click();
+  await settings.getByRole("tab", { name: "Dữ liệu" }).click();
   await settings.locator('input[type="file"]').setInputFiles({
     name: "replacement-backup.json",
     mimeType: "application/json",
@@ -461,7 +470,7 @@ test("import preview can merge a backup without replacing the workspace", async 
   await page.getByRole("button", { name: "Cài đặt" }).click({ force: true });
   const settings = page.getByRole("dialog", { name: "Cài đặt" });
   await expect(settings).toBeVisible();
-  await settings.getByRole("button", { name: "Dữ liệu" }).click();
+  await settings.getByRole("tab", { name: "Dữ liệu" }).click();
   const input = settings.locator('input[type="file"]');
   await input.setInputFiles({
     name: "taskboard-backup.json",
@@ -510,7 +519,8 @@ test("task discussion supports mention, reply and pin controls", async ({ page }
     .click();
   const dialog = page.getByRole("dialog", { name: "Thông tin task" });
   await dialog.getByRole("tab", { name: /Thảo luận/ }).click();
-  await dialog.getByLabel("Mention thành viên").selectOption({ label: "@Linh" });
+  await dialog.getByLabel("Mention thành viên").click();
+  await page.getByRole("option", { name: "@Linh" }).click();
   await expect(dialog.getByLabel("Nội dung comment")).toHaveValue("@Linh ");
   await dialog.getByLabel("Nội dung comment").fill("@Linh kiểm tra giúp mình");
   await dialog.getByRole("button", { name: "Gửi comment" }).click();
