@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import type { Task } from "@/lib/types";
 
 /** Keeps task modal URLs addressable without leaking query-string logic into the runtime. */
@@ -21,6 +21,7 @@ export function useWorkspaceTaskDeepLink({
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const closingTaskRef = useRef<string | null>(null);
 
   const replaceTaskQuery = useCallback(
     (taskId?: string) => {
@@ -42,6 +43,7 @@ export function useWorkspaceTaskDeepLink({
   );
 
   const closeTask = useCallback(() => {
+    closingTaskRef.current = searchParams.get("task");
     onClose();
     replaceTaskQuery();
   }, [onClose, replaceTaskQuery]);
@@ -49,6 +51,8 @@ export function useWorkspaceTaskDeepLink({
   useEffect(() => {
     if (!ready || modal) return;
     const taskId = searchParams.get("task");
+    if (closingTaskRef.current === taskId) return;
+    if (!taskId) closingTaskRef.current = null;
     const task = tasks.find((item) => item.id === taskId);
     if (task) onOpen(task);
   }, [modal, onOpen, ready, searchParams, tasks]);

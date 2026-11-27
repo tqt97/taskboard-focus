@@ -86,3 +86,16 @@ test("task deep link opens the requested task and clears on close", async ({
   await dialog.getByRole("button", { name: "Đóng cửa sổ task" }).click();
   await expect(page).toHaveURL(/\/tasks$/);
 });
+
+test("clicking the task backdrop closes the modal once", async ({ page }) => {
+  await page.goto("/tasks");
+  await page
+    .getByRole("button", {
+      name: "Mở task MENSQZIN-248: Hoàn thiện luồng thanh toán",
+    })
+    .click();
+  await expect(page.getByRole("dialog", { name: "Thông tin task" })).toBeVisible();
+  await page.locator(".overlay").click({ position: { x: 8, y: 8 } });
+  await expect(page.getByRole("dialog", { name: "Thông tin task" })).toBeHidden();
+  await expect(page).toHaveURL(/\/tasks$/);
+});
