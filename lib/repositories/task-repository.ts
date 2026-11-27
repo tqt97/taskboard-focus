@@ -73,6 +73,7 @@ export interface WorkspaceRepository {
   list(): Promise<RemoteWorkspace[]>;
   listMembers(workspaceId: string): Promise<RemoteWorkspaceMember[]>;
   listTaskMembers(workspaceId: string): Promise<Member[]>;
+  removeTaskMember(workspaceId: string, memberId: string): Promise<void>;
   create(name: string): Promise<RemoteWorkspace>;
   remove(workspaceId: string): Promise<void>;
   setMemberRole(
@@ -326,6 +327,14 @@ export function createSupabaseWorkspaceRepository(
       if (error)
         throw new Error(`Không thể tải danh sách người phụ trách: ${error.message}`);
       return (data || []) as Member[];
+    },
+    async removeTaskMember(workspaceId, memberId) {
+      const { error } = await client
+        .from("members")
+        .delete()
+        .eq("workspace_id", workspaceId)
+        .eq("id", memberId);
+      if (error) throw new Error(`Không thể xóa người phụ trách: ${error.message}`);
     },
     async setMemberRole(workspaceId, userId, role) {
       const { error } = await client.from("workspace_members").upsert({

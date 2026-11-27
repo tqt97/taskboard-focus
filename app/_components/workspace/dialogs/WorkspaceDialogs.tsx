@@ -51,6 +51,8 @@ export function SettingsModal({
   tab,
   setTab,
   onMember,
+  onDeleteMember,
+  canManageMembers = true,
   onClose,
   onExport,
   onImport,
@@ -81,6 +83,8 @@ export function SettingsModal({
   tab: string;
   setTab: (s: string) => void;
   onMember: (m: Member) => void;
+  onDeleteMember?: (memberId: string) => Promise<void> | void;
+  canManageMembers?: boolean;
   onClose: () => void;
   onExport: () => void;
   onImport: (f?: File) => void;
@@ -146,6 +150,8 @@ export function SettingsModal({
     [remoteUserId, setRemoteUserId] = useState(""),
     [inviteEmail, setInviteEmail] = useState(""),
     [inviteRole, setInviteRole] = useState<RemoteWorkspaceMember["role"]>("member"),
+    [memberToDelete, setMemberToDelete] = useState<string | null>(null),
+    [deletingMemberId, setDeletingMemberId] = useState<string | null>(null),
     [inviteSending, setInviteSending] = useState(false);
   return (
     <DialogFrame
@@ -312,15 +318,20 @@ export function SettingsModal({
                     {m.name.slice(0, 1)}
                   </span>
                   <input
+                    aria-label={`Tên thành viên ${m.name}`}
                     value={m.name}
+                    disabled={!canManageMembers}
                     onChange={(e) => onMember({ ...m, name: e.target.value })}
                   />
                   <input
+                    aria-label={`Vai trò công việc của ${m.name}`}
                     value={m.role}
+                    disabled={!canManageMembers}
                     onChange={(e) => onMember({ ...m, role: e.target.value })}
                   />
                   <Select
                     aria-label={`Quyền workspace của ${m.name}`}
+                    disabled={!canManageMembers}
                     value={m.access_role || "member"}
                     options={[
                       { value: "owner", label: "Owner" },
@@ -337,25 +348,75 @@ export function SettingsModal({
                   />
                   <Button
                     className={m.active ? "tiny-toggle on" : "tiny-toggle"}
+                    type="button"
+                    disabled={!canManageMembers}
                     onClick={() => onMember({ ...m, active: !m.active })}
                   >
                     {m.active ? "Đang hoạt động" : "Đã ẩn"}
                   </Button>
+                  {memberToDelete === m.id ? (
+                    <>
+                      <Button
+                        variant="danger"
+                        className="mini danger-action"
+                        type="button"
+                        aria-label={`Xác nhận xóa ${m.name}`}
+                        disabled={deletingMemberId === m.id}
+                        onClick={async () => {
+                          setDeletingMemberId(m.id);
+                          try {
+                            await onDeleteMember?.(m.id);
+                            setMemberToDelete(null);
+                          } finally {
+                            setDeletingMemberId(null);
+                          }
+                        }}
+                      >
+                        {deletingMemberId === m.id ? "Đang xóa…" : "Xóa"}
+                      </Button>
+                      <Button
+                        variant="icon"
+                        className="mini"
+                        type="button"
+                        aria-label={`Hủy xóa ${m.name}`}
+                        disabled={deletingMemberId === m.id}
+                        onClick={() => setMemberToDelete(null)}
+                      >
+                        <X size={14} />
+                      </Button>
+                    </>
+                  ) : (
+                    <Button
+                      variant="icon"
+                      className="mini danger-action"
+                      type="button"
+                      aria-label={`Xóa thành viên ${m.name}`}
+                      title={`Xóa thành viên ${m.name}`}
+                      disabled={!canManageMembers}
+                      onClick={() => setMemberToDelete(m.id)}
+                    >
+                      <Trash2 size={14} />
+                    </Button>
+                  )}
                 </div>
               ))}
               <div className="add-member">
                 <input
+                  aria-label="Tên thành viên mới"
                   placeholder="Tên thành viên"
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
                 />
                 <input
+                  aria-label="Vai trò thành viên mới"
                   placeholder="Vai trò"
                   value={newRole}
                   onChange={(e) => setNewRole(e.target.value)}
                 />
                 <Button
                   variant="secondary"
+                  type="button"
+                  disabled={!canManageMembers}
                   onClick={() => {
                     if (newName.trim()) {
                       onMember({

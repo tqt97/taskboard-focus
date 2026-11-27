@@ -354,6 +354,26 @@ test("template management lives in workspace settings", async ({ page }) => {
   await expect(settings.getByText(/Chưa có template/)).toBeVisible();
 });
 
+test("local workspace members support add and delete", async ({ page }) => {
+  await page.goto("/tasks");
+  await page.getByRole("button", { name: "Cài đặt" }).click({ force: true });
+  const settings = page.getByRole("dialog", { name: "Cài đặt" });
+  await settings.getByRole("tab", { name: "Đội ngũ" }).click();
+  await settings.getByLabel("Tên thành viên mới").fill("Temporary member");
+  await settings.getByLabel("Vai trò thành viên mới").fill("QA");
+  await settings.getByRole("button", { name: "Thêm", exact: true }).click();
+  await expect(
+    settings.getByRole("button", { name: "Xóa thành viên Temporary member" }),
+  ).toBeVisible();
+  await settings
+    .getByRole("button", { name: "Xóa thành viên Temporary member" })
+    .click();
+  await settings.getByRole("button", { name: "Xác nhận xóa Temporary member" }).click();
+  await expect(
+    settings.getByRole("button", { name: "Xóa thành viên Temporary member" }),
+  ).toHaveCount(0);
+});
+
 test("replacing a backup can be undone to restore the prior workspace", async ({
   page,
 }, testInfo) => {

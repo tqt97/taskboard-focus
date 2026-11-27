@@ -1788,6 +1788,48 @@ export default function WorkspaceRuntime({
         : [...d.members, m],
     }));
   };
+  const removeMember = async (memberId: string) => {
+    if (!canManageMembers) {
+      setToast("Bạn không có quyền quản lý thành viên workspace này.");
+      return;
+    }
+    const member = data.members.find((item) => item.id === memberId);
+    if (!member) return;
+    const affectedTasks = data.tasks
+      .filter(
+        (task) =>
+          (task.assignee_ids || []).includes(memberId) || task.assignee_id === memberId,
+      )
+      .map((task) => ({
+        ...task,
+        assignee_ids: (task.assignee_ids || []).filter((id) => id !== memberId),
+        assignee_id: task.assignee_id === memberId ? "" : task.assignee_id,
+      }));
+    if (remoteWorkspaceIds.includes(workspaceId) && cloudUserEmail) {
+      const { auth, repository } = await loadCloudModules();
+      const user = await auth.getCurrentUser();
+      if (!user) return;
+      try {
+        await repository
+          .createSupabaseWorkspaceRepository(user.id)
+          .removeTaskMember(workspaceId, memberId);
+      } catch (error) {
+        setToast(
+          error instanceof Error ? error.message : "Không thể xóa người phụ trách.",
+        );
+        return;
+      }
+    }
+    setData((current) => ({
+      ...current,
+      members: current.members.filter((item) => item.id !== memberId),
+      tasks: current.tasks.map(
+        (task) => affectedTasks.find((updated) => updated.id === task.id) || task,
+      ),
+    }));
+    if (affectedTasks.length) syncRemoteTasks(affectedTasks);
+    setToast(`Đã xóa thành viên ${member.name}`);
+  };
   const openTask = useCallback((task: Task) => {
     setEdit(task);
     setModal("task");
@@ -2263,6 +2305,8 @@ export default function WorkspaceRuntime({
             tab={settingsTab}
             setTab={setSettingsTab}
             onMember={setMember}
+            onDeleteMember={removeMember}
+            canManageMembers={canManageMembers}
             onClose={() => setModal(null)}
             onExport={exportData}
             onImport={
